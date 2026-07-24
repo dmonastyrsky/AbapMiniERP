@@ -1,0 +1,44 @@
+managed implementation in class ZBP_MERP_R_WAREHOUSE unique;
+strict ( 2 );
+with draft;
+extensible;
+
+define behavior for ZMERP_R_WAREHOUSE alias Warehouse
+persistent table ZMERP_WAREHOUSE
+extensible
+draft table ZMERP_WHSE_D
+etag master LocalLastChangedAt
+lock master total etag LastChangedAt
+authorization master( global )
+{
+  create;
+  update;
+  delete;
+
+  field ( readonly : update ) WarehouseCode;
+  field ( mandatory ) WarehouseName, CompanyCode;
+
+  validation validateMandatoryFields on save { create; update; field WarehouseName, CompanyCode; }
+  validation validateWarehouseCode on save { create; field WarehouseCode; }
+
+  draft action Edit;
+  draft action Activate optimized;
+  draft action Discard;
+  draft action Resume;
+  draft determine action Prepare
+  {
+    validation validateMandatoryFields;
+  }
+
+  mapping for zmerp_warehouse
+  {
+    WarehouseCode        = warehouse_code;
+    WarehouseName        = warehouse_name;
+    CompanyCode          = company_code;
+    CreatedBy            = created_by;
+    CreatedAt            = created_at;
+    LocalLastChangedBy   = local_last_changed_by;
+    LocalLastChangedAt   = local_last_changed_at;
+    LastChangedAt        = last_changed_at;
+  }
+}

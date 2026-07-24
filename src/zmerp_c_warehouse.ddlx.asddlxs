@@ -1,17 +1,17 @@
 @Metadata.layer: #CUSTOMER
 
 @UI.headerInfo: {
-  typeName: 'Company Code',
-  typeNamePlural: 'Company Codes',
-  title: { value: 'CompanyName' },
-  description: { value: 'CompanyCode' }
+  typeName: 'Warehouse',
+  typeNamePlural: 'Warehouses',
+  title: { value: 'WarehouseName' },
+  description: { value: 'WarehouseCode' }
 }
 
 @UI.presentationVariant: [{
-  sortOrder: [{ by: 'CompanyCode', direction: #ASC }]
+  sortOrder: [{ by: 'WarehouseCode', direction: #ASC }]
 }]
 
-annotate view ZMERP_C_COMPANY_CODE with
+annotate view ZMERP_C_WAREHOUSE with
 {
   @UI.facet: [
     {
@@ -33,27 +33,24 @@ annotate view ZMERP_C_COMPANY_CODE with
     }
   ]
 
-  @EndUserText.label: 'Code'
+  @EndUserText.label: 'Warehouse Code'
   @UI.lineItem: [{ position: 10, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 10 }]
   @UI.selectionField: [{ position: 10 }]
-  CompanyCode;
+  WarehouseCode;
 
-  @EndUserText.label: 'Company Name'
+  @EndUserText.label: 'Warehouse Name'
   @UI.lineItem: [{ position: 20, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 20 }]
   @UI.selectionField: [{ position: 20 }]
-  CompanyName;
+  WarehouseName;
 
-  @EndUserText.label: 'Currency'
+  @EndUserText.label: 'Company Code'
   @UI.lineItem: [{ position: 30, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 30 }]
-  CurrencyCode;
-
-  @EndUserText.label: 'Country'
-  @UI.lineItem: [{ position: 40, importance: #HIGH }]
-  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 40 }]
-  Country;
+  @UI.selectionField: [{ position: 30 }]
+  @UI.textArrangement: #TEXT_FIRST
+  CompanyCode;
 
   @UI.hidden: true
   @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 10 }]

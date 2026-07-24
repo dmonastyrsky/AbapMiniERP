@@ -32,6 +32,24 @@
      <MSGNR>004</MSGNR>
      <TEXT>Company Code &amp;1 already exists.</TEXT>
     </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>005</MSGNR>
+     <TEXT>Enter a Warehouse Name.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>006</MSGNR>
+     <TEXT>Enter a Company Code.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>007</MSGNR>
+     <TEXT>Warehouse &amp;1 already exists.</TEXT>
+    </T100>
    </T100>
   </asx:values>
  </asx:abap>

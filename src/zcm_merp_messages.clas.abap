@@ -45,7 +45,34 @@ CLASS zcm_merp_messages DEFINITION
         attr2 TYPE scx_attrname VALUE '',
         attr3 TYPE scx_attrname VALUE '',
         attr4 TYPE scx_attrname VALUE '',
-      END OF company_code_exists.
+      END OF company_code_exists,
+
+      BEGIN OF enter_warehouse_name,
+        msgid TYPE symsgid VALUE 'ZMC_MERP',
+        msgno TYPE symsgno VALUE '005',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF enter_warehouse_name,
+
+      BEGIN OF enter_company_code,
+        msgid TYPE symsgid VALUE 'ZMC_MERP',
+        msgno TYPE symsgno VALUE '006',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF enter_company_code,
+
+      BEGIN OF warehouse_code_exists,
+        msgid TYPE symsgid VALUE 'ZMC_MERP',
+        msgno TYPE symsgno VALUE '007',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF warehouse_code_exists.
 
     DATA:
       mv_attr1 TYPE string,

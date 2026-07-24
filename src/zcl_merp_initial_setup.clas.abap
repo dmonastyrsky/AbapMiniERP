@@ -16,6 +16,11 @@ CLASS zcl_merp_initial_setup DEFINITION
     CLASS-METHODS setup_company_codes
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
+    CLASS-METHODS setup_warehouses
+    IMPORTING
+      out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
 ENDCLASS.
 
 CLASS zcl_merp_initial_setup IMPLEMENTATION.
@@ -34,9 +39,9 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
     " Setup Master Data entities
     setup_company_codes( out ).
+    setup_warehouses( out ).
 
     " Future modules described in File 08 will be integrated here:
-    " setup_warehouses( out ).
     " setup_vat_rates( out ).
     " setup_item_groups( out ).
     " setup_product_items( out ).
@@ -98,6 +103,86 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
     IF out IS BOUND.
       out->write( |[Company Code]: Successfully inserted { sy-dbcnt } rows.| ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD setup_warehouses.
+    DATA: lt_warehouses TYPE TABLE OF zmerp_warehouse,
+          lv_user       TYPE abp_creation_user,
+          lv_timestamp  TYPE abp_creation_tstmpl.
+
+    TRY.
+        lv_user = cl_abap_context_info=>get_user_technical_name( ).
+      CATCH cx_abap_context_info_error.
+        lv_user = 'INITIAL_SETUP'.
+    ENDTRY.
+
+    GET TIME STAMP FIELD lv_timestamp.
+
+    DELETE FROM zmerp_warehouse.
+
+    lt_warehouses = VALUE #(
+      " Company Code 1000 - MERP Deutschland GmbH
+      ( warehouse_code        = 'WH10'
+        warehouse_name        = 'Hauptlager Frankfurt'
+        company_code          = '1000'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( warehouse_code        = 'WH11'
+        warehouse_name        = 'Lager Berlin'
+        company_code          = '1000'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( warehouse_code        = 'WH12'
+        warehouse_name        = 'Retourlager Frankfurt'
+        company_code          = '1000'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      " Company Code 2000 - MERP Trading GmbH
+      ( warehouse_code        = 'WH20'
+        warehouse_name        = 'Hauptlager Hamburg'
+        company_code          = '2000'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( warehouse_code        = 'WH21'
+        warehouse_name        = 'Lager München'
+        company_code          = '2000'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( warehouse_code        = 'WH22'
+        warehouse_name        = 'Transitlager Hamburg'
+        company_code          = '2000'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+    ).
+
+    INSERT zmerp_warehouse FROM TABLE @lt_warehouses.
+
+    IF out IS BOUND.
+      out->write( |[Warehouse]: Successfully inserted { sy-dbcnt } rows.| ).
     ENDIF.
   ENDMETHOD.
 
