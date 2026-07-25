@@ -72,7 +72,34 @@ CLASS zcm_merp_messages DEFINITION
         attr2 TYPE scx_attrname VALUE '',
         attr3 TYPE scx_attrname VALUE '',
         attr4 TYPE scx_attrname VALUE '',
-      END OF warehouse_code_exists.
+      END OF warehouse_code_exists,
+
+      BEGIN OF enter_vat_name,
+        msgid TYPE symsgid VALUE 'ZMC_MERP',
+        msgno TYPE symsgno VALUE '008',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF enter_vat_name,
+
+      BEGIN OF vat_code_exists,
+        msgid TYPE symsgid VALUE 'ZMC_MERP',
+        msgno TYPE symsgno VALUE '009',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF vat_code_exists,
+
+      BEGIN OF invalid_vat_percentage,
+        msgid TYPE symsgid VALUE 'ZMC_MERP',
+        msgno TYPE symsgno VALUE '010',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF invalid_vat_percentage.
 
     DATA:
       mv_attr1 TYPE string,

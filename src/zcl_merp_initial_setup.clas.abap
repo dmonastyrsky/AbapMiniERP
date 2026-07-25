@@ -21,6 +21,10 @@ CLASS zcl_merp_initial_setup DEFINITION
     IMPORTING
       out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
+    CLASS-METHODS setup_vat_rates
+      IMPORTING
+        out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
 ENDCLASS.
 
 CLASS zcl_merp_initial_setup IMPLEMENTATION.
@@ -40,9 +44,9 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     " Setup Master Data entities
     setup_company_codes( out ).
     setup_warehouses( out ).
+    setup_vat_rates( out ).
 
     " Future modules described in File 08 will be integrated here:
-    " setup_vat_rates( out ).
     " setup_item_groups( out ).
     " setup_product_items( out ).
     " setup_service_items( out ).
@@ -183,6 +187,57 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
     IF out IS BOUND.
       out->write( |[Warehouse]: Successfully inserted { sy-dbcnt } rows.| ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD setup_vat_rates.
+    DATA: lt_vat_rates TYPE TABLE OF zmerp_vat_rate,
+          lv_user      TYPE abp_creation_user,
+          lv_timestamp TYPE abp_creation_tstmpl.
+
+    TRY.
+        lv_user = cl_abap_context_info=>get_user_technical_name( ).
+      CATCH cx_abap_context_info_error.
+        lv_user = 'INITIAL_SETUP'.
+    ENDTRY.
+
+    GET TIME STAMP FIELD lv_timestamp.
+
+    DELETE FROM zmerp_vat_rate.
+
+    lt_vat_rates = VALUE #(
+      ( vat_code              = 'V1'
+        description           = 'VAT 19%'
+        percentage            = '19.00'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( vat_code              = 'V2'
+        description           = 'VAT 7%'
+        percentage            = '7.00'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( vat_code              = 'V0'
+        description           = 'VAT 0%'
+        percentage            = '0.00'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+    ).
+
+    INSERT zmerp_vat_rate FROM TABLE @lt_vat_rates.
+
+    IF out IS BOUND.
+      out->write( |[VAT Rate]: Successfully inserted { sy-dbcnt } rows.| ).
     ENDIF.
   ENDMETHOD.
 

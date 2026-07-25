@@ -10,4 +10,5 @@ define service ZUI_MERP
   provider contracts odata_v4_ui {
   expose ZMERP_C_COMPANY_CODE as CompanyCode;
   expose ZMERP_C_WAREHOUSE    as Warehouse;
+  expose ZMERP_C_VAT_RATE     as VatRate;
 }

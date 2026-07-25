@@ -50,6 +50,24 @@
      <MSGNR>007</MSGNR>
      <TEXT>Warehouse &amp;1 already exists.</TEXT>
     </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>008</MSGNR>
+     <TEXT>Enter VAT description.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>009</MSGNR>
+     <TEXT>VAT Code &amp;1 already exists.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>010</MSGNR>
+     <TEXT>VAT percentage must be between 0 and 100.</TEXT>
+    </T100>
    </T100>
   </asx:values>
  </asx:abap>

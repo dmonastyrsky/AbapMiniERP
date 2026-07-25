@@ -1,0 +1,72 @@
+@Metadata.layer: #CUSTOMER
+
+@UI.headerInfo: {
+  typeName: 'VAT Rate',
+  typeNamePlural: 'VAT Rates',
+  title: { value: 'Description' },
+  description: { value: 'VatCode' }
+}
+
+@UI.presentationVariant: [{
+  sortOrder: [{ by: 'VatCode', direction: #ASC }]
+}]
+
+annotate view ZMERP_C_VAT_RATE with
+{
+  @UI.facet: [
+    {
+      id: 'GeneralHeaderSection',
+      purpose: #STANDARD,
+      type: #FIELDGROUP_REFERENCE,
+      label: 'General Information',
+      targetQualifier: 'GeneralGroup',
+      position: 10
+    },
+    {
+      id: 'AdminHeaderSection',
+      purpose: #STANDARD,
+      type: #FIELDGROUP_REFERENCE,
+      label: 'Administrative Data',
+      targetQualifier: 'AdminGroup',
+      position: 20,
+      hidden: true
+    }
+  ]
+
+  @EndUserText.label: 'VAT Code'
+  @UI.lineItem: [{ position: 10, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 10 }]
+  @UI.selectionField: [{ position: 10 }]
+  VatCode;
+
+  @EndUserText.label: 'VAT Name'
+  @UI.lineItem: [{ position: 20, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 20 }]
+  @UI.selectionField: [{ position: 20 }]
+  Description;
+
+  @EndUserText.label: 'VAT Percentage (%)'
+  @UI.lineItem: [{ position: 30, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 30 }]
+  Percentage;
+
+  @UI.hidden: true
+  @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 10 }]
+  CreatedBy;
+
+  @UI.hidden: true
+  @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 20 }]
+  CreatedAt;
+
+  @UI.hidden: true
+  @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 30 }]
+  LocalLastChangedBy;
+
+  @UI.hidden: true
+  @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 40 }]
+  LocalLastChangedAt;
+
+  @UI.hidden: true
+  @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 50 }]
+  LastChangedAt;
+}
