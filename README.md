@@ -1,5 +1,7 @@
 # Mini ERP — Core Master Data & Enterprise Engine (SAP RAP)
 
+[English](README.md) | [Українська](README.uk.md) | [Deutsch](README.de.md)
+
 ![SAP S/4HANA](https://img.shields.io/badge/SAP-S%2F4HANA%20Cloud-008FD3?style=flat&logo=sap)
 ![ABAP Cloud](https://img.shields.io/badge/Language-ABAP%20Cloud-blue?style=flat)
 ![RAP Framework](https://img.shields.io/badge/Framework-SAP%20RAP%20(Strict%202)-green?style=flat)
@@ -7,60 +9,62 @@
 
 ---
 
-## 📌 Про проект / About the Project
+## 📌 About the Project
 
-**Mini ERP** — це навчально-демонстраційний проект повнофункціональної ERP-системи, побудований на базі **ABAP Cloud** та **SAP RESTful Application Programming Model (RAP)**.
+**Mini ERP** is a demonstration project of a core enterprise system built on **ABAP Cloud** and the **SAP RESTful Application Programming Model (RAP)**.
 
-Основна мета проекту — продемонструвати розробку ентерпрайз-додатків за сучасними стандартами **Clean Core**, з підтримкою **Draft-технології** для стабільних UX-сесій у SAP Fiori, гнучкими валідаціями бізнес-логіки та інтеграцією сервісів **OData V4**.
-
----
-
-## 🏢 Довідники та Бізнес-Об'єкти (Master Data)
-
-Наразі в системі реалізовано ядро ведення базових довідників підприємства (Master Data Management):
-
-### 1. Company Code (Балансова одиниця)
-* **Призначення**: Управління юридичними особами та організаційними структурами компанії.
-* **Функціонал**:
-  * Інтеграція зі стандартними довідниками валют (`I_Currency`) та країн (`I_Country`).
-  * Перевірка обов'язковості заповнення полів та унікальності коду балансової одиниці.
-
-### 2. Warehouse (Складське господарство)
-* **Призначення**: Ведення місць зберігання товарно-матеріальних цінностей із прив'язкою до компаній.
-* **Функціонал**:
-  * Зовнішній ключ та асоціація з `Company Code` з автоматичною валідацією через OData V4 framework (`useForValidation: true`).
-  * Fiori Text Arrangement (`#TEXT_FIRST`) — у списку та формах відображається назва компанії разом з її кодом.
-  * Повнотекстовий пошук (Fuzzy Search) по коду та назві складу.
-
-### 3. VAT Rate (Ставки ПДВ)
-* **Призначення**: Управління податковими ставками для фінансових розрахунків, продажу та закупівель.
-* **Функціонал**:
-  * Ведення кодів ПДВ, бізнес-описів (`Standard Rate 19%`, `Reduced Rate 7%`, `Zero Rate 0%`) та відсоткових ставок.
-  * Валідація коректності відсотка (значення має бути в межах від `0.00` до `100.00%`).
-  * Контроль унікальності коду ПДВ та перевірка на обов'язкове введення опису.
+The project demonstrates modern enterprise application development following **Clean Core** principles, featuring full **Draft capabilities** for stateful UX in SAP Fiori, transactional business logic validations, and **OData V4** service integration.
 
 ---
 
-## 🗺 Дорожня карта (Roadmap)
+## 🏢 Business Objects (Master Data)
 
-У наступних модулях системи запланована реалізація:
+The repository currently includes the foundational Master Data entities:
 
-* 📦 **Item Groups & Products/Services**: Групи товарів, номенклатура матеріалів та послуг.
-* 🤝 **Business Partners**: Довідник контрагентів (Клієнти та Постачальники).
-* 🧾 **Sales & Purchase Documents**: Закупівельні та збутові транзакційні документи (Замовлення, Рахунки, Поставки).
+### 1. Company Code
+* **Purpose**: Management of corporate legal entities and organizational structures.
+* **Features**:
+  * Associations with standard released CDS views (`I_Currency`, `I_Country`).
+  * Custom validations for mandatory fields and code uniqueness.
+
+### 2. Warehouse
+* **Purpose**: Storage location management associated with company codes.
+* **Features**:
+  * Foreign key association to `Company Code` with automated OData V4 framework validation (`useForValidation: true`).
+  * Fiori Text Arrangement (`#TEXT_FIRST`) displaying `Company Name (Code)` in lists and object pages.
+  * Multi-field search capabilities with Fuzzy Search threshold enabled.
+
+### 3. VAT Rate
+* **Purpose**: Tax code and rate management for financial calculations in sales and procurement.
+* **Features**:
+  * Maintenance of tax codes, business descriptions (`Standard Rate 19%`, `Reduced Rate 7%`, `Zero Rate 0%`), and tax percentages.
+  * Range validation ensuring the tax percentage stays between `0.00` and `100.00%`.
+  * Mandatory field and duplicate key checks.
 
 ---
 
-## 🛠 Технічна архітектура та UX
+## 🗺 Roadmap
 
-* **RAP Strict Mode 2**: Дотримання новітніх транзакційних стандартів розробки SAP S/4HANA.
-* **Full Draft Support**: Повна підтримка чорновиків (Drafts) для збереження незавершеного стану форм у Fiori Elements.
-* **State Area Messaging**: Прив'язка повідомлень про помилки бізнес-логіки безпосередньо до відповідних полів на UI (`%element`).
-* **Automated Data Seed**: Єдиний клас ініціалізації демо-даних (`ZCL_MERP_INITIAL_SETUP`) для миттєвого заповнення тестового середовища.
+Upcoming modules planned for integration:
+
+* 📦 **Item Groups & Products/Services**: Material groups, product master data, and service items.
+* 🤝 **Business Partners**: Customers and Vendors master data.
+* 🧾 **Sales & Purchase Documents**: Transactional processing (Purchase Orders, Sales Orders, Invoices).
 
 ---
 
-## 🚀 Ініціалізація даних
+## 🛠 Technical Architecture & UX
 
-1. Запустіть клас `ZCL_MERP_INITIAL_SETUP` в ADT Console (`F9`) для заповнення довідників початковими даними.
-2. Відкрийте Service Binding `ZUI_MERP_O4` та запустіть **Fiori Elements Preview** для потрібної сутності.
+* **RAP Strict Mode 2**: Compliance with modern transactional standards in SAP S/4HANA Cloud.
+* **Full Draft Support**: Seamless stateful editing and session handling in SAP Fiori Elements.
+* **State Area Messaging**: Field-bound error messages directly mapped to UI controls (`%element`).
+* **Automated Data Seed**: Unified initial setup class (`ZCL_MERP_INITIAL_SETUP`) for quick test environment seeding.
+
+---
+
+## 🚀 How to Run
+
+1. Clone the repository into your ABAP package using **abapGit** in Eclipse ADT.
+2. Activate all project objects (`Ctrl + Shift + F3`).
+3. Run class `ZCL_MERP_INITIAL_SETUP` (`F9`) to generate initial demo datasets.
+4. Launch the **Fiori Elements Preview** via Service Binding `ZUI_MERP_O4`.
