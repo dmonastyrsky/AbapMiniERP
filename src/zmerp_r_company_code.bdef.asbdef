@@ -19,7 +19,6 @@ authorization master( global )
   field ( mandatory ) CompanyName, CurrencyCode, Country;
 
   validation validateMandatoryFields on save { create; update; field CompanyName, CurrencyCode, Country; }
-  validation validateCompanyCode on save { create; field CompanyCode; }
 
   draft action Edit;
   draft action Activate optimized;
