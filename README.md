@@ -1,40 +1,66 @@
-# Mini ERP — Core Master Data (SAP RAP)
+# Mini ERP — Core Master Data & Enterprise Engine (SAP RAP)
 
 ![SAP S/4HANA](https://img.shields.io/badge/SAP-S%2F4HANA%20Cloud-008FD3?style=flat&logo=sap)
 ![ABAP Cloud](https://img.shields.io/badge/Language-ABAP%20Cloud-blue?style=flat)
 ![RAP Framework](https://img.shields.io/badge/Framework-SAP%20RAP%20(Strict%202)-green?style=flat)
 ![OData V4](https://img.shields.io/badge/Protocol-OData%20V4-orange?style=flat)
 
-Modular **Mini ERP** demonstration project built on ABAP Cloud and the **SAP RESTful Application Programming Model (RAP)**. The project showcases Clean Core architecture, transactional processing with full Draft capabilities, and OData V4 Fiori Elements integration.
+---
+
+## 📌 Про проект / About the Project
+
+**Mini ERP** — це навчально-демонстраційний проект повнофункціональної ERP-системи, побудований на базі **ABAP Cloud** та **SAP RESTful Application Programming Model (RAP)**.
+
+Основна мета проекту — продемонструвати розробку ентерпрайз-додатків за сучасними стандартами **Clean Core**, з підтримкою **Draft-технології** для стабільних UX-сесій у SAP Fiori, гнучкими валідаціями бізнес-логіки та інтеграцією сервісів **OData V4**.
 
 ---
 
-## 🏢 Business Objects
+## 🏢 Довідники та Бізнес-Об'єкти (Master Data)
 
-The system currently manages core enterprise master data:
+Наразі в системі реалізовано ядро ведення базових довідників підприємства (Master Data Management):
 
-* **Company Code (Балансова одиниця)**
-  * Master data management with standard text associations (`I_Currency`, `I_Country`).
-  * Custom validations for mandatory fields and code uniqueness.
-* **Warehouse (Склад)**
-  * Foreign key association to Company Code with automated OData V4 validation.
-  * Fiori Elements Text Arrangement (`#TEXT_FIRST`) displaying `Company Name (Code)`.
-  * Multi-field search capabilities (Fuzzy Search threshold enabled).
+### 1. Company Code (Балансова одиниця)
+* **Призначення**: Управління юридичними особами та організаційними структурами компанії.
+* **Функціонал**:
+  * Інтеграція зі стандартними довідниками валют (`I_Currency`) та країн (`I_Country`).
+  * Перевірка обов'язковості заповнення полів та унікальності коду балансової одиниці.
+
+### 2. Warehouse (Складське господарство)
+* **Призначення**: Ведення місць зберігання товарно-матеріальних цінностей із прив'язкою до компаній.
+* **Функціонал**:
+  * Зовнішній ключ та асоціація з `Company Code` з автоматичною валідацією через OData V4 framework (`useForValidation: true`).
+  * Fiori Text Arrangement (`#TEXT_FIRST`) — у списку та формах відображається назва компанії разом з її кодом.
+  * Повнотекстовий пошук (Fuzzy Search) по коду та назві складу.
+
+### 3. VAT Rate (Ставки ПДВ)
+* **Призначення**: Управління податковими ставками для фінансових розрахунків, продажу та закупівель.
+* **Функціонал**:
+  * Ведення кодів ПДВ, бізнес-описів (`Standard Rate 19%`, `Reduced Rate 7%`, `Zero Rate 0%`) та відсоткових ставок.
+  * Валідація коректності відсотка (значення має бути в межах від `0.00` до `100.00%`).
+  * Контроль унікальності коду ПДВ та перевірка на обов'язкове введення опису.
 
 ---
 
-## 🛠 Technical Highlights & Architecture
+## 🗺 Дорожня карта (Roadmap)
 
-* **RAP Strict Mode 2**: Developed following modern S/4HANA transactional standards.
-* **Draft Enablement**: Full draft support across all business objects for seamless stateful UI processing in SAP Fiori.
-* **Clean Core & OData V4**: Built with `@Consumption.valueHelpDefinition` and `useForValidation: true` to leverage built-in framework checks instead of redundant SQL queries.
-* **User Experience (UX)**: State area error messaging mapped directly to UI input fields.
+У наступних модулях системи запланована реалізація:
+
+* 📦 **Item Groups & Products/Services**: Групи товарів, номенклатура матеріалів та послуг.
+* 🤝 **Business Partners**: Довідник контрагентів (Клієнти та Постачальники).
+* 🧾 **Sales & Purchase Documents**: Закупівельні та збутові транзакційні документи (Замовлення, Рахунки, Поставки).
 
 ---
 
-## 🚀 How to Run
+## 🛠 Технічна архітектура та UX
 
-1. Clone the repository into your ABAP package using **abapGit** in Eclipse ADT.
-2. Activate all project objects (`Ctrl + Shift + F3`).
-3. Execute class `ZCL_MERP_INITIAL_SETUP` (`F9`) to generate initial demo datasets.
-4. Launch the **Fiori Elements Preview** via Service Binding `ZUI_MERP_O4`.
+* **RAP Strict Mode 2**: Дотримання новітніх транзакційних стандартів розробки SAP S/4HANA.
+* **Full Draft Support**: Повна підтримка чорновиків (Drafts) для збереження незавершеного стану форм у Fiori Elements.
+* **State Area Messaging**: Прив'язка повідомлень про помилки бізнес-логіки безпосередньо до відповідних полів на UI (`%element`).
+* **Automated Data Seed**: Єдиний клас ініціалізації демо-даних (`ZCL_MERP_INITIAL_SETUP`) для миттєвого заповнення тестового середовища.
+
+---
+
+## 🚀 Ініціалізація даних
+
+1. Запустіть клас `ZCL_MERP_INITIAL_SETUP` в ADT Console (`F9`) для заповнення довідників початковими даними.
+2. Відкрийте Service Binding `ZUI_MERP_O4` та запустіть **Fiori Elements Preview** для потрібної сутності.
