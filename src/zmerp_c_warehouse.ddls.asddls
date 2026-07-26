@@ -1,6 +1,7 @@
 @EndUserText.label: 'Warehouse Projection View'
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @Metadata.allowExtensions: true
+@ObjectModel.semanticKey: [ 'WarehouseCode' ]
 @Search.searchable: true
 define root view entity ZMERP_C_WAREHOUSE
   provider contract transactional_query

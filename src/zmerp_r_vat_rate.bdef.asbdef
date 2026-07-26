@@ -19,7 +19,6 @@ authorization master( global )
   field ( mandatory ) Description, Percentage;
 
   validation validateMandatoryFields on save { create; update; field Description, Percentage; }
-  validation validateVatCode on save { create; field VatCode; }
   validation validatePercentage on save { create; update; field Percentage; }
 
   draft action Edit;

@@ -19,7 +19,6 @@ authorization master( global )
   field ( mandatory ) WarehouseName, CompanyCode;
 
   validation validateMandatoryFields on save { create; update; field WarehouseName, CompanyCode; }
-  validation validateWarehouseCode on save { create; field WarehouseCode; }
 
   draft action Edit;
   draft action Activate optimized;
