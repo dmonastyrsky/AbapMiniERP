@@ -9,13 +9,15 @@ extensible
 draft table ZMERP_VATR_D
 etag master LocalLastChangedAt
 lock master total etag LastChangedAt
+early numbering
 authorization master( global )
 {
   create;
   update;
   delete;
 
-  field ( readonly : update ) VatCode;
+  //field ( readonly : update ) VatCode;
+  field ( readonly ) VatCode;
   field ( mandatory ) Description, Percentage;
 
   validation validateMandatoryFields on save { create; update; field Description, Percentage; }

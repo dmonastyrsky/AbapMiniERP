@@ -11,13 +11,10 @@ define root view entity ZMERP_R_COMPANY_CODE
 
       @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CurrencyStdVH', element: 'Currency' }, useForValidation: true }]
       @ObjectModel.foreignKey.association: '_Currency'
-      @ObjectModel.text.association: '_Currency'
-      
       currency_code         as CurrencyCode,
 
       @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CountryVH', element: 'Country' }, useForValidation: true }]
       @ObjectModel.foreignKey.association: '_Country'
-      @ObjectModel.text.association: '_Country'
       country               as Country,
 
       @Semantics.user.createdBy: true

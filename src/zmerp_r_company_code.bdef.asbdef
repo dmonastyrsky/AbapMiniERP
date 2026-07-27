@@ -15,8 +15,9 @@ authorization master( global )
   update;
   delete;
 
-  field ( readonly : update ) CompanyCode;
+  field ( mandatory : create ) CompanyCode;
   field ( mandatory ) CompanyName, CurrencyCode, Country;
+  field ( readonly : update ) CompanyCode;
 
   validation validateMandatoryFields on save { create; update; field CompanyName, CurrencyCode, Country; }
 

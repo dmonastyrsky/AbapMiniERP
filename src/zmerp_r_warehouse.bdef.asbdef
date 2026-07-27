@@ -9,13 +9,14 @@ extensible
 draft table ZMERP_WHSE_D
 etag master LocalLastChangedAt
 lock master total etag LastChangedAt
+early numbering
 authorization master( global )
 {
   create;
   update;
   delete;
 
-  field ( readonly : update ) WarehouseCode;
+  field ( readonly) WarehouseCode;
   field ( mandatory ) WarehouseName, CompanyCode;
 
   validation validateMandatoryFields on save { create; update; field WarehouseName, CompanyCode; }

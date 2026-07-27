@@ -6,7 +6,9 @@ CLASS lhc_zmerp_r_warehouse DEFINITION INHERITING FROM cl_abap_behavior_handler.
           REQUEST requested_authorizations FOR Warehouse
         RESULT result,
       validateMandatoryFields FOR VALIDATE ON SAVE
-        IMPORTING keys FOR Warehouse~validateMandatoryFields.
+        IMPORTING keys FOR Warehouse~validateMandatoryFields,
+      earlynumbering_create FOR NUMBERING
+            IMPORTING entities FOR CREATE Warehouse.
 ENDCLASS.
 
 CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
@@ -64,5 +66,46 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
 
     ENDLOOP.
   ENDMETHOD.
+
+  METHOD earlynumbering_create.
+    DATA: lv_next_wh_code TYPE zmerp_warehouse-warehouse_code.
+
+    LOOP AT entities REFERENCE INTO DATA(lr_entity).
+
+      IF lr_entity->WarehouseCode IS INITIAL.
+        lv_next_wh_code = zcl_merp_md_util=>get_next_warehouse_code( ).
+
+        IF lv_next_wh_code IS NOT INITIAL.
+          APPEND VALUE #(
+            %cid          = lr_entity->%cid
+            %is_draft     = lr_entity->%is_draft
+            WarehouseCode = lv_next_wh_code
+          ) TO mapped-warehouse.
+        ELSE.
+          APPEND VALUE #(
+            %cid      = lr_entity->%cid
+            %is_draft = lr_entity->%is_draft
+          ) TO failed-warehouse.
+
+          APPEND VALUE #(
+            %cid      = lr_entity->%cid
+            %is_draft = lr_entity->%is_draft
+            %msg      = new_message_with_text(
+                          severity = if_abap_behv_message=>severity-error
+                          text     = 'Could not generate next Warehouse Code sequence.' )
+          ) TO reported-warehouse.
+        ENDIF.
+
+      ELSE.
+        APPEND VALUE #(
+          %cid          = lr_entity->%cid
+          %is_draft     = lr_entity->%is_draft
+          WarehouseCode = lr_entity->WarehouseCode
+        ) TO mapped-warehouse.
+      ENDIF.
+
+    ENDLOOP.
+  ENDMETHOD.
+
 
 ENDCLASS.

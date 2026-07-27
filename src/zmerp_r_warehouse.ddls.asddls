@@ -8,9 +8,8 @@ define root view entity ZMERP_R_WAREHOUSE
   key warehouse_code        as WarehouseCode,
       warehouse_name        as WarehouseName,
 
-      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_C_COMPANY_CODE', element: 'CompanyCode' }, useForValidation: true }]
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_COMPANY_CODE_VH', element: 'CompanyCode' }, useForValidation: true }]
       @ObjectModel.foreignKey.association: '_CompanyCode'
-      @ObjectModel.text.association: '_CompanyCode'
       company_code          as CompanyCode,
 
       @Semantics.user.createdBy: true

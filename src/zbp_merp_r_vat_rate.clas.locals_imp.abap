@@ -8,7 +8,9 @@ CLASS lhc_zmerp_r_vat_rate DEFINITION INHERITING FROM cl_abap_behavior_handler.
       validateMandatoryFields FOR VALIDATE ON SAVE
         IMPORTING keys FOR VatRate~validateMandatoryFields,
       validatePercentage FOR VALIDATE ON SAVE
-        IMPORTING keys FOR VatRate~validatePercentage.
+        IMPORTING keys FOR VatRate~validatePercentage,
+      earlynumbering_create FOR NUMBERING
+            IMPORTING entities FOR CREATE VatRate.
 ENDCLASS.
 
 CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
@@ -76,6 +78,47 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
 
       IF lv_has_error = abap_true.
         APPEND VALUE #( %tky = lr_vat->%tky ) TO failed-vatrate.
+      ENDIF.
+
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD earlynumbering_create.
+    DATA: lv_next_vat_code TYPE zmerp_vat_rate-vat_code.
+
+    LOOP AT entities INTO DATA(ls_entity).
+
+      IF ls_entity-VatCode IS INITIAL.
+        lv_next_vat_code = zcl_merp_md_util=>get_next_vat_code( ).
+
+        IF lv_next_vat_code IS NOT INITIAL.
+          APPEND VALUE #(
+            %cid      = ls_entity-%cid
+            %is_draft = ls_entity-%is_draft
+            VatCode   = lv_next_vat_code
+          ) TO mapped-vatrate.
+        ELSE.
+          APPEND VALUE #(
+            %cid      = ls_entity-%cid
+            %is_draft = ls_entity-%is_draft
+          ) TO failed-vatrate.
+
+         APPEND VALUE #(
+            %cid      = ls_entity-%cid
+            %is_draft = ls_entity-%is_draft
+            %msg      = new_message_with_text(
+                          severity = if_abap_behv_message=>severity-error
+                          text     = 'Could not generate next VAT Code sequence.' )
+          ) TO reported-vatrate.
+        ENDIF.
+
+      ELSE.
+        " If user provided ID manually, map it back with draft flag
+        APPEND VALUE #(
+          %cid      = ls_entity-%cid
+          %is_draft = ls_entity-%is_draft
+          VatCode   = ls_entity-VatCode
+        ) TO mapped-vatrate.
       ENDIF.
 
     ENDLOOP.
