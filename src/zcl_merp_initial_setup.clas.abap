@@ -46,10 +46,14 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       out->write( '==================================================' ).
     ENDIF.
 
+    " Insert seed data using formatted keys
     setup_company_codes( out ).
-    setup_warehouses( out ).
     setup_vat_rates( out ).
+    setup_warehouses( out ).
     setup_item_groups( out ).
+
+    " Dynamically sync NRO levels with real DB record counts
+    zcl_merp_num_range_util=>sync_intervals_from_db( ).
 
     IF out IS BOUND.
       out->write( '==================================================' ).
@@ -72,6 +76,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
     GET TIME STAMP FIELD lv_timestamp.
 
+    " Clear active and draft tables
     DELETE FROM zmerp_comp_code.
 
     lt_comp_code = VALUE #(
@@ -104,6 +109,59 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD setup_vat_rates.
+    DATA: lt_vat_rates TYPE TABLE OF zmerp_vat_rate,
+          lv_user      TYPE abp_creation_user,
+          lv_timestamp TYPE abp_creation_tstmpl.
+
+    TRY.
+        lv_user = cl_abap_context_info=>get_user_technical_name( ).
+      CATCH cx_abap_context_info_error.
+        lv_user = 'INITIAL_SETUP'.
+    ENDTRY.
+
+    GET TIME STAMP FIELD lv_timestamp.
+
+    " Clear active and draft tables
+    DELETE FROM zmerp_vat_rate.
+    DELETE FROM zmerp_vatr_d.
+
+    lt_vat_rates = VALUE #(
+      ( vat_code              = zcl_merp_num_range_util=>format_vat_code( 1 )
+        description           = 'VAT 0%'
+        percentage            = '0.00'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( vat_code              = zcl_merp_num_range_util=>format_vat_code( 2 )
+        description           = 'VAT 7%'
+        percentage            = '7.00'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( vat_code              = zcl_merp_num_range_util=>format_vat_code( 3 )
+        description           = 'VAT 19%'
+        percentage            = '19.00'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp )
+    ).
+
+    INSERT zmerp_vat_rate FROM TABLE @lt_vat_rates.
+
+    IF out IS BOUND.
+      out->write( |[VAT Rate]: Successfully inserted { sy-dbcnt } rows.| ).
+    ENDIF.
+  ENDMETHOD.
+
+
   METHOD setup_warehouses.
     DATA: lt_warehouses TYPE TABLE OF zmerp_warehouse,
           lv_user       TYPE abp_creation_user,
@@ -117,7 +175,9 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
     GET TIME STAMP FIELD lv_timestamp.
 
+    " Clear active and draft tables
     DELETE FROM zmerp_warehouse.
+    DELETE FROM zmerp_whse_d.
 
     lt_warehouses = VALUE #(
       ( warehouse_code        = zcl_merp_num_range_util=>format_warehouse_code( 1 )
@@ -192,58 +252,6 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD setup_vat_rates.
-    DATA: lt_vat_rates TYPE TABLE OF zmerp_vat_rate,
-          lv_user      TYPE abp_creation_user,
-          lv_timestamp TYPE abp_creation_tstmpl.
-
-    TRY.
-        lv_user = cl_abap_context_info=>get_user_technical_name( ).
-      CATCH cx_abap_context_info_error.
-        lv_user = 'INITIAL_SETUP'.
-    ENDTRY.
-
-    GET TIME STAMP FIELD lv_timestamp.
-
-    DELETE FROM zmerp_vat_rate.
-
-    lt_vat_rates = VALUE #(
-      ( vat_code              = zcl_merp_num_range_util=>format_vat_code( 1 )
-        description           = 'VAT 0%'
-        percentage            = '0.00'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( vat_code              = zcl_merp_num_range_util=>format_vat_code( 2 )
-        description           = 'VAT 7%'
-        percentage            = '7.00'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( vat_code              = zcl_merp_num_range_util=>format_vat_code( 3 )
-        description           = 'VAT 19%'
-        percentage            = '19.00'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-    ).
-
-    INSERT zmerp_vat_rate FROM TABLE @lt_vat_rates.
-
-    IF out IS BOUND.
-      out->write( |[VAT Rate]: Successfully inserted { sy-dbcnt } rows.| ).
-    ENDIF.
-  ENDMETHOD.
-
-
   METHOD setup_item_groups.
     DATA: lt_item_groups TYPE TABLE OF zmerp_item_group,
           lv_user        TYPE abp_creation_user,
@@ -257,12 +265,16 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
     GET TIME STAMP FIELD lv_timestamp.
 
+    " Clear active and draft tables
     DELETE FROM zmerp_item_group.
+    DELETE FROM zmerp_item_grp_d.
+
+    DATA(lv_vat19) = zcl_merp_num_range_util=>format_vat_code( 3 ).
 
     lt_item_groups = VALUE #(
       ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 1 )
         description           = 'Major Home Appliances'
-        default_vat_code      = zcl_merp_num_range_util=>format_vat_code( 3 )
+        default_vat_code      = lv_vat19
         created_by            = lv_user
         created_at            = lv_timestamp
         local_last_changed_by = lv_user
@@ -271,7 +283,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
       ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 2 )
         description           = 'Small Kitchen Appliances'
-        default_vat_code      = zcl_merp_num_range_util=>format_vat_code( 3 )
+        default_vat_code      = lv_vat19
         created_by            = lv_user
         created_at            = lv_timestamp
         local_last_changed_by = lv_user
@@ -280,7 +292,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
       ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 3 )
         description           = 'Consumer Electronics'
-        default_vat_code      = zcl_merp_num_range_util=>format_vat_code( 3 )
+        default_vat_code      = lv_vat19
         created_by            = lv_user
         created_at            = lv_timestamp
         local_last_changed_by = lv_user
@@ -289,7 +301,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
       ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 4 )
         description           = 'Accessories & Supplies'
-        default_vat_code      = zcl_merp_num_range_util=>format_vat_code( 3 )
+        default_vat_code      = lv_vat19
         created_by            = lv_user
         created_at            = lv_timestamp
         local_last_changed_by = lv_user
@@ -298,7 +310,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
       ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 5 )
         description           = 'Installation & Support Services'
-        default_vat_code      = zcl_merp_num_range_util=>format_vat_code( 3 )
+        default_vat_code      = lv_vat19
         created_by            = lv_user
         created_at            = lv_timestamp
         local_last_changed_by = lv_user
