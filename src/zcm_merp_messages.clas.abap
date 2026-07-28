@@ -140,6 +140,12 @@ CLASS zcm_merp_messages IMPLEMENTATION.
     me->mv_attr3 = attr3.
     me->mv_attr4 = attr4.
 
+    " Populate if_t100_dyn_msg explicit parameters for proper framework rendering
+    if_t100_dyn_msg~msgv1 = attr1.
+    if_t100_dyn_msg~msgv2 = attr2.
+    if_t100_dyn_msg~msgv3 = attr3.
+    if_t100_dyn_msg~msgv4 = attr4.
+
     if_abap_behv_message~m_severity = severity.
 
     CLEAR me->textid.

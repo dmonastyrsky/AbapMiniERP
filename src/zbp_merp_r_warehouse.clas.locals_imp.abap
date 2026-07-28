@@ -8,16 +8,32 @@ CLASS lhc_zmerp_r_warehouse DEFINITION INHERITING FROM cl_abap_behavior_handler.
       validateMandatoryFields FOR VALIDATE ON SAVE
         IMPORTING keys FOR Warehouse~validateMandatoryFields,
       earlynumbering_create FOR NUMBERING
-            IMPORTING entities FOR CREATE Warehouse.
+        IMPORTING entities FOR CREATE Warehouse.
 ENDCLASS.
 
 CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
 
   METHOD get_global_authorizations.
+    IF requested_authorizations-%create = if_abap_behv=>mk-on.
+      result-%create = if_abap_behv=>auth-allowed.
+    ENDIF.
 
+    IF requested_authorizations-%update = if_abap_behv=>mk-on.
+      result-%update = if_abap_behv=>auth-allowed.
+    ENDIF.
+
+    IF requested_authorizations-%delete = if_abap_behv=>mk-on.
+      result-%delete = if_abap_behv=>auth-allowed.
+    ENDIF.
   ENDMETHOD.
 
   METHOD validateMandatoryFields.
+
+    " Clear state messages before performing validation checks
+    LOOP AT keys REFERENCE INTO DATA(lr_key).
+      APPEND VALUE #( %tky        = lr_key->%tky
+                      %state_area = 'VALIDATE_MANDATORY' ) TO reported-warehouse.
+    ENDLOOP.
 
     READ ENTITIES OF zmerp_r_warehouse IN LOCAL MODE
       ENTITY Warehouse
@@ -29,35 +45,26 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
 
       DATA(lv_has_error) = abap_false.
 
-      APPEND VALUE #( %tky        = lr_whse->%tky
-                      %state_area = 'VALIDATE_MANDATORY' ) TO reported-warehouse.
-
       " Validate Warehouse Name
       IF lr_whse->WarehouseName IS INITIAL.
-
         lv_has_error = abap_true.
-
         APPEND VALUE #( %tky                   = lr_whse->%tky
                         %state_area           = 'VALIDATE_MANDATORY'
                         %msg                  = NEW zcm_merp_messages(
                                                   textid   = zcm_merp_messages=>enter_warehouse_name
                                                   severity = if_abap_behv_message=>severity-error )
                         %element-WarehouseName = if_abap_behv=>mk-on ) TO reported-warehouse.
-
       ENDIF.
 
       " Validate Company Code
       IF lr_whse->CompanyCode IS INITIAL.
-
         lv_has_error = abap_true.
-
         APPEND VALUE #( %tky                  = lr_whse->%tky
                         %state_area           = 'VALIDATE_MANDATORY'
                         %msg                  = NEW zcm_merp_messages(
                                                   textid   = zcm_merp_messages=>enter_company_code
                                                   severity = if_abap_behv_message=>severity-error )
                         %element-CompanyCode  = if_abap_behv=>mk-on ) TO reported-warehouse.
-
       ENDIF.
 
       IF lv_has_error = abap_true.
@@ -73,7 +80,8 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
 
       IF lr_entity->WarehouseCode IS INITIAL.
-        lv_next_wh_code = zcl_merp_num_range_util=>get_next_warehouse_code( ).
+
+        lv_next_wh_code = zcl_merp_num_range_util=>get_next_warehouse_code_nro( ).
 
         IF lv_next_wh_code IS NOT INITIAL.
           APPEND VALUE #(
@@ -106,6 +114,5 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
 
     ENDLOOP.
   ENDMETHOD.
-
 
 ENDCLASS.

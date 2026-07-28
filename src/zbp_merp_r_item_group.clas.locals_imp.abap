@@ -28,6 +28,12 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD validateMandatoryFields.
+    " Clear state messages before performing validation checks
+    LOOP AT keys REFERENCE INTO DATA(lr_key).
+      APPEND VALUE #( %tky        = lr_key->%tky
+                      %state_area = 'VALIDATE_MANDATORY' ) TO reported-itemgroup.
+    ENDLOOP.
+
     READ ENTITIES OF zmerp_r_item_group IN LOCAL MODE
       ENTITY ItemGroup
       FIELDS ( Description )
@@ -38,9 +44,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
 
       DATA(lv_has_error) = abap_false.
 
-      APPEND VALUE #( %tky        = lr_grp->%tky
-                      %state_area = 'VALIDATE_MANDATORY' ) TO reported-itemgroup.
-
+      " Validate Description
       IF lr_grp->Description IS INITIAL.
         lv_has_error = abap_true.
 
@@ -65,7 +69,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
 
       IF lr_entity->ItemGroupCode IS INITIAL.
-        lv_next_ig_code = zcl_merp_num_range_util=>get_next_item_group_code( ).
+        lv_next_ig_code = zcl_merp_num_range_util=>get_next_item_group_code_nro( ).
 
         IF lv_next_ig_code IS NOT INITIAL.
           APPEND VALUE #(
