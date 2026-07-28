@@ -99,7 +99,16 @@ CLASS zcm_merp_messages DEFINITION
         attr2 TYPE scx_attrname VALUE '',
         attr3 TYPE scx_attrname VALUE '',
         attr4 TYPE scx_attrname VALUE '',
-      END OF invalid_vat_percentage.
+      END OF invalid_vat_percentage,
+
+      BEGIN OF enter_item_group_desc,
+        msgid TYPE symsgid VALUE 'ZMC_MERP',
+        msgno TYPE symsgno VALUE '011',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF enter_item_group_desc.
 
     DATA:
       mv_attr1 TYPE string,

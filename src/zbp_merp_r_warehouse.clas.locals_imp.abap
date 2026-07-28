@@ -73,7 +73,7 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
 
       IF lr_entity->WarehouseCode IS INITIAL.
-        lv_next_wh_code = zcl_merp_md_util=>get_next_warehouse_code( ).
+        lv_next_wh_code = zcl_merp_num_range_util=>get_next_warehouse_code( ).
 
         IF lv_next_wh_code IS NOT INITIAL.
           APPEND VALUE #(

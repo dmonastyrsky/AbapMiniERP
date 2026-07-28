@@ -6,6 +6,7 @@ define root view entity ZMERP_R_COMPANY_CODE
   association [0..1] to I_Currency as _Currency on $projection.CurrencyCode = _Currency.Currency
   association [0..1] to I_Country  as _Country  on $projection.Country      = _Country.Country
 {
+      @ObjectModel.text.element: ['CompanyName']
   key company_code          as CompanyCode,
       company_name          as CompanyName,
 

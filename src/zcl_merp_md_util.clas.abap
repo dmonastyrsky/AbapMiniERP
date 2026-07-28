@@ -17,6 +17,11 @@ CLASS zcl_merp_md_util DEFINITION
       RETURNING
         VALUE(rv_wh_id) TYPE zmerp_warehouse-warehouse_code.
 
+    "! Generates the next sequential Item Group Code (e.g., 00001, 00002, 00003).
+    CLASS-METHODS get_next_item_group_code
+      RETURNING
+        VALUE(rv_item_group) TYPE zmerp_item_group-item_group.
+
   PRIVATE SECTION.
     "! Generic sequential number generator based on existing keys in active and draft tables.
     CLASS-METHODS get_next_number
@@ -51,6 +56,17 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
       iv_field       = 'WAREHOUSE_CODE'
       iv_draft_table = 'ZMERP_WHSE_D'
       iv_draft_field = 'WAREHOUSECODE'
+      iv_length      = 5
+    ).
+  ENDMETHOD.
+
+  METHOD get_next_item_group_code.
+    rv_item_group = get_next_number(
+      iv_prefix      = ''
+      iv_table       = 'ZMERP_ITEM_GROUP'
+      iv_field       = 'ITEM_GROUP'
+      iv_draft_table = 'ZMERP_ITEM_GRP_D'
+      iv_draft_field = 'ITEMGROUP'
       iv_length      = 5
     ).
   ENDMETHOD.
@@ -146,4 +162,3 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-

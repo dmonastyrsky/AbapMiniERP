@@ -68,6 +68,12 @@
      <MSGNR>010</MSGNR>
      <TEXT>VAT percentage must be between 0 and 100.</TEXT>
     </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>011</MSGNR>
+     <TEXT>Enter Item Group description.</TEXT>
+    </T100>
    </T100>
   </asx:values>
  </asx:abap>
