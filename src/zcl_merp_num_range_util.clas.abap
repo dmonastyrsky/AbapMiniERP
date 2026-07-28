@@ -37,6 +37,20 @@ CLASS zcl_merp_num_range_util DEFINITION
       RETURNING
         VALUE(rv_code) TYPE string.
 
+    "! Formats numeric sequence into target length string with optional prefix and padding.
+    CLASS-METHODS format_code
+      IMPORTING
+        iv_number       TYPE simple
+        iv_prefix       TYPE string
+        iv_total_length TYPE i
+      RETURNING
+        VALUE(rv_code)  TYPE string.
+
+    "! Convenience formatters for seeders, tests, and initial setup
+    CLASS-METHODS format_vat_code       IMPORTING iv_number TYPE simple RETURNING VALUE(rv_code) TYPE string.
+    CLASS-METHODS format_warehouse_code IMPORTING iv_number TYPE simple RETURNING VALUE(rv_code) TYPE string.
+    CLASS-METHODS format_item_grp_code  IMPORTING iv_number TYPE simple RETURNING VALUE(rv_code) TYPE string.
+
   PRIVATE SECTION.
 
     "! Generic sequential number generator based on the max existing key in active and draft tables.
@@ -67,15 +81,6 @@ CLASS zcl_merp_num_range_util DEFINITION
         iv_offset TYPE i
       RETURNING
         VALUE(rv_numeric) TYPE int8.
-
-    "! Formats numeric sequence into target length string with optional prefix and padding.
-    CLASS-METHODS format_number_with_padding
-      IMPORTING
-        iv_prefix       TYPE string
-        iv_numeric      TYPE int8
-        iv_total_length TYPE i
-      RETURNING
-        VALUE(rv_code) TYPE string.
 
 ENDCLASS.
 
@@ -121,6 +126,55 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD format_code.
+    DATA(lv_numeric_length) = iv_total_length - strlen( iv_prefix ).
+
+    TRY.
+        IF lv_numeric_length > 0
+           AND CONV int8( iv_number ) >= ipow(
+                 base = 10
+                 exp  = lv_numeric_length ).
+          RETURN.
+        ENDIF.
+      CATCH cx_sy_arithmetic_overflow cx_sy_conversion_error.
+        RETURN.
+    ENDTRY.
+
+    DATA(lv_padded) = COND string(
+      WHEN lv_numeric_length > 0
+      THEN add_leading_zeros(
+             iv_value  = iv_number
+             iv_length = lv_numeric_length )
+      ELSE |{ iv_number }| ).
+
+    rv_code = |{ iv_prefix }{ lv_padded }|.
+  ENDMETHOD.
+
+
+  METHOD format_vat_code.
+    rv_code = format_code(
+      iv_number       = iv_number
+      iv_prefix       = c_prefix_vat
+      iv_total_length = c_length_vat ).
+  ENDMETHOD.
+
+
+  METHOD format_warehouse_code.
+    rv_code = format_code(
+      iv_number       = iv_number
+      iv_prefix       = c_prefix_wh
+      iv_total_length = c_length_wh ).
+  ENDMETHOD.
+
+
+  METHOD format_item_grp_code.
+    rv_code = format_code(
+      iv_number       = iv_number
+      iv_prefix       = c_prefix_ig
+      iv_total_length = c_length_ig ).
+  ENDMETHOD.
+
+
   METHOD get_next_number.
     DATA(lv_prefix_length) = strlen( iv_prefix ).
 
@@ -147,9 +201,9 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
     lv_max_numeric += 1.
 
-    rv_number = format_number_with_padding(
+    rv_number = format_code(
       iv_prefix       = iv_prefix
-      iv_numeric      = lv_max_numeric
+      iv_number       = lv_max_numeric
       iv_total_length = iv_total_length ).
   ENDMETHOD.
 
@@ -195,31 +249,6 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
           CLEAR rv_numeric.
       ENDTRY.
     ENDIF.
-  ENDMETHOD.
-
-
-  METHOD format_number_with_padding.
-    DATA(lv_numeric_length) = iv_total_length - strlen( iv_prefix ).
-
-    TRY.
-        IF lv_numeric_length > 0
-           AND iv_numeric >= ipow(
-                 base = 10
-                 exp  = lv_numeric_length ).
-          RETURN.
-        ENDIF.
-      CATCH cx_sy_arithmetic_overflow.
-        RETURN.
-    ENDTRY.
-
-    DATA(lv_padded) = COND string(
-      WHEN lv_numeric_length > 0
-      THEN add_leading_zeros(
-             iv_value  = iv_numeric
-             iv_length = lv_numeric_length )
-      ELSE |{ iv_numeric }| ).
-
-    rv_code = |{ iv_prefix }{ lv_padded }|.
   ENDMETHOD.
 
 ENDCLASS.
