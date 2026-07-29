@@ -10,10 +10,10 @@
     <SCRLEN2>20</SCRLEN2>
     <SCRLEN3>40</SCRLEN3>
     <DDTEXT>Warehouse Name</DDTEXT>
-    <REPTEXT>Warehouse Name</REPTEXT>
-    <SCRTEXT_S>Warh. Name</SCRTEXT_S>
-    <SCRTEXT_M>Warehouse Name</SCRTEXT_M>
-    <SCRTEXT_L>Warehouse Name</SCRTEXT_L>
+    <REPTEXT>Warehouse Description</REPTEXT>
+    <SCRTEXT_S>Warh. Desc</SCRTEXT_S>
+    <SCRTEXT_M>Warehouse Descr.</SCRTEXT_M>
+    <SCRTEXT_L>Warehouse Description</SCRTEXT_L>
     <DTELMASTER>E</DTELMASTER>
     <DATATYPE>CHAR</DATATYPE>
     <LENG>000100</LENG>

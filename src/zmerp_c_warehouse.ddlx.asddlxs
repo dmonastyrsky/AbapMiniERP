@@ -33,20 +33,17 @@ annotate view ZMERP_C_WAREHOUSE with
     }
   ]
 
-  @EndUserText.label: 'Code'
   @UI.textArrangement: #TEXT_SEPARATE
   @UI.lineItem: [{ position: 10, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 10 }]
   @UI.selectionField: [{ position: 10 }]
   WarehouseCode;
 
-  @EndUserText.label: 'Warehouse Name'
   @UI.lineItem: [{ position: 20, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 20 }]
   @UI.selectionField: [{ position: 20 }]
   WarehouseName;
 
-  @EndUserText.label: 'Company Code'
   @UI.lineItem: [{ position: 30, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 30 }]
   @UI.selectionField: [{ position: 30 }]

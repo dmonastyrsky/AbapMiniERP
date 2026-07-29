@@ -74,6 +74,36 @@
      <MSGNR>011</MSGNR>
      <TEXT>Enter Item Group description.</TEXT>
     </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>012</MSGNR>
+     <TEXT>Enter Item description.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>013</MSGNR>
+     <TEXT>Enter an Item type.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>014</MSGNR>
+     <TEXT>Select an Item Group.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>015</MSGNR>
+     <TEXT>Select a Default VAT Code.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>016</MSGNR>
+     <TEXT>Select a Base Unit of Measure.</TEXT>
+    </T100>
    </T100>
   </asx:values>
  </asx:abap>

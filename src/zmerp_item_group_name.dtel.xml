@@ -10,10 +10,10 @@
     <SCRLEN2>20</SCRLEN2>
     <SCRLEN3>40</SCRLEN3>
     <DDTEXT>Item Group Name</DDTEXT>
-    <REPTEXT>Item Group Name</REPTEXT>
-    <SCRTEXT_S>Group Name</SCRTEXT_S>
-    <SCRTEXT_M>Group Name</SCRTEXT_M>
-    <SCRTEXT_L>Item Group Name</SCRTEXT_L>
+    <REPTEXT>Item Group Description</REPTEXT>
+    <SCRTEXT_S>Group Desc</SCRTEXT_S>
+    <SCRTEXT_M>Group Description</SCRTEXT_M>
+    <SCRTEXT_L>Item Group Description</SCRTEXT_L>
     <DTELMASTER>E</DTELMASTER>
     <DATATYPE>CHAR</DATATYPE>
     <LENG>000060</LENG>

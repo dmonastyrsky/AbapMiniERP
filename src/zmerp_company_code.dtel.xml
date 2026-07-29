@@ -11,8 +11,8 @@
     <SCRLEN3>40</SCRLEN3>
     <DDTEXT>Company Code</DDTEXT>
     <REPTEXT>Company Code</REPTEXT>
-    <SCRTEXT_S>CoCode</SCRTEXT_S>
-    <SCRTEXT_M>Company Code</SCRTEXT_M>
+    <SCRTEXT_S>Company</SCRTEXT_S>
+    <SCRTEXT_M>Company</SCRTEXT_M>
     <SCRTEXT_L>Company Code</SCRTEXT_L>
     <DTELMASTER>E</DTELMASTER>
     <DATATYPE>CHAR</DATATYPE>

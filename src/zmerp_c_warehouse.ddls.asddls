@@ -7,6 +7,7 @@ define root view entity ZMERP_C_WAREHOUSE
   provider contract transactional_query
   as projection on ZMERP_R_WAREHOUSE
 {
+      @ObjectModel.text.element: ['WarehouseName']
       @Search.defaultSearchElement: true
       @Search.ranking: #HIGH
       key WarehouseCode,

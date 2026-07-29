@@ -3,6 +3,7 @@
 {
 "FROM":
 [
+"ZMERP_R_ITEM",
 "ZMERP_R_ITEM_GROUP"
 ],
 "ASSOCIATED":

@@ -5,7 +5,7 @@
    <VSEOCLASS>
     <CLSNAME>ZCL_MERP_MD_UTIL</CLSNAME>
     <LANGU>E</LANGU>
-    <DESCRIPT>Master Data Utility Class</DESCRIPT>
+    <DESCRIPT>Utility Class for Master Data Operations</DESCRIPT>
     <STATE>1</STATE>
     <CLSCCINCL>X</CLSCCINCL>
     <FIXPT>X</FIXPT>

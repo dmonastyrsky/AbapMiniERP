@@ -110,7 +110,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
           %tky = lr_key->%tky
           %msg = new_message_with_text(
                    severity = if_abap_behv_message=>severity-error
-                   text     = |Company Code '{ lr_dep->CompanyCode }' cannot be deleted because it is referenced in '{ lr_dep->UsedInEntity }'.| )
+                   text     = |Company Code '{ lr_dep->CompanyCode }' used in '{ lr_dep->UsedInEntity }'.| )
         ) TO reported-companycode.
       ENDIF.
     ENDLOOP.

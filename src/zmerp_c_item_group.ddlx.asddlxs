@@ -33,21 +33,19 @@ annotate view ZMERP_C_ITEM_GROUP with
     }
   ]
 
-  @EndUserText.label: 'Code'
   @UI.textArrangement: #TEXT_SEPARATE
   @UI.lineItem: [{ position: 10, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 10 }]
   @UI.selectionField: [{ position: 10 }]
   ItemGroupCode;
 
-  @EndUserText.label: 'Group Name'
   @UI.lineItem: [{ position: 20, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 20 }]
   @UI.selectionField: [{ position: 20 }]
   Description;
 
   @EndUserText.label: 'Default VAT Code'
-  @UI.textArrangement: #TEXT_FIRST
+  @UI.textArrangement: #TEXT_ONLY
   @UI.lineItem: [{ position: 30, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 30 }]
   DefaultVatCode;

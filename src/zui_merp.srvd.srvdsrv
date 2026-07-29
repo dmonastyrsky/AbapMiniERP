@@ -12,4 +12,5 @@ define service ZUI_MERP
   expose ZMERP_C_WAREHOUSE    as Warehouse;
   expose ZMERP_C_VAT_RATE     as VatRate;
   expose ZMERP_C_ITEM_GROUP   as ItemGroup;
+  expose ZMERP_C_ITEM         as Item;
 }

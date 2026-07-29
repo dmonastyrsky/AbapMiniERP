@@ -14,12 +14,12 @@ authorization master ( global )
 {
   create;
   update;
-  delete;
+  delete ( precheck );
 
   field ( readonly ) ItemGroupCode;
-  field ( mandatory ) Description;
+  field ( mandatory ) Description, DefaultVatCode;
 
-  validation validateMandatoryFields on save { create; update; field Description; }
+  validation validateMandatoryFields on save { create; update; field Description, DefaultVatCode; }
 
   draft action Edit;
   draft action Activate optimized;

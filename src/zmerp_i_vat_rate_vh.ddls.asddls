@@ -9,7 +9,7 @@ define view entity ZMERP_I_VAT_RATE_VH
 {
   @UI.lineItem: [{ position: 10, label: 'VAT Code' }]
   @ObjectModel.text.element: ['Description']
-  @UI.textArrangement: #TEXT_FIRST
+  @UI.textArrangement: #TEXT_ONLY
   @Search.defaultSearchElement: true
   @Search.ranking: #HIGH
   @Search.fuzzinessThreshold: 0.7

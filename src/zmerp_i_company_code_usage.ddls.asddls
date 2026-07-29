@@ -1,6 +1,7 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @EndUserText.label: 'Company Code Usage Dependencies'
 @VDM.viewType: #COMPOSITE
+@Metadata.ignorePropagatedAnnotations: true
 define view entity ZMERP_I_COMPANY_CODE_USAGE
   as select from ZMERP_R_WAREHOUSE
 {

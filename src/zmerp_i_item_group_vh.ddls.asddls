@@ -18,6 +18,12 @@ define view entity ZMERP_I_ITEM_GROUP_VH
   Description,
 
   @UI.lineItem: [{ position: 30, label: 'Default VAT Code' }]
-  @UI.textArrangement: #TEXT_FIRST
-  DefaultVatCode
+  @UI.textArrangement: #TEXT_ONLY
+  @ObjectModel.text.element: ['DefaultVatDescription']  
+  DefaultVatCode,
+  
+  @UI.hidden: true
+  _DefaultVATRate.Description as DefaultVatDescription,  
+  
+  _DefaultVATRate
 }

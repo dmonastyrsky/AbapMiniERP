@@ -3,16 +3,16 @@ CLASS lhc_zmerp_r_vat_rate DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS:
       get_global_authorizations FOR GLOBAL AUTHORIZATION
         IMPORTING
-          REQUEST requested_authorizations FOR VatRate
+        REQUEST requested_authorizations FOR VatRate
         RESULT result,
       validateMandatoryFields FOR VALIDATE ON SAVE
         IMPORTING keys FOR VatRate~validateMandatoryFields,
       validatePercentage FOR VALIDATE ON SAVE
         IMPORTING keys FOR VatRate~validatePercentage,
       earlynumbering_create FOR NUMBERING
-            IMPORTING entities FOR CREATE VatRate,
+        IMPORTING entities FOR CREATE VatRate,
       precheck_delete FOR PRECHECK
-            IMPORTING keys FOR DELETE VatRate.
+        IMPORTING keys FOR DELETE VatRate.
 ENDCLASS.
 
 CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
@@ -144,7 +144,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD precheck_delete.
-    " 1. Extract keys via %tky structure (where key fields live in RAP)
+    " 1. Extract keys via %tky structure
     DATA lt_keys TYPE STANDARD TABLE OF zmerp_vat_rate-vat_code WITH DEFAULT KEY.
     lt_keys = VALUE #( FOR key IN keys ( key-%tky-VatCode ) ).
 
@@ -152,7 +152,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " 2. Check foreign key dependencies in CDS View
+    " 2. Query usage CDS view
     SELECT DISTINCT VatCode, UsedInEntity
       FROM ZMERP_I_VAT_RATE_USAGE
       FOR ALL ENTRIES IN @lt_keys
@@ -163,20 +163,17 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " 3. Process failed records
+    " 3. Block instances and pass messages
     LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep).
-      " Find original key reference from input keys table
       READ TABLE keys WITH KEY %tky-VatCode = lr_dep->VatCode REFERENCE INTO DATA(lr_key).
       IF sy-subrc = 0.
-        " Block deletion for this instance
         APPEND VALUE #( %tky = lr_key->%tky ) TO failed-vatrate.
 
-        " Pass error message to Fiori UI
         APPEND VALUE #(
           %tky = lr_key->%tky
           %msg = new_message_with_text(
                    severity = if_abap_behv_message=>severity-error
-                   text     = |VAT Rate '{ lr_dep->VatCode }' cannot be deleted because it is referenced in '{ lr_dep->UsedInEntity }'.| )
+                   text     = |VAT Rate '{ lr_dep->VatCode }' used in '{ lr_dep->UsedInEntity }'.| )
         ) TO reported-vatrate.
       ENDIF.
     ENDLOOP.

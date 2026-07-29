@@ -1,3 +1,4 @@
+"! Initial seed data population runner for Mini ERP application.
 CLASS zcl_merp_initial_setup DEFINITION
   PUBLIC
   FINAL
@@ -6,25 +7,42 @@ CLASS zcl_merp_initial_setup DEFINITION
   PUBLIC SECTION.
     INTERFACES if_oo_adt_classrun .
 
+    "! Executes complete initial seed data setup for all master data entities and syncs NRO levels.
+    "! @parameter out | Console output object for logging setup progress
     CLASS-METHODS execute
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+
+    "! Populates initial company codes seed data into ZMERP_COMP_CODE table.
+    "! @parameter out | Console output object for logging setup progress
     CLASS-METHODS setup_company_codes
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
+    "! Populates initial warehouses seed data into ZMERP_WAREHOUSE table.
+    "! @parameter out | Console output object for logging setup progress
     CLASS-METHODS setup_warehouses
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
+    "! Populates initial VAT rates seed data into ZMERP_VAT_RATE table.
+    "! @parameter out | Console output object for logging setup progress
     CLASS-METHODS setup_vat_rates
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
+    "! Populates initial item groups seed data into ZMERP_ITEM_GROUP table.
+    "! @parameter out | Console output object for logging setup progress
     CLASS-METHODS setup_item_groups
+      IMPORTING
+        out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
+    "! Populates initial master items/products seed data into ZMERP_ITEM table.
+    "! @parameter out | Console output object for logging setup progress
+    CLASS-METHODS setup_items
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
@@ -41,9 +59,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
   METHOD execute.
     IF out IS BOUND.
-      out->write( '==================================================' ).
-      out->write( '  Starting Mini ERP Initial Setup Process         ' ).
-      out->write( '==================================================' ).
+      out->write( '=== Starting Initial Data Setup for Mini ERP ===' ).
     ENDIF.
 
     " Insert seed data using formatted keys
@@ -51,14 +67,13 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     setup_vat_rates( out ).
     setup_warehouses( out ).
     setup_item_groups( out ).
+    setup_items( out ).
 
     " Dynamically sync NRO levels with real DB record counts
     zcl_merp_num_range_util=>sync_intervals_from_db( ).
 
     IF out IS BOUND.
-      out->write( '==================================================' ).
-      out->write( '  Initial Setup Completed Successfully!            ' ).
-      out->write( '==================================================' ).
+      out->write( '=== Initial Data Setup Completed Successfully ===' ).
     ENDIF.
   ENDMETHOD.
 
@@ -151,7 +166,8 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
         created_by            = lv_user
         created_at            = lv_timestamp
         local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp )
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
     ).
 
     INSERT zmerp_vat_rate FROM TABLE @lt_vat_rates.
@@ -270,6 +286,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     DELETE FROM zmerp_item_grp_d.
 
     DATA(lv_vat19) = zcl_merp_num_range_util=>format_vat_code( 3 ).
+    DATA(lv_vat7)  = zcl_merp_num_range_util=>format_vat_code( 2 ).
 
     lt_item_groups = VALUE #(
       ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 1 )
@@ -310,7 +327,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
       ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 5 )
         description           = 'Installation & Support Services'
-        default_vat_code      = lv_vat19
+        default_vat_code      = lv_vat7
         created_by            = lv_user
         created_at            = lv_timestamp
         local_last_changed_by = lv_user
@@ -322,6 +339,130 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
     IF out IS BOUND.
       out->write( |[Item Group]: Successfully inserted { sy-dbcnt } rows.| ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD setup_items.
+    DATA: lt_items     TYPE TABLE OF zmerp_item,
+          lv_user      TYPE abp_creation_user,
+          lv_timestamp TYPE abp_creation_tstmpl.
+
+    TRY.
+        lv_user = cl_abap_context_info=>get_user_technical_name( ).
+      CATCH cx_abap_context_info_error.
+        lv_user = 'INITIAL_SETUP'.
+    ENDTRY.
+
+    GET TIME STAMP FIELD lv_timestamp.
+
+    " Clear active and draft tables
+    DELETE FROM zmerp_item.
+    DELETE FROM zmerp_item_d.
+
+    " Formatted Group Codes
+    DATA(lv_grp1) = zcl_merp_num_range_util=>format_item_grp_code( 1 ).
+    DATA(lv_grp2) = zcl_merp_num_range_util=>format_item_grp_code( 2 ).
+    DATA(lv_grp3) = zcl_merp_num_range_util=>format_item_grp_code( 3 ).
+    DATA(lv_grp4) = zcl_merp_num_range_util=>format_item_grp_code( 4 ).
+    DATA(lv_grp5) = zcl_merp_num_range_util=>format_item_grp_code( 5 ).
+
+    lt_items = VALUE #(
+      " Group 1: Major Home Appliances
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 1 )
+        description          = 'Washing Machine Bosch Series 6'
+        item_type            = 'P'
+        item_group_code      = lv_grp1
+        base_unit_of_measure = 'EA' )
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 2 )
+        description          = 'Refrigerator Siemens iQ500'
+        item_type            = 'P'
+        item_group_code      = lv_grp1
+        base_unit_of_measure = 'EA' )
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 3 )
+        description          = 'Dishwasher Miele G7000'
+        item_type            = 'P'
+        item_group_code      = lv_grp1
+        base_unit_of_measure = 'EA' )
+
+      " Group 2: Small Kitchen Appliances
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 4 )
+        description          = 'Espresso Machine DeLonghi Magnifica'
+        item_type            = 'P'
+        item_group_code      = lv_grp2
+        base_unit_of_measure = 'EA' )
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 5 )
+        description          = 'Electric Kettle Philips Daily Collection'
+        item_type            = 'P'
+        item_group_code      = lv_grp2
+        base_unit_of_measure = 'EA' )
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 6 )
+        description          = 'Toaster Tefal Express 2-Slot'
+        item_type            = 'P'
+        item_group_code      = lv_grp2
+        base_unit_of_measure = 'EA' )
+
+      " Group 3: Consumer Electronics
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 7 )
+        description          = 'Smart TV Samsung 55 Inch OLED'
+        item_type            = 'P'
+        item_group_code      = lv_grp3
+        base_unit_of_measure = 'EA' )
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 8 )
+        description          = 'Soundbar Sony HT-S400 2.1ch'
+        item_type            = 'P'
+        item_group_code      = lv_grp3
+        base_unit_of_measure = 'EA' )
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 9 )
+        description          = 'Wireless Headphones Bose QuietComfort 45'
+        item_type            = 'P'
+        item_group_code      = lv_grp3
+        base_unit_of_measure = 'EA' )
+
+      " Group 4: Accessories & Supplies
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 10 )
+        description          = 'HDMI Cable 2.0 High Speed (2m)'
+        item_type            = 'P'
+        item_group_code      = lv_grp4
+        base_unit_of_measure = 'EA' )
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 11 )
+        description          = 'Washing Machine Water Inlet Hose (1.5m)'
+        item_type            = 'P'
+        item_group_code      = lv_grp4
+        base_unit_of_measure = 'EA' )
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 12 )
+        description          = 'Descaling Solution for Coffee Machines 500ml'
+        item_type            = 'P'
+        item_group_code      = lv_grp4
+        base_unit_of_measure = 'BOT' )
+
+      " Group 5: Installation & Support Services
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 13 )
+        description          = 'Home Appliance Installation Service'
+        item_type            = 'S'
+        item_group_code      = lv_grp5
+        base_unit_of_measure = 'H' )
+      ( item_code            = zcl_merp_num_range_util=>format_item_code( 14 )
+        description          = 'Extended Warranty & On-site Repair Service'
+        item_type            = 'S'
+        item_group_code      = lv_grp5
+        base_unit_of_measure = 'H' )
+    ).
+
+    " Dynamically pull default_vat_code from Item Group using ZCL_MERP_MD_UTIL
+    LOOP AT lt_items REFERENCE INTO DATA(lr_item).
+      lr_item->default_vat_code      = zcl_merp_md_util=>get_item_group_default_vat( lr_item->item_group_code ).
+      lr_item->created_by           = lv_user.
+      lr_item->created_at           = lv_timestamp.
+      lr_item->local_last_changed_by = lv_user.
+      lr_item->local_last_changed_at = lv_timestamp.
+      lr_item->last_changed_at      = lv_timestamp.
+    ENDLOOP.
+
+    INSERT zmerp_item FROM TABLE @lt_items.
+
+    IF out IS BOUND.
+      out->write( |[Item]: Successfully inserted { sy-dbcnt } rows.| ).
     ENDIF.
   ENDMETHOD.
 
