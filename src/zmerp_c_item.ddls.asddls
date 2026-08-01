@@ -17,7 +17,6 @@ define root view entity ZMERP_C_ITEM
       @Search.fuzzinessThreshold: 0.7
       Description,
 
-      @ObjectModel.text.association: '_ItemType'
       ItemTypeCode,
       ItemGroupCode,
       DefaultVatCode,

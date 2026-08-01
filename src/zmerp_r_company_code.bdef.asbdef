@@ -18,6 +18,7 @@ authorization master( global )
   field ( mandatory : create ) CompanyCode;
   field ( mandatory ) CompanyName, CurrencyCode, Country;
   field ( readonly : update ) CompanyCode;
+  field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
 
   validation validateMandatoryFields on save { create; update; field CompanyName, CurrencyCode, Country; }
 

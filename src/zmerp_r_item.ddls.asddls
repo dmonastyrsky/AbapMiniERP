@@ -5,7 +5,7 @@ define root view entity ZMERP_R_ITEM
   as select from zmerp_item
   association [0..1] to ZMERP_R_ITEM_GROUP as _ItemGroup      on $projection.ItemGroupCode = _ItemGroup.ItemGroupCode
   association [0..1] to ZMERP_R_VAT_RATE   as _DefaultVATRate on $projection.DefaultVatCode = _DefaultVATRate.VatCode
-  association [0..1] to ZMERP_I_ITEM_TYPE_VH as _ItemType       on $projection.ItemTypeCode = _ItemType.ItemTypeCode
+  association [0..1] to ZMERP_I_ITEM_TYPE  as _ItemType       on $projection.ItemTypeCode = _ItemType.ItemTypeCode
 {
   @ObjectModel.text.element: ['Description']
   key item_code             as ItemCode,
@@ -29,8 +29,7 @@ define root view entity ZMERP_R_ITEM
         entity: { name: 'ZMERP_I_VAT_RATE_VH', element: 'VatCode' },
         useForValidation: true
       }]
-      @ObjectModel.foreignKey.association: '_DefaultVATRate'
-      @ObjectModel.text.association: '_DefaultVATRate'
+      @ObjectModel.text.association: '_DefaultVATRate' // Видалено foreignKey, залишено text для зв'язку Текст->Код
       default_vat_code      as DefaultVatCode,
 
       @Consumption.valueHelpDefinition: [{

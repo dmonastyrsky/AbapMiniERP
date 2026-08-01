@@ -1,20 +1,18 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @EndUserText.label: 'Company Code Root Entity'
 @ObjectModel.sapObjectNodeType.name: 'ZMERP_COMP_CODE'
+@Metadata.ignorePropagatedAnnotations: true
 define root view entity ZMERP_R_COMPANY_CODE
   as select from zmerp_comp_code
   association [0..1] to I_Currency as _Currency on $projection.CurrencyCode = _Currency.Currency
   association [0..1] to I_Country  as _Country  on $projection.Country      = _Country.Country
 {
-      @ObjectModel.text.element: ['CompanyName']
   key company_code          as CompanyCode,
       company_name          as CompanyName,
 
-      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CurrencyStdVH', element: 'Currency' }, useForValidation: true }]
       @ObjectModel.foreignKey.association: '_Currency'
       currency_code         as CurrencyCode,
 
-      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CountryVH', element: 'Country' }, useForValidation: true }]
       @ObjectModel.foreignKey.association: '_Country'
       country               as Country,
 
