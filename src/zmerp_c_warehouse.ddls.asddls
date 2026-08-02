@@ -17,6 +17,7 @@ define root view entity ZMERP_C_WAREHOUSE
       @Search.fuzzinessThreshold: 0.7
       WarehouseName,
 
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_COMPANY_CODE_VH', element: 'CompanyCode' }, useForValidation: true }]
       CompanyCode,
 
       CreatedBy,

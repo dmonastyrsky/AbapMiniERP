@@ -153,7 +153,16 @@ CLASS zcm_merp_messages DEFINITION
         attr2 TYPE scx_attrname VALUE '',
         attr3 TYPE scx_attrname VALUE '',
         attr4 TYPE scx_attrname VALUE '',
-      END OF select_base_unit.
+      END OF select_base_unit,
+
+      BEGIN OF company_code_not_found,
+        msgid TYPE symsgid VALUE 'ZMC_MERP',
+        msgno TYPE symsgno VALUE '017',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF company_code_not_found.
 
     DATA:
       mv_attr1 TYPE string,

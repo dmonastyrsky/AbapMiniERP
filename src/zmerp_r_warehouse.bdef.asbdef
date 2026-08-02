@@ -16,10 +16,12 @@ authorization master( global )
   update;
   delete;
 
-  field ( readonly) WarehouseCode;
+  field ( readonly ) WarehouseCode;
+  field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
   field ( mandatory ) WarehouseName, CompanyCode;
 
   validation validateMandatoryFields on save { create; update; field WarehouseName, CompanyCode; }
+  validation validateCompanyCode on save { create; update; field CompanyCode; }
 
   draft action Edit;
   draft action Activate optimized;
@@ -28,6 +30,7 @@ authorization master( global )
   draft determine action Prepare
   {
     validation validateMandatoryFields;
+    validation validateCompanyCode;
   }
 
   mapping for zmerp_warehouse

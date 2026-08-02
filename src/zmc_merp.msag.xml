@@ -42,7 +42,7 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>006</MSGNR>
-     <TEXT>Enter a Company Code.</TEXT>
+     <TEXT>Select a Company Code.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
@@ -103,6 +103,12 @@
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>016</MSGNR>
      <TEXT>Select a Base Unit of Measure.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>017</MSGNR>
+     <TEXT>Company Code &amp;1 does not exist.</TEXT>
     </T100>
    </T100>
   </asx:values>

@@ -235,6 +235,10 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       iv_nro_object   = c_nro_vat
       iv_prefix       = c_prefix_vat
       iv_total_length = c_length_vat ).
+
+    IF rv_vat_code IS INITIAL.
+      rv_vat_code = get_next_vat_code( ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD get_next_warehouse_code_nro.
@@ -242,6 +246,10 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       iv_nro_object   = c_nro_wh
       iv_prefix       = c_prefix_wh
       iv_total_length = c_length_wh ).
+
+    IF rv_wh_id IS INITIAL.
+      rv_wh_id = get_next_warehouse_code( ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD get_next_item_group_code_nro.
@@ -249,6 +257,10 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       iv_nro_object   = c_nro_ig
       iv_prefix       = c_prefix_ig
       iv_total_length = c_length_ig ).
+
+    IF rv_item_group_code IS INITIAL.
+      rv_item_group_code = get_next_item_group_code( ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD get_next_item_code_nro.
@@ -256,6 +268,10 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       iv_nro_object   = c_nro_item
       iv_prefix       = c_prefix_item
       iv_total_length = c_length_item ).
+
+    IF rv_item_code IS INITIAL.
+      rv_item_code = get_next_item_code( ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD add_leading_zeros.
@@ -389,7 +405,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD sync_intervals_from_db.
+    METHOD sync_intervals_from_db.
     DATA: lt_interval TYPE TABLE OF cl_numberrange_intervals=>nr_nriv_line,
           ls_interval LIKE LINE OF lt_interval,
           lv_error    TYPE cl_numberrange_intervals=>nr_error,
@@ -448,20 +464,20 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       ( object = c_nro_item level = lv_item_level )
     ).
 
-    LOOP AT lt_sync INTO DATA(ls_sync).
+    LOOP AT lt_sync ASSIGNING FIELD-SYMBOL(<fs_sync>).
       CLEAR: lt_interval, ls_interval.
 
       ls_interval-nrrangenr  = '01'.
       ls_interval-fromnumber = '0000000001'.
       ls_interval-tonumber   = '9999999999'.
-      ls_interval-nrlevel    = add_leading_zeros( iv_value = ls_sync-level iv_length = 10 ).
+      ls_interval-nrlevel    = add_leading_zeros( iv_value = <fs_sync>-level iv_length = 10 ).
       APPEND ls_interval TO lt_interval.
 
       TRY.
           cl_numberrange_intervals=>update(
             EXPORTING
-              object    = CONV #( ls_sync-object )
-              interval  = lt_interval
+              object   = <fs_sync>-object
+              interval = lt_interval
             IMPORTING
               error     = lv_error
               error_inf = ls_error ).
@@ -469,8 +485,8 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
           TRY.
               cl_numberrange_intervals=>create(
                 EXPORTING
-                  object    = CONV #( ls_sync-object )
-                  interval  = lt_interval
+                  object   = <fs_sync>-object
+                  interval = lt_interval
                 IMPORTING
                   error     = lv_error
                   error_inf = ls_error ).
@@ -479,6 +495,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       ENDTRY.
     ENDLOOP.
   ENDMETHOD.
+
 
   METHOD get_next_number.
     DATA(lv_prefix_length) = strlen( iv_prefix ).

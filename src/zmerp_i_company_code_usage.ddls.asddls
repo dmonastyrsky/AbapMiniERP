@@ -1,19 +1,11 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @EndUserText.label: 'Company Code Usage Dependencies'
 @Metadata.ignorePropagatedAnnotations: true
+
 define view entity ZMERP_I_COMPANY_CODE_USAGE
   as select from ZMERP_R_WAREHOUSE
 {
   key CompanyCode,
-      cast( 'Warehouse' as abap.char( 30 ) ) as UsedInEntity
+  key WarehouseCode                           as RefEntityKey,
+  key cast( 'Warehouse' as zmerp_entity_name ) as UsedInEntity
 }
-// union all select from ZMERP_R_PurchaseOrder
-// {
-//   key CompanyCode,
-//       'Purchase Order' as UsedInEntity
-// }
-// union all select from ZMERP_R_SalesOrder
-// {
-//   key CompanyCode,
-//       'Sales Order' as UsedInEntity
-// }
