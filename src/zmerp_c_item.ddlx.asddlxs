@@ -44,7 +44,7 @@ annotate view ZMERP_C_ITEM with
   @UI.selectionField: [{ position: 20 }]
   Description;
 
-  @UI.textArrangement: #TEXT_FIRST
+  @UI.textArrangement: #TEXT_ONLY
   @UI.lineItem: [{ position: 25, importance: #MEDIUM }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 25 }]
   @UI.selectionField: [{ position: 25 }]

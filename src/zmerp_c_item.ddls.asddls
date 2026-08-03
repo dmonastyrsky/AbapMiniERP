@@ -17,9 +17,20 @@ define root view entity ZMERP_C_ITEM
       @Search.fuzzinessThreshold: 0.7
       Description,
 
+      @ObjectModel.text.element: ['ItemTypeDescription']
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_ITEM_TYPE_VH', element: 'ItemTypeCode' }, useForValidation: true }]
       ItemTypeCode,
+      
+      @EndUserText.label: 'Item Type Description'
+      _ItemType.Description as ItemTypeDescription,
+      
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_ITEM_GROUP_VH', element: 'ItemGroupCode' }, useForValidation: true }]
       ItemGroupCode,
+      
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_VAT_RATE_VH', element: 'VatCode' }, useForValidation: true }]
       DefaultVatCode,
+            
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_UnitOfMeasureStdVH', element: 'UnitOfMeasure' }, useForValidation: true }]
       BaseUnitOfMeasure,
 
       CreatedBy,

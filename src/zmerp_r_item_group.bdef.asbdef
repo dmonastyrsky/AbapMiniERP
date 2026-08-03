@@ -17,6 +17,7 @@ authorization master ( global )
   delete ( precheck );
 
   field ( readonly ) ItemGroupCode;
+  field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
   field ( mandatory ) Description, DefaultVatCode;
 
   validation validateMandatoryFields on save { create; update; field Description, DefaultVatCode; }

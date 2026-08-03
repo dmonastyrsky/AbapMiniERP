@@ -11,7 +11,7 @@ define root view entity ZMERP_C_VAT_RATE
       @ObjectModel.text.element: ['Description']      
       @Search.defaultSearchElement: true
       @Search.ranking: #HIGH
-      key VatCode,
+  key VatCode,
 
       @Search.defaultSearchElement: true
       @Search.ranking: #HIGH

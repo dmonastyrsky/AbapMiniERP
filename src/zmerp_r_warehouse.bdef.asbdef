@@ -14,7 +14,7 @@ authorization master( global )
 {
   create;
   update;
-  delete;
+  delete ( precheck );
 
   field ( readonly ) WarehouseCode;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;

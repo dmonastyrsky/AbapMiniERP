@@ -7,13 +7,9 @@
 "ZMERP_R_VAT_RATE"
 ],
 "ASSOCIATED":
-[
-"ZMERP_R_VAT_RATE"
-],
+[],
 "BASE":
-[
-"ZMERP_R_ITEM_GROUP"
-],
+[],
 "ANNO_REF":
 [],
 "SCALAR_FUNCTION":

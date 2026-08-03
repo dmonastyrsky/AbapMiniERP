@@ -10,8 +10,8 @@ CLASS lhc_zmerp_r_warehouse DEFINITION INHERITING FROM cl_abap_behavior_handler.
     "! @parameter result | Resulting authorization statuses
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
       IMPORTING
-        REQUEST requested_authorizations FOR Warehouse
-        RESULT result.
+      REQUEST requested_authorizations FOR Warehouse
+      RESULT result.
 
     "! Validates mandatory fields before saving.
     "! @parameter keys | Entity keys for validation
@@ -23,6 +23,8 @@ CLASS lhc_zmerp_r_warehouse DEFINITION INHERITING FROM cl_abap_behavior_handler.
     "! @parameter keys | Entity keys for validation
     METHODS validateCompanyCode FOR VALIDATE ON SAVE
       IMPORTING keys FOR Warehouse~validateCompanyCode.
+    METHODS precheck_delete FOR PRECHECK
+      IMPORTING keys FOR DELETE Warehouse.
 
     "! Assigns early numbers for new Warehouse entities.
     "! @parameter entities | Entities requested for creation
@@ -51,7 +53,7 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD validateMandatoryFields.
-    DATA lv_error_found TYPE abap_bool.
+    DATA lv_has_error TYPE abap_bool.
 
     reported-warehouse = VALUE #(
       BASE reported-warehouse
@@ -67,10 +69,10 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
       RESULT DATA(lt_warehouses).
 
     LOOP AT lt_warehouses REFERENCE INTO DATA(lr_whse).
-      lv_error_found = abap_false.
+      lv_has_error = abap_false.
 
       IF lr_whse->WarehouseName IS INITIAL.
-        lv_error_found = abap_true.
+        lv_has_error = abap_true.
         APPEND VALUE #(
           %tky                   = lr_whse->%tky
           %state_area           = c_state_area_mandatory
@@ -82,7 +84,7 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
       ENDIF.
 
       IF lr_whse->CompanyCode IS INITIAL.
-        lv_error_found = abap_true.
+        lv_has_error = abap_true.
         APPEND VALUE #(
           %tky                  = lr_whse->%tky
           %state_area           = c_state_area_mandatory
@@ -93,16 +95,17 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
         ) TO reported-warehouse.
       ENDIF.
 
-      IF lv_error_found = abap_true.
-        APPEND VALUE #( %tky = lr_whse->%tky ) TO failed-warehouse.
+      IF lv_has_error = abap_true.
+        APPEND VALUE #(
+          %tky        = lr_whse->%tky
+          %fail-cause = if_abap_behv=>cause-unspecific
+        ) TO failed-warehouse.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
 
   METHOD validateCompanyCode.
-    DATA lt_companies_to_check TYPE zcl_merp_md_util=>tt_company_codes.
-
-    " Clear previous reported error messages for this state area
+    " 1. Clear previous reported error messages for this state area
     reported-warehouse = VALUE #(
       BASE reported-warehouse
       FOR key IN keys
@@ -110,44 +113,59 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
         %state_area = c_state_area_company )
     ).
 
-    " Read requested entity instances
+    " 2. Read requested entity instances
     READ ENTITIES OF zmerp_r_warehouse IN LOCAL MODE
       ENTITY Warehouse
       FIELDS ( CompanyCode )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_warehouses).
 
-    " Collect unique non-initial company codes
-    LOOP AT lt_warehouses REFERENCE INTO DATA(lr_whse_chk) WHERE CompanyCode IS NOT INITIAL.
-      INSERT lr_whse_chk->CompanyCode INTO TABLE lt_companies_to_check.
+    " 3. Define a sorted structure to instantly deduplicate codes in memory
+    TYPES: BEGIN OF ty_company_code,
+             companycode TYPE zmerp_company_code,
+           END OF ty_company_code.
+
+    DATA lt_companies_to_check TYPE SORTED TABLE OF ty_company_code WITH UNIQUE KEY companycode.
+
+    " 4. Collect non-initial company codes (automatically deduplicated by unique key)
+    LOOP AT lt_warehouses REFERENCE INTO DATA(lr_whse_src) WHERE CompanyCode IS NOT INITIAL.
+      INSERT VALUE #( companycode = lr_whse_src->CompanyCode ) INTO TABLE lt_companies_to_check.
     ENDLOOP.
 
     IF lt_companies_to_check IS INITIAL.
       RETURN.
     ENDIF.
 
-    " Validate against global Master Data service
-    DATA(lt_invalid_companies) = zcl_merp_md_util=>validate_companies( lt_companies_to_check ).
+    " 5. Direct selection into a sorted table to find valid existing records
+    DATA lt_existing_db TYPE SORTED TABLE OF ty_company_code WITH UNIQUE KEY companycode.
 
-    " Report errors for missing entries
-    IF lt_invalid_companies IS NOT INITIAL.
-      LOOP AT lt_warehouses REFERENCE INTO DATA(lr_whse) WHERE CompanyCode IS NOT INITIAL.
-        IF line_exists( lt_invalid_companies[ table_line = lr_whse->CompanyCode ] ).
-          APPEND VALUE #( %tky = lr_whse->%tky ) TO failed-warehouse.
+    SELECT CompanyCode AS companycode
+      FROM zmerp_r_company_code WITH PRIVILEGED ACCESS
+      FOR ALL ENTRIES IN @lt_companies_to_check
+      WHERE CompanyCode = @lt_companies_to_check-companycode
+      INTO TABLE @lt_existing_db.
 
-          APPEND VALUE #(
-            %tky                  = lr_whse->%tky
-            %state_area           = c_state_area_company
-            %msg                  = NEW zcm_merp_messages(
-                                      textid   = zcm_merp_messages=>company_code_not_found
-                                      attr1    = CONV #( lr_whse->CompanyCode )
-                                      severity = if_abap_behv_message=>severity-error )
-            %element-CompanyCode  = if_abap_behv=>mk-on
-          ) TO reported-warehouse.
-        ENDIF.
-      ENDLOOP.
-    ENDIF.
+    " 6. Report errors for non-existing entries using built-in key lookup
+    LOOP AT lt_warehouses REFERENCE INTO DATA(lr_whse) WHERE CompanyCode IS NOT INITIAL.
+      IF NOT line_exists( lt_existing_db[ companycode = lr_whse->CompanyCode ] ).
+        APPEND VALUE #(
+          %tky        = lr_whse->%tky
+          %fail-cause = if_abap_behv=>cause-not_found
+        ) TO failed-warehouse.
+
+        APPEND VALUE #(
+          %tky                  = lr_whse->%tky
+          %state_area           = c_state_area_company
+          %msg                  = NEW zcm_merp_messages(
+                                    textid   = zcm_merp_messages=>company_code_not_found
+                                    attr1    = CONV #( lr_whse->CompanyCode )
+                                    severity = if_abap_behv_message=>severity-error )
+          %element-CompanyCode  = if_abap_behv=>mk-on
+        ) TO reported-warehouse.
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
+
 
   METHOD earlynumbering_create.
     IF entities IS INITIAL.
@@ -168,16 +186,17 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
           ) TO mapped-warehouse.
         ELSE.
           APPEND VALUE #(
-            %cid      = lr_entity->%cid
-            %is_draft = lr_entity->%is_draft
+            %cid        = lr_entity->%cid
+            %is_draft   = lr_entity->%is_draft
+            %fail-cause = if_abap_behv=>cause-unspecific
           ) TO failed-warehouse.
 
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
-            %msg      = new_message_with_text(
-                          severity = if_abap_behv_message=>severity-error
-                          text     = 'Could not generate next Warehouse Code sequence.' )
+            %msg      = NEW zcm_merp_messages(
+                          textid   = zcm_merp_messages=>warehouse_number_failed
+                          severity = if_abap_behv_message=>severity-error )
           ) TO reported-warehouse.
         ENDIF.
       ELSE.
@@ -188,6 +207,9 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
         ) TO mapped-warehouse.
       ENDIF.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD precheck_delete.
   ENDMETHOD.
 
 ENDCLASS.

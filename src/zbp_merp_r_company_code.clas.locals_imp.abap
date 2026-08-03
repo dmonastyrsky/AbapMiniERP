@@ -20,6 +20,7 @@ CLASS lhc_zmerp_r_company_code DEFINITION INHERITING FROM cl_abap_behavior_handl
     "! @parameter keys | Keys requested for deletion
     METHODS precheck_delete FOR PRECHECK
       IMPORTING keys FOR DELETE CompanyCode.
+
 ENDCLASS.
 
 CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
@@ -94,12 +95,19 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
       ENDIF.
 
       IF lv_has_error = abap_true.
-        APPEND VALUE #( %tky = lr_comp_code->%tky ) TO failed-companycode.
+        APPEND VALUE #(
+          %tky        = lr_comp_code->%tky
+          %fail-cause = if_abap_behv=>cause-unspecific
+        ) TO failed-companycode.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
 
   METHOD precheck_delete.
+    IF keys IS INITIAL.
+      RETURN.
+    ENDIF.
+
     TYPES: BEGIN OF ty_key,
              companycode TYPE zmerp_company_code,
            END OF ty_key.
@@ -109,17 +117,18 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
              usedinentity TYPE zmerp_entity_name,
            END OF ty_dependency.
 
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY companycode.
+    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY companycode.
     DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY companycode.
     DATA lv_failed_added TYPE abap_bool.
 
-    IF keys IS INITIAL.
-      RETURN.
-    ENDIF.
-
+    " Collect key values and remove potential duplicates to optimize SQL predicate standard
     lt_keys = VALUE #( FOR key IN keys ( companycode = key-CompanyCode ) ).
+    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING companycode.
 
-    SELECT DISTINCT usage~CompanyCode, usage~UsedInEntity
+    " Bulk check database dependencies for collected key set
+    SELECT DISTINCT
+           usage~CompanyCode  AS companycode,
+           usage~UsedInEntity AS usedinentity
       FROM zmerp_i_company_code_usage AS usage
       INNER JOIN @lt_keys AS key ON usage~CompanyCode = key~companycode
       INTO TABLE @lt_dependencies.
@@ -131,22 +140,78 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
     LOOP AT keys REFERENCE INTO DATA(lr_key).
       lv_failed_added = abap_false.
 
+      " ABAP runtime automatically performs a highly efficient binary boundary scan here
       LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
         WHERE companycode = lr_key->CompanyCode.
 
+        " Record entity failure state ONCE per key
         IF lv_failed_added = abap_false.
-          APPEND VALUE #( %tky = lr_key->%tky ) TO failed-companycode.
+          APPEND VALUE #(
+            %tky        = lr_key->%tky
+            %fail-cause = if_abap_behv=>cause-dependency
+          ) TO failed-companycode.
           lv_failed_added = abap_true.
         ENDIF.
 
+        " Report explicit dependency error message to UI
         APPEND VALUE #(
-          %tky = lr_key->%tky
-          %msg = new_message_with_text(
-                   severity = if_abap_behv_message=>severity-error
-                   text     = |Company Code '{ lr_dep->companycode }' used in '{ lr_dep->usedinentity }'.| )
+          %tky                 = lr_key->%tky
+          %element-CompanyCode = if_abap_behv=>mk-on
+          %msg                  = NEW zcm_merp_messages(
+                                      textid   = zcm_merp_messages=>company_code_in_use
+                                      attr1    = CONV #( lr_dep->companycode )
+                                      attr2    = CONV #( lr_dep->usedinentity )
+                                      severity = if_abap_behv_message=>severity-error )
         ) TO reported-companycode.
       ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
+
+*  METHOD precheck_delete.
+*    IF keys IS INITIAL.
+*      RETURN.
+*    ENDIF.
+*
+*    DATA lv_failed_added TYPE abap_bool.
+*
+*    DATA(lt_key_strings) = VALUE string_table(
+*      FOR key IN keys ( CONV string( key-CompanyCode ) )
+*    ).
+*
+*    DATA(lt_blocked) = zcl_merp_md_util=>check_dependencies(
+*      it_keys           = lt_key_strings
+*      iv_usage_cds      = 'ZMERP_I_COMPANY_CODE_USAGE'
+*      iv_key_field_name = 'COMPANYCODE'
+*      is_textid         = zcm_merp_messages=>company_code_in_use
+*    ).
+*
+*    IF lt_blocked IS INITIAL.
+*      RETURN.
+*    ENDIF.
+*
+*    LOOP AT keys REFERENCE INTO DATA(lr_key).
+*      lv_failed_added = abap_false.
+*
+*      LOOP AT lt_blocked REFERENCE INTO DATA(lr_blocked)
+*        WHERE key_value = lr_key->CompanyCode.
+*
+*        IF lv_failed_added = abap_false.
+*          APPEND VALUE #(
+*            %tky        = lr_key->%tky
+*            %fail-cause = if_abap_behv=>cause-dependency
+*          ) TO failed-companycode.
+*          lv_failed_added = abap_true.
+*        ENDIF.
+*
+*        IF lr_blocked->msg IS BOUND.
+*          APPEND VALUE #(
+*            %tky                 = lr_key->%tky
+*            %element-CompanyCode = if_abap_behv=>mk-on
+*            %msg                 = lr_blocked->msg
+*          ) TO reported-companycode.
+*        ENDIF.
+*      ENDLOOP.
+*    ENDLOOP.
+*  ENDMETHOD.
 
 ENDCLASS.

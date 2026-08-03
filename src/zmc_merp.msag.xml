@@ -110,6 +110,42 @@
      <MSGNR>017</MSGNR>
      <TEXT>Company Code &amp;1 does not exist.</TEXT>
     </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>018</MSGNR>
+     <TEXT>Company Code &apos;&amp;1&apos; used in &apos;&amp;2&apos;.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>019</MSGNR>
+     <TEXT>Could not generate next Warehouse Code sequence.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>020</MSGNR>
+     <TEXT>VAT Rate &apos;&amp;1&apos; used in &apos;&amp;2&apos;.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>021</MSGNR>
+     <TEXT>Could not generate next VAT Rate sequence.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>022</MSGNR>
+     <TEXT>Item Group &apos;&amp;1&apos; used in &apos;&amp;2&apos;.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>023</MSGNR>
+     <TEXT>Could not generate next Item Group sequence.</TEXT>
+    </T100>
    </T100>
   </asx:values>
  </asx:abap>

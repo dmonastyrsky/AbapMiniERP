@@ -1,16 +1,33 @@
+"! Local behavior handler for Item Group BO entity.
 CLASS lhc_zmerp_r_item_group DEFINITION INHERITING FROM cl_abap_behavior_handler.
   PRIVATE SECTION.
-    METHODS:
-      get_global_authorizations FOR GLOBAL AUTHORIZATION
-        IMPORTING
-        REQUEST requested_authorizations FOR ItemGroup
-        RESULT result,
-      validateMandatoryFields FOR VALIDATE ON SAVE
-        IMPORTING keys FOR ItemGroup~validateMandatoryFields,
-      earlynumbering_create FOR NUMBERING
-        IMPORTING entities FOR CREATE ItemGroup,
-      precheck_delete FOR PRECHECK
-        IMPORTING keys FOR DELETE ItemGroup.
+    CONSTANTS c_state_area_mandatory TYPE string VALUE 'VALIDATE_MANDATORY'.
+
+    "! Evaluates global authorizations for CUD operations.
+    "! @parameter requested_authorizations | Mandatory RAP requested authorization flags
+    "! @parameter result | Resulting authorization statuses
+    METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+      IMPORTING
+      REQUEST requested_authorizations FOR ItemGroup
+      RESULT result.
+
+    "! Validates mandatory fields before saving.
+    "! @parameter keys | Entity keys for validation
+    METHODS validateMandatoryFields FOR VALIDATE ON SAVE
+      IMPORTING keys FOR ItemGroup~validateMandatoryFields.
+
+    "! Assigns early numbers for new Item Group entities.
+    "! @parameter entities | Entities requested for creation
+    "! @parameter mapped | Mapped keys output structure
+    "! @parameter failed | Failed entities output structure
+    "! @parameter reported | Reported messages output structure
+    METHODS earlynumbering_create FOR NUMBERING
+      IMPORTING entities FOR CREATE ItemGroup.
+
+    "! Pre-checks deletion dependencies in referenced entities.
+    "! @parameter keys | Keys requested for deletion
+    METHODS precheck_delete FOR PRECHECK
+      IMPORTING keys FOR DELETE ItemGroup.
 ENDCLASS.
 
 CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
@@ -30,10 +47,14 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD validateMandatoryFields.
-    LOOP AT keys REFERENCE INTO DATA(lr_key).
-      APPEND VALUE #( %tky        = lr_key->%tky
-                      %state_area = 'VALIDATE_MANDATORY' ) TO reported-itemgroup.
-    ENDLOOP.
+    DATA lv_has_error TYPE abap_bool.
+
+    reported-itemgroup = VALUE #(
+      BASE reported-itemgroup
+      FOR key IN keys
+      ( %tky        = key-%tky
+        %state_area = c_state_area_mandatory )
+    ).
 
     READ ENTITIES OF zmerp_r_item_group IN LOCAL MODE
       ENTITY ItemGroup
@@ -42,41 +63,51 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
       RESULT DATA(lt_groups).
 
     LOOP AT lt_groups REFERENCE INTO DATA(lr_group).
-      DATA(lv_has_error) = abap_false.
+      lv_has_error = abap_false.
 
       " 1. Validate Description
       IF lr_group->Description IS INITIAL.
         lv_has_error = abap_true.
-        APPEND VALUE #( %tky                 = lr_group->%tky
-                        %state_area          = 'VALIDATE_MANDATORY'
-                        %msg                 = NEW zcm_merp_messages(
-                                                 textid   = zcm_merp_messages=>enter_item_grp_desc
-                                                 severity = if_abap_behv_message=>severity-error )
-                        %element-Description = if_abap_behv=>mk-on ) TO reported-itemgroup.
+        APPEND VALUE #(
+          %tky                 = lr_group->%tky
+          %state_area          = c_state_area_mandatory
+          %msg                 = NEW zcm_merp_messages(
+                                   textid   = zcm_merp_messages=>enter_item_grp_desc
+                                   severity = if_abap_behv_message=>severity-error )
+          %element-Description = if_abap_behv=>mk-on
+        ) TO reported-itemgroup.
       ENDIF.
 
       " 2. Validate Default VAT Code
       IF lr_group->DefaultVatCode IS INITIAL.
         lv_has_error = abap_true.
-        APPEND VALUE #( %tky                    = lr_group->%tky
-                        %state_area             = 'VALIDATE_MANDATORY'
-                        %msg                    = NEW zcm_merp_messages(
-                                                    textid   = zcm_merp_messages=>select_default_vat_code
-                                                    severity = if_abap_behv_message=>severity-error )
-                        %element-DefaultVatCode = if_abap_behv=>mk-on ) TO reported-itemgroup.
+        APPEND VALUE #(
+          %tky                    = lr_group->%tky
+          %state_area             = c_state_area_mandatory
+          %msg                    = NEW zcm_merp_messages(
+                                      textid   = zcm_merp_messages=>select_default_vat_code
+                                      severity = if_abap_behv_message=>severity-error )
+          %element-DefaultVatCode = if_abap_behv=>mk-on
+        ) TO reported-itemgroup.
       ENDIF.
 
       IF lv_has_error = abap_true.
-        APPEND VALUE #( %tky = lr_group->%tky ) TO failed-itemgroup.
+        APPEND VALUE #(
+          %tky        = lr_group->%tky
+          %fail-cause = if_abap_behv=>cause-unspecific
+        ) TO failed-itemgroup.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
 
   METHOD earlynumbering_create.
-    DATA: lv_next_ig_code TYPE zmerp_item_group-item_group_code.
+    IF entities IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    DATA lv_next_ig_code TYPE zmerp_item_group_code.
 
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
-
       IF lr_entity->ItemGroupCode IS INITIAL.
         lv_next_ig_code = zcl_merp_num_range_util=>get_next_item_group_code_nro( ).
 
@@ -88,65 +119,92 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
           ) TO mapped-itemgroup.
         ELSE.
           APPEND VALUE #(
-            %cid      = lr_entity->%cid
-            %is_draft = lr_entity->%is_draft
+            %cid        = lr_entity->%cid
+            %is_draft   = lr_entity->%is_draft
+            %fail-cause = if_abap_behv=>cause-unspecific
           ) TO failed-itemgroup.
 
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
-            %msg      = new_message_with_text(
-                          severity = if_abap_behv_message=>severity-error
-                          text     = 'Could not generate next Item Group Code sequence.' )
+            %msg      = NEW zcm_merp_messages(
+                          textid   = zcm_merp_messages=>item_group_number_failed
+                          severity = if_abap_behv_message=>severity-error )
           ) TO reported-itemgroup.
         ENDIF.
-
       ELSE.
-        " Manual key assignment fallback
         APPEND VALUE #(
           %cid          = lr_entity->%cid
           %is_draft     = lr_entity->%is_draft
           ItemGroupCode = lr_entity->ItemGroupCode
         ) TO mapped-itemgroup.
       ENDIF.
-
     ENDLOOP.
   ENDMETHOD.
 
   METHOD precheck_delete.
-    " 1. Extract keys via %tky structure
-    DATA lt_keys TYPE STANDARD TABLE OF zmerp_item_group-item_group_code WITH DEFAULT KEY.
-    lt_keys = VALUE #( FOR key IN keys ( key-%tky-ItemGroupCode ) ).
-
-    IF lt_keys IS INITIAL.
+    IF keys IS INITIAL.
       RETURN.
     ENDIF.
 
-    " 2. Query usage CDS view
-    SELECT DISTINCT ItemGroupCode, UsedInEntity
-      FROM zmerp_i_item_group_usage
-      FOR ALL ENTRIES IN @lt_keys
-      WHERE ItemGroupCode = @lt_keys-table_line
-      INTO TABLE @DATA(lt_dependencies).
+    TYPES: BEGIN OF ty_key,
+             itemgroupcode TYPE zmerp_item_group_code, " Replace with your actual Data Element for Item Group Code
+           END OF ty_key.
+
+    TYPES: BEGIN OF ty_dependency,
+             itemgroupcode TYPE zmerp_item_group_code,
+             usedinentity  TYPE zmerp_entity_name,
+           END OF ty_dependency.
+
+    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY itemgroupcode.
+    DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY itemgroupcode.
+    DATA lv_failed_added TYPE abap_bool.
+
+    " Collect key values and remove potential duplicates to optimize SQL predicate standard
+    lt_keys = VALUE #( FOR key IN keys ( itemgroupcode = key-ItemGroupCode ) ).
+    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING itemgroupcode.
+
+    " Bulk check database dependencies for collected key set
+    SELECT DISTINCT
+           usage~ItemGroupCode AS itemgroupcode,
+           usage~UsedInEntity  AS usedinentity
+      FROM zmerp_i_item_group_usage AS usage
+      INNER JOIN @lt_keys AS key ON usage~ItemGroupCode = key~itemgroupcode
+      INTO TABLE @lt_dependencies.
 
     IF lt_dependencies IS INITIAL.
       RETURN.
     ENDIF.
 
-    " 3. Block instances and pass messages
-    LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep).
-      READ TABLE keys WITH KEY %tky-ItemGroupCode = lr_dep->ItemGroupCode REFERENCE INTO DATA(lr_key).
-      IF sy-subrc = 0.
-        APPEND VALUE #( %tky = lr_key->%tky ) TO failed-itemgroup.
+    LOOP AT keys REFERENCE INTO DATA(lr_key).
+      lv_failed_added = abap_false.
 
+      " ABAP runtime automatically performs a highly efficient binary boundary scan here
+      LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
+        WHERE itemgroupcode = lr_key->ItemGroupCode.
+
+        " Record entity failure state ONCE per key
+        IF lv_failed_added = abap_false.
+          APPEND VALUE #(
+            %tky        = lr_key->%tky
+            %fail-cause = if_abap_behv=>cause-dependency
+          ) TO failed-itemgroup.
+          lv_failed_added = abap_true.
+        ENDIF.
+
+        " Report explicit dependency error message to UI
         APPEND VALUE #(
-          %tky = lr_key->%tky
-          %msg = new_message_with_text(
-                     severity = if_abap_behv_message=>severity-error
-                     text     = |Item Group '{ lr_dep->ItemGroupCode }' used in '{ lr_dep->UsedInEntity }'.| )
+          %tky                   = lr_key->%tky
+          %element-ItemGroupCode = if_abap_behv=>mk-on
+          %msg                   = NEW zcm_merp_messages(
+                                      textid   = zcm_merp_messages=>item_group_in_use
+                                      attr1    = CONV #( lr_dep->itemgroupcode )
+                                      attr2    = CONV #( lr_dep->usedinentity )
+                                      severity = if_abap_behv_message=>severity-error )
         ) TO reported-itemgroup.
-      ENDIF.
+      ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
+
 
 ENDCLASS.

@@ -16,11 +16,11 @@ authorization master( global )
   update;
   delete ( precheck );
 
-  //field ( readonly : update ) VatCode;
   field ( readonly ) VatCode;
+  field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
   field ( mandatory ) Description, Percentage;
 
-  validation validateMandatoryFields on save { create; update; field Description, Percentage; }
+  validation validateMandatoryFields on save { create; update; field Description; }
   validation validatePercentage on save { create; update; field Percentage; }
 
   draft action Edit;

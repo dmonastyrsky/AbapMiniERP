@@ -1,18 +1,40 @@
+"! Local behavior handler for VAT Rate BO entity.
 CLASS lhc_zmerp_r_vat_rate DEFINITION INHERITING FROM cl_abap_behavior_handler.
   PRIVATE SECTION.
-    METHODS:
-      get_global_authorizations FOR GLOBAL AUTHORIZATION
-        IMPORTING
-        REQUEST requested_authorizations FOR VatRate
-        RESULT result,
-      validateMandatoryFields FOR VALIDATE ON SAVE
-        IMPORTING keys FOR VatRate~validateMandatoryFields,
-      validatePercentage FOR VALIDATE ON SAVE
-        IMPORTING keys FOR VatRate~validatePercentage,
-      earlynumbering_create FOR NUMBERING
-        IMPORTING entities FOR CREATE VatRate,
-      precheck_delete FOR PRECHECK
-        IMPORTING keys FOR DELETE VatRate.
+    CONSTANTS:
+      c_state_area_mandatory  TYPE string VALUE 'VALIDATE_MANDATORY',
+      c_state_area_percentage TYPE string VALUE 'VALIDATE_PERCENTAGE'.
+
+    "! Evaluates global authorizations for CUD operations.
+    "! @parameter requested_authorizations | Mandatory RAP requested authorization flags
+    "! @parameter result | Resulting authorization statuses
+    METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+      IMPORTING
+      REQUEST requested_authorizations FOR VatRate
+      RESULT result.
+
+    "! Validates mandatory fields before saving.
+    "! @parameter keys | Entity keys for validation
+    METHODS validateMandatoryFields FOR VALIDATE ON SAVE
+      IMPORTING keys FOR VatRate~validateMandatoryFields.
+
+    "! Validates VAT percentage range.
+    "! @parameter keys | Entity keys for validation
+    METHODS validatePercentage FOR VALIDATE ON SAVE
+      IMPORTING keys FOR VatRate~validatePercentage.
+
+    "! Assigns early numbers for new VAT Rate entities.
+    "! @parameter entities | Entities requested for creation
+    "! @parameter mapped | Mapped keys output structure
+    "! @parameter failed | Failed entities output structure
+    "! @parameter reported | Reported messages output structure
+    METHODS earlynumbering_create FOR NUMBERING
+      IMPORTING entities FOR CREATE VatRate.
+
+    "! Pre-checks deletion dependencies in referenced entities.
+    "! @parameter keys | Keys requested for deletion
+    METHODS precheck_delete FOR PRECHECK
+      IMPORTING keys FOR DELETE VatRate.
 ENDCLASS.
 
 CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
@@ -32,11 +54,14 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD validateMandatoryFields.
-    " Clear state messages before performing validation checks
-    LOOP AT keys REFERENCE INTO DATA(lr_key).
-      APPEND VALUE #( %tky        = lr_key->%tky
-                      %state_area = 'VALIDATE_MANDATORY' ) TO reported-vatrate.
-    ENDLOOP.
+    DATA lv_has_error TYPE abap_bool.
+
+    reported-vatrate = VALUE #(
+      BASE reported-vatrate
+      FOR key IN keys
+      ( %tky        = key-%tky
+        %state_area = c_state_area_mandatory )
+    ).
 
     READ ENTITIES OF zmerp_r_vat_rate IN LOCAL MODE
       ENTITY VatRate
@@ -45,34 +70,38 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       RESULT DATA(lt_vat_rates).
 
     LOOP AT lt_vat_rates REFERENCE INTO DATA(lr_vat).
+      lv_has_error = abap_false.
 
-      DATA(lv_has_error) = abap_false.
-
-      " Validate Description
       IF lr_vat->Description IS INITIAL.
         lv_has_error = abap_true.
-
-        APPEND VALUE #( %tky                 = lr_vat->%tky
-                        %state_area          = 'VALIDATE_MANDATORY'
-                        %msg                 = NEW zcm_merp_messages(
-                                                 textid   = zcm_merp_messages=>enter_vat_name
-                                                 severity = if_abap_behv_message=>severity-error )
-                        %element-Description = if_abap_behv=>mk-on ) TO reported-vatrate.
+        APPEND VALUE #(
+          %tky                 = lr_vat->%tky
+          %state_area          = c_state_area_mandatory
+          %msg                 = NEW zcm_merp_messages(
+                                   textid   = zcm_merp_messages=>enter_vat_name
+                                   severity = if_abap_behv_message=>severity-error )
+          %element-Description = if_abap_behv=>mk-on
+        ) TO reported-vatrate.
       ENDIF.
 
       IF lv_has_error = abap_true.
-        APPEND VALUE #( %tky = lr_vat->%tky ) TO failed-vatrate.
+        APPEND VALUE #(
+          %tky        = lr_vat->%tky
+          %fail-cause = if_abap_behv=>cause-unspecific
+        ) TO failed-vatrate.
       ENDIF.
-
     ENDLOOP.
   ENDMETHOD.
 
   METHOD validatePercentage.
-    " Clear state messages before performing validation checks
-    LOOP AT keys REFERENCE INTO DATA(lr_key).
-      APPEND VALUE #( %tky        = lr_key->%tky
-                      %state_area = 'VALIDATE_PERCENTAGE' ) TO reported-vatrate.
-    ENDLOOP.
+    DATA lv_has_error TYPE abap_bool.
+
+    reported-vatrate = VALUE #(
+      BASE reported-vatrate
+      FOR key IN keys
+      ( %tky        = key-%tky
+        %state_area = c_state_area_percentage )
+    ).
 
     READ ENTITIES OF zmerp_r_vat_rate IN LOCAL MODE
       ENTITY VatRate
@@ -81,33 +110,37 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       RESULT DATA(lt_vat_rates).
 
     LOOP AT lt_vat_rates REFERENCE INTO DATA(lr_vat).
+      lv_has_error = abap_false.
 
-      DATA(lv_has_error) = abap_false.
-
-      " Validate Percentage range (0 - 100%)
       IF lr_vat->Percentage < 0 OR lr_vat->Percentage > 100.
         lv_has_error = abap_true.
-
-        APPEND VALUE #( %tky                = lr_vat->%tky
-                        %state_area         = 'VALIDATE_PERCENTAGE'
-                        %msg                = NEW zcm_merp_messages(
-                                                textid   = zcm_merp_messages=>invalid_vat_percentage
-                                                severity = if_abap_behv_message=>severity-error )
-                        %element-Percentage = if_abap_behv=>mk-on ) TO reported-vatrate.
+        APPEND VALUE #(
+          %tky                = lr_vat->%tky
+          %state_area         = c_state_area_percentage
+          %msg                = NEW zcm_merp_messages(
+                                  textid   = zcm_merp_messages=>invalid_vat_percentage
+                                  severity = if_abap_behv_message=>severity-error )
+          %element-Percentage = if_abap_behv=>mk-on
+        ) TO reported-vatrate.
       ENDIF.
 
       IF lv_has_error = abap_true.
-        APPEND VALUE #( %tky = lr_vat->%tky ) TO failed-vatrate.
+        APPEND VALUE #(
+          %tky        = lr_vat->%tky
+          %fail-cause = if_abap_behv=>cause-unspecific
+        ) TO failed-vatrate.
       ENDIF.
-
     ENDLOOP.
   ENDMETHOD.
 
   METHOD earlynumbering_create.
-    DATA: lv_next_vat_code TYPE zmerp_vat_rate-vat_code.
+    IF entities IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    DATA lv_next_vat_code TYPE zmerp_vat_code.
 
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
-
       IF lr_entity->VatCode IS INITIAL.
         lv_next_vat_code = zcl_merp_num_range_util=>get_next_vat_code_nro( ).
 
@@ -119,19 +152,19 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
           ) TO mapped-vatrate.
         ELSE.
           APPEND VALUE #(
-            %cid      = lr_entity->%cid
-            %is_draft = lr_entity->%is_draft
+            %cid        = lr_entity->%cid
+            %is_draft   = lr_entity->%is_draft
+            %fail-cause = if_abap_behv=>cause-unspecific
           ) TO failed-vatrate.
 
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
-            %msg      = new_message_with_text(
-                          severity = if_abap_behv_message=>severity-error
-                          text     = 'Could not generate next VAT Code sequence.' )
+            %msg      = NEW zcm_merp_messages(
+                          textid   = zcm_merp_messages=>vat_number_failed
+                          severity = if_abap_behv_message=>severity-error )
           ) TO reported-vatrate.
         ENDIF.
-
       ELSE.
         APPEND VALUE #(
           %cid      = lr_entity->%cid
@@ -139,43 +172,70 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
           VatCode   = lr_entity->VatCode
         ) TO mapped-vatrate.
       ENDIF.
-
     ENDLOOP.
   ENDMETHOD.
 
   METHOD precheck_delete.
-    " 1. Extract keys via %tky structure
-    DATA lt_keys TYPE STANDARD TABLE OF zmerp_vat_rate-vat_code WITH DEFAULT KEY.
-    lt_keys = VALUE #( FOR key IN keys ( key-%tky-VatCode ) ).
-
-    IF lt_keys IS INITIAL.
+    IF keys IS INITIAL.
       RETURN.
     ENDIF.
 
-    " 2. Query usage CDS view
-    SELECT DISTINCT VatCode, UsedInEntity
-      FROM ZMERP_I_VAT_RATE_USAGE
-      FOR ALL ENTRIES IN @lt_keys
-      WHERE VatCode = @lt_keys-table_line
-      INTO TABLE @DATA(lt_dependencies).
+    TYPES: BEGIN OF ty_key,
+             vatcode TYPE zmerp_vat_code, " Replace with your actual Data Element for VAT Code
+           END OF ty_key.
+
+    TYPES: BEGIN OF ty_dependency,
+             vatcode      TYPE zmerp_vat_code,
+             usedinentity TYPE zmerp_entity_name,
+           END OF ty_dependency.
+
+    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY vatcode.
+    DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY vatcode.
+    DATA lv_failed_added TYPE abap_bool.
+
+    " Collect key values and remove potential duplicates to optimize SQL predicate standard
+    lt_keys = VALUE #( FOR key IN keys ( vatcode = key-VatCode ) ).
+    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING vatcode.
+
+    " Bulk check database dependencies for collected key set
+    SELECT DISTINCT
+           usage~VatCode      AS vatcode,
+           usage~UsedInEntity AS usedinentity
+      FROM zmerp_i_vat_rate_usage AS usage
+      INNER JOIN @lt_keys AS key ON usage~VatCode = key~vatcode
+      INTO TABLE @lt_dependencies.
 
     IF lt_dependencies IS INITIAL.
       RETURN.
     ENDIF.
 
-    " 3. Block instances and pass messages
-    LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep).
-      READ TABLE keys WITH KEY %tky-VatCode = lr_dep->VatCode REFERENCE INTO DATA(lr_key).
-      IF sy-subrc = 0.
-        APPEND VALUE #( %tky = lr_key->%tky ) TO failed-vatrate.
+    LOOP AT keys REFERENCE INTO DATA(lr_key).
+      lv_failed_added = abap_false.
 
+      " ABAP runtime automatically performs a highly efficient binary boundary scan here
+      LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
+        WHERE vatcode = lr_key->VatCode.
+
+        " Record entity failure state ONCE per key
+        IF lv_failed_added = abap_false.
+          APPEND VALUE #(
+            %tky        = lr_key->%tky
+            %fail-cause = if_abap_behv=>cause-dependency
+          ) TO failed-vatrate.
+          lv_failed_added = abap_true.
+        ENDIF.
+
+        " Report explicit dependency error message to UI
         APPEND VALUE #(
-          %tky = lr_key->%tky
-          %msg = new_message_with_text(
-                   severity = if_abap_behv_message=>severity-error
-                   text     = |VAT Rate '{ lr_dep->VatCode }' used in '{ lr_dep->UsedInEntity }'.| )
+          %tky             = lr_key->%tky
+          %element-VatCode = if_abap_behv=>mk-on
+          %msg             = NEW zcm_merp_messages(
+                                  textid   = zcm_merp_messages=>vat_rate_in_use
+                                  attr1    = CONV #( lr_dep->vatcode )
+                                  attr2    = CONV #( lr_dep->usedinentity )
+                                  severity = if_abap_behv_message=>severity-error )
         ) TO reported-vatrate.
-      ENDIF.
+      ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
 
