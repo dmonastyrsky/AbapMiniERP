@@ -6,33 +6,24 @@ CLASS lhc_zmerp_r_vat_rate DEFINITION INHERITING FROM cl_abap_behavior_handler.
       c_state_area_percentage TYPE string VALUE 'VALIDATE_PERCENTAGE'.
 
     "! Evaluates global authorizations for CUD operations.
-    "! @parameter requested_authorizations | Mandatory RAP requested authorization flags
-    "! @parameter result | Resulting authorization statuses
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
       IMPORTING
-      REQUEST requested_authorizations FOR VatRate
-      RESULT result.
+        REQUEST requested_authorizations FOR VatRate
+        RESULT result.
 
     "! Validates mandatory fields before saving.
-    "! @parameter keys | Entity keys for validation
     METHODS validateMandatoryFields FOR VALIDATE ON SAVE
       IMPORTING keys FOR VatRate~validateMandatoryFields.
 
     "! Validates VAT percentage range.
-    "! @parameter keys | Entity keys for validation
     METHODS validatePercentage FOR VALIDATE ON SAVE
       IMPORTING keys FOR VatRate~validatePercentage.
 
     "! Assigns early numbers for new VAT Rate entities.
-    "! @parameter entities | Entities requested for creation
-    "! @parameter mapped | Mapped keys output structure
-    "! @parameter failed | Failed entities output structure
-    "! @parameter reported | Reported messages output structure
     METHODS earlynumbering_create FOR NUMBERING
       IMPORTING entities FOR CREATE VatRate.
 
     "! Pre-checks deletion dependencies in referenced entities.
-    "! @parameter keys | Keys requested for deletion
     METHODS precheck_delete FOR PRECHECK
       IMPORTING keys FOR DELETE VatRate.
 ENDCLASS.
@@ -56,6 +47,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
   METHOD validateMandatoryFields.
     DATA lv_has_error TYPE abap_bool.
 
+    " Clear previous validation messages for this state area to prevent duplicate errors in UI
     reported-vatrate = VALUE #(
       BASE reported-vatrate
       FOR key IN keys
@@ -63,11 +55,16 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
         %state_area = c_state_area_mandatory )
     ).
 
+    " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_vat_rate IN LOCAL MODE
       ENTITY VatRate
       FIELDS ( Description )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_vat_rates).
+
+    IF lt_vat_rates IS INITIAL.
+      RETURN.
+    ENDIF.
 
     LOOP AT lt_vat_rates REFERENCE INTO DATA(lr_vat).
       lv_has_error = abap_false.
@@ -85,6 +82,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       ENDIF.
 
       IF lv_has_error = abap_true.
+        " Mark entity instance as failed to prevent transaction commit
         APPEND VALUE #(
           %tky        = lr_vat->%tky
           %fail-cause = if_abap_behv=>cause-unspecific
@@ -96,6 +94,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
   METHOD validatePercentage.
     DATA lv_has_error TYPE abap_bool.
 
+    " Clear previous validation messages for this state area to prevent duplicate errors in UI
     reported-vatrate = VALUE #(
       BASE reported-vatrate
       FOR key IN keys
@@ -103,11 +102,16 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
         %state_area = c_state_area_percentage )
     ).
 
+    " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_vat_rate IN LOCAL MODE
       ENTITY VatRate
       FIELDS ( Percentage )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_vat_rates).
+
+    IF lt_vat_rates IS INITIAL.
+      RETURN.
+    ENDIF.
 
     LOOP AT lt_vat_rates REFERENCE INTO DATA(lr_vat).
       lv_has_error = abap_false.
@@ -125,6 +129,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       ENDIF.
 
       IF lv_has_error = abap_true.
+        " Mark entity instance as failed to prevent transaction commit
         APPEND VALUE #(
           %tky        = lr_vat->%tky
           %fail-cause = if_abap_behv=>cause-unspecific
@@ -138,13 +143,12 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA lv_next_vat_code TYPE zmerp_vat_code.
-
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
       IF lr_entity->VatCode IS INITIAL.
-        lv_next_vat_code = zcl_merp_num_range_util=>get_next_vat_code_nro( ).
+        DATA(lv_next_vat_code) = zcl_merp_num_range_util=>get_next_vat_code_nro( ).
 
         IF lv_next_vat_code IS NOT INITIAL.
+          " Map generated business key to the draft/content creation ID (%cid)
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
@@ -166,6 +170,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
           ) TO reported-vatrate.
         ENDIF.
       ELSE.
+        " Preserve user-provided key if supplied during creation
         APPEND VALUE #(
           %cid      = lr_entity->%cid
           %is_draft = lr_entity->%is_draft
@@ -181,7 +186,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
     ENDIF.
 
     TYPES: BEGIN OF ty_key,
-             vatcode TYPE zmerp_vat_code, " Replace with your actual Data Element for VAT Code
+             vatcode TYPE zmerp_vat_code,
            END OF ty_key.
 
     TYPES: BEGIN OF ty_dependency,
@@ -194,8 +199,12 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
     DATA lv_failed_added TYPE abap_bool.
 
     " Collect key values and remove potential duplicates to optimize SQL predicate standard
-    lt_keys = VALUE #( FOR key IN keys ( vatcode = key-VatCode ) ).
+    lt_keys = VALUE #( FOR key IN keys WHERE ( VatCode IS NOT INITIAL ) ( vatcode = key-VatCode ) ).
     DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING vatcode.
+
+    IF lt_keys IS INITIAL.
+      RETURN.
+    ENDIF.
 
     " Bulk check database dependencies for collected key set
     SELECT DISTINCT

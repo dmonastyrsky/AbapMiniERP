@@ -1,26 +1,22 @@
 "! Local behavior handler for Company Code BO entity.
 CLASS lhc_zmerp_r_company_code DEFINITION INHERITING FROM cl_abap_behavior_handler.
   PRIVATE SECTION.
-    CONSTANTS c_state_area_mandatory TYPE string VALUE 'VALIDATE_MANDATORY'.
+    CONSTANTS:
+      c_state_area_mandatory TYPE string VALUE 'VALIDATE_MANDATORY'.
 
     "! Evaluates global authorizations for CUD operations.
-    "! @parameter requested_authorizations | Mandatory RAP requested authorization flags
-    "! @parameter result | Resulting authorization statuses
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
       IMPORTING
         REQUEST requested_authorizations FOR CompanyCode
         RESULT result.
 
     "! Validates mandatory fields before saving.
-    "! @parameter keys | Entity keys for validation
     METHODS validateMandatoryFields FOR VALIDATE ON SAVE
       IMPORTING keys FOR CompanyCode~validateMandatoryFields.
 
     "! Pre-checks deletion dependencies in referenced entities.
-    "! @parameter keys | Keys requested for deletion
     METHODS precheck_delete FOR PRECHECK
       IMPORTING keys FOR DELETE CompanyCode.
-
 ENDCLASS.
 
 CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
@@ -42,6 +38,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
   METHOD validateMandatoryFields.
     DATA lv_has_error TYPE abap_bool.
 
+    " Clear previous validation messages for this state area to prevent duplicate errors in UI
     reported-companycode = VALUE #(
       BASE reported-companycode
       FOR key IN keys
@@ -49,11 +46,16 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         %state_area = c_state_area_mandatory )
     ).
 
+    " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_company_code IN LOCAL MODE
       ENTITY CompanyCode
       FIELDS ( CompanyName CurrencyCode Country )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_comp_codes).
+
+    IF lt_comp_codes IS INITIAL.
+      RETURN.
+    ENDIF.
 
     LOOP AT lt_comp_codes REFERENCE INTO DATA(lr_comp_code).
       lv_has_error = abap_false.
@@ -95,6 +97,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
       ENDIF.
 
       IF lv_has_error = abap_true.
+        " Mark entity instance as failed to prevent transaction commit
         APPEND VALUE #(
           %tky        = lr_comp_code->%tky
           %fail-cause = if_abap_behv=>cause-unspecific
@@ -122,8 +125,12 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
     DATA lv_failed_added TYPE abap_bool.
 
     " Collect key values and remove potential duplicates to optimize SQL predicate standard
-    lt_keys = VALUE #( FOR key IN keys ( companycode = key-CompanyCode ) ).
+    lt_keys = VALUE #( FOR key IN keys WHERE ( CompanyCode IS NOT INITIAL ) ( companycode = key-CompanyCode ) ).
     DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING companycode.
+
+    IF lt_keys IS INITIAL.
+      RETURN.
+    ENDIF.
 
     " Bulk check database dependencies for collected key set
     SELECT DISTINCT

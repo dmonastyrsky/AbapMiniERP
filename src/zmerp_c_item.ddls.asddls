@@ -42,5 +42,7 @@ define root view entity ZMERP_C_ITEM
       /* Redirected associations */
       _ItemGroup      : redirected to ZMERP_C_ITEM_GROUP,
       _DefaultVATRate : redirected to ZMERP_C_VAT_RATE,
+      
+      /* Exposed text association */
       _ItemType
 }

@@ -216,7 +216,25 @@ CLASS zcm_merp_messages DEFINITION
         attr2 TYPE scx_attrname VALUE '',
         attr3 TYPE scx_attrname VALUE '',
         attr4 TYPE scx_attrname VALUE '',
-      END OF item_group_number_failed.
+      END OF item_group_number_failed,
+
+      BEGIN OF item_in_use,
+        msgid TYPE symsgid VALUE 'ZMC_MERP',
+        msgno TYPE symsgno VALUE '022',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE 'MV_ATTR2',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF item_in_use,
+
+      BEGIN OF item_number_failed,
+        msgid TYPE symsgid VALUE 'ZMC_MERP',
+        msgno TYPE symsgno VALUE '023',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF item_number_failed.
 
     DATA:
       mv_attr1 TYPE string,

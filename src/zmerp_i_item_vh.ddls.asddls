@@ -1,28 +1,32 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @EndUserText.label: 'Item Value Help'
+@Metadata.ignorePropagatedAnnotations: true
 @Search.searchable: true
-@ObjectModel.dataCategory: #VALUE_HELP
 
 define view entity ZMERP_I_ITEM_VH
   as select from ZMERP_R_ITEM
 {
-  @UI.lineItem: [{ position: 10, label: 'Item Code' }]
-  @Search.defaultSearchElement: true
-  @Search.ranking: #HIGH
+      @Search.defaultSearchElement: true
+      @Search.ranking: #HIGH
   key ItemCode,
 
-  @UI.lineItem: [{ position: 20, label: 'Description' }]
-  @Search.defaultSearchElement: true
-  @Search.ranking: #HIGH
-  @Search.fuzzinessThreshold: 0.7
-  Description,
+      @Search.defaultSearchElement: true
+      @Search.ranking: #HIGH
+      @Search.fuzzinessThreshold: 0.7
+      Description,
 
-  @UI.lineItem: [{ position: 30, label: 'Item Type' }]
-  ItemTypeCode, 
+      @ObjectModel.text.element: [ 'ItemTypeDescription' ]
+      @UI.textArrangement: #TEXT_ONLY
+      ItemTypeCode,
+      _ItemType.Description        as ItemTypeDescription,
 
-  @UI.lineItem: [{ position: 40, label: 'Item Group' }]
-  ItemGroupCode,
+      @ObjectModel.text.element: [ 'ItemGroupDescription' ]
+      @UI.textArrangement: #TEXT_ONLY
+      ItemGroupCode,
+      _ItemGroup.Description       as ItemGroupDescription,
 
-  @UI.lineItem: [{ position: 50, label: 'Default VAT Code' }]
-  DefaultVatCode
+      @ObjectModel.text.element: [ 'DefaultVATRateDescription' ]
+      @UI.textArrangement: #TEXT_ONLY  
+      DefaultVatCode,  
+      _DefaultVATRate.Description as DefaultVATRateDescription
 }

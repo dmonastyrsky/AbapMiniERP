@@ -14,7 +14,7 @@ authorization master ( global )
 {
   create;
   update;
-  delete;
+  delete ( precheck );
 
   field ( readonly ) ItemCode;
   field ( mandatory ) Description, ItemTypeCode, ItemGroupCode, DefaultVatCode, BaseUnitOfMeasure;

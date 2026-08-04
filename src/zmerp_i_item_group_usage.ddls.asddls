@@ -5,7 +5,7 @@
 define view entity ZMERP_I_ITEM_GROUP_USAGE
   as select from ZMERP_R_ITEM
 {
-  key ItemGroupCode,
+  key ItemGroupCode                       as ItemGroupCode,
   key ItemCode                            as RefEntityKey,
   key cast( 'Item' as zmerp_entity_name ) as UsedInEntity
 }

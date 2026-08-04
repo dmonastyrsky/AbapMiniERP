@@ -1,31 +1,24 @@
 "! Local behavior handler for Item Group BO entity.
 CLASS lhc_zmerp_r_item_group DEFINITION INHERITING FROM cl_abap_behavior_handler.
   PRIVATE SECTION.
-    CONSTANTS c_state_area_mandatory TYPE string VALUE 'VALIDATE_MANDATORY'.
+    CONSTANTS:
+      c_state_area_mandatory TYPE string VALUE 'VALIDATE_MANDATORY'.
 
     "! Evaluates global authorizations for CUD operations.
-    "! @parameter requested_authorizations | Mandatory RAP requested authorization flags
-    "! @parameter result | Resulting authorization statuses
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
       IMPORTING
-      REQUEST requested_authorizations FOR ItemGroup
-      RESULT result.
+        REQUEST requested_authorizations FOR ItemGroup
+        RESULT result.
 
     "! Validates mandatory fields before saving.
-    "! @parameter keys | Entity keys for validation
     METHODS validateMandatoryFields FOR VALIDATE ON SAVE
       IMPORTING keys FOR ItemGroup~validateMandatoryFields.
 
     "! Assigns early numbers for new Item Group entities.
-    "! @parameter entities | Entities requested for creation
-    "! @parameter mapped | Mapped keys output structure
-    "! @parameter failed | Failed entities output structure
-    "! @parameter reported | Reported messages output structure
     METHODS earlynumbering_create FOR NUMBERING
       IMPORTING entities FOR CREATE ItemGroup.
 
     "! Pre-checks deletion dependencies in referenced entities.
-    "! @parameter keys | Keys requested for deletion
     METHODS precheck_delete FOR PRECHECK
       IMPORTING keys FOR DELETE ItemGroup.
 ENDCLASS.
@@ -49,6 +42,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
   METHOD validateMandatoryFields.
     DATA lv_has_error TYPE abap_bool.
 
+    " Clear previous validation messages for this state area to prevent duplicate errors in UI
     reported-itemgroup = VALUE #(
       BASE reported-itemgroup
       FOR key IN keys
@@ -56,16 +50,20 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
         %state_area = c_state_area_mandatory )
     ).
 
+    " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_item_group IN LOCAL MODE
       ENTITY ItemGroup
       FIELDS ( Description DefaultVatCode )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_groups).
 
+    IF lt_groups IS INITIAL.
+      RETURN.
+    ENDIF.
+
     LOOP AT lt_groups REFERENCE INTO DATA(lr_group).
       lv_has_error = abap_false.
 
-      " 1. Validate Description
       IF lr_group->Description IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -78,7 +76,6 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
         ) TO reported-itemgroup.
       ENDIF.
 
-      " 2. Validate Default VAT Code
       IF lr_group->DefaultVatCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -92,6 +89,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
       ENDIF.
 
       IF lv_has_error = abap_true.
+        " Mark entity instance as failed to prevent transaction commit
         APPEND VALUE #(
           %tky        = lr_group->%tky
           %fail-cause = if_abap_behv=>cause-unspecific
@@ -105,13 +103,12 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA lv_next_ig_code TYPE zmerp_item_group_code.
-
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
       IF lr_entity->ItemGroupCode IS INITIAL.
-        lv_next_ig_code = zcl_merp_num_range_util=>get_next_item_group_code_nro( ).
+        DATA(lv_next_ig_code) = zcl_merp_num_range_util=>get_next_item_group_code_nro( ).
 
         IF lv_next_ig_code IS NOT INITIAL.
+          " Map generated business key to the draft/content creation ID (%cid)
           APPEND VALUE #(
             %cid          = lr_entity->%cid
             %is_draft     = lr_entity->%is_draft
@@ -133,6 +130,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
           ) TO reported-itemgroup.
         ENDIF.
       ELSE.
+        " Preserve user-provided key if supplied during creation
         APPEND VALUE #(
           %cid          = lr_entity->%cid
           %is_draft     = lr_entity->%is_draft
@@ -148,7 +146,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
     ENDIF.
 
     TYPES: BEGIN OF ty_key,
-             itemgroupcode TYPE zmerp_item_group_code, " Replace with your actual Data Element for Item Group Code
+             itemgroupcode TYPE zmerp_item_group_code,
            END OF ty_key.
 
     TYPES: BEGIN OF ty_dependency,
@@ -161,8 +159,12 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
     DATA lv_failed_added TYPE abap_bool.
 
     " Collect key values and remove potential duplicates to optimize SQL predicate standard
-    lt_keys = VALUE #( FOR key IN keys ( itemgroupcode = key-ItemGroupCode ) ).
+    lt_keys = VALUE #( FOR key IN keys WHERE ( ItemGroupCode IS NOT INITIAL ) ( itemgroupcode = key-ItemGroupCode ) ).
     DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING itemgroupcode.
+
+    IF lt_keys IS INITIAL.
+      RETURN.
+    ENDIF.
 
     " Bulk check database dependencies for collected key set
     SELECT DISTINCT
@@ -205,6 +207,5 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
       ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
-
 
 ENDCLASS.

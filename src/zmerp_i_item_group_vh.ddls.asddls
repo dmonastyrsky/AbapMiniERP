@@ -17,7 +17,6 @@ define view entity ZMERP_I_ITEM_GROUP_VH
 
   @ObjectModel.text.element: [ 'DefaultVATRateDescription' ]
   @UI.textArrangement: #TEXT_ONLY  
-  @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_VAT_RATE_VH', element: 'VatCode' }, useForValidation: true }]
   DefaultVatCode,  
   _DefaultVATRate.Description as DefaultVATRateDescription
 }

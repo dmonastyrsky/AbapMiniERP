@@ -146,6 +146,18 @@
      <MSGNR>023</MSGNR>
      <TEXT>Could not generate next Item Group sequence.</TEXT>
     </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>024</MSGNR>
+     <TEXT>Item &apos;&amp;1&apos; used in &apos;&amp;2&apos;.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>025</MSGNR>
+     <TEXT>Could not generate next Item sequence.</TEXT>
+    </T100>
    </T100>
   </asx:values>
  </asx:abap>
