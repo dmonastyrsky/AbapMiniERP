@@ -105,7 +105,14 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
 
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
       IF lr_entity->ItemGroupCode IS INITIAL.
-        DATA(lv_next_ig_code) = zcl_merp_num_range_util=>get_next_item_group_code_nro( ).
+
+        DATA(lv_next_ig_code) = VALUE string( ).
+
+        TRY.
+            lv_next_ig_code = zcl_merp_num_range_util=>get_next_item_group_code_nro( ).
+          CATCH cx_number_ranges.
+            CLEAR lv_next_ig_code.
+        ENDTRY.
 
         IF lv_next_ig_code IS NOT INITIAL.
           " Map generated business key to the draft/content creation ID (%cid)

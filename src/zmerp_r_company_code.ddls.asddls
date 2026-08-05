@@ -15,6 +15,7 @@ define root view entity ZMERP_R_COMPANY_CODE
       
   key company_code          as CompanyCode,
       company_name          as CompanyName,
+      company_prefix        as CompanyPrefix,
 
       @ObjectModel.foreignKey.association: '_Currency'
       currency_code         as CurrencyCode,

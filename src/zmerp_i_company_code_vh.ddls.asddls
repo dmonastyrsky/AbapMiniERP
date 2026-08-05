@@ -15,6 +15,9 @@ define view entity ZMERP_I_COMPANY_CODE_VH
       @Search.ranking: #HIGH
       @Search.fuzzinessThreshold: 0.7
       CompanyName,
+      
+      @Search.defaultSearchElement: true
+      CompanyPrefix,
 
       CurrencyCode,
       @ObjectModel.text.element: [ 'CountryName' ]

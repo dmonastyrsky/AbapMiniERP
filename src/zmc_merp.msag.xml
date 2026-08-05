@@ -12,61 +12,61 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>001</MSGNR>
-     <TEXT>Enter a Company Name.</TEXT>
+     <TEXT>Enter Business Partner name.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>002</MSGNR>
-     <TEXT>Enter a Currency.</TEXT>
+     <TEXT>Select at least one role: Customer or Supplier.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>003</MSGNR>
-     <TEXT>Enter a Country.</TEXT>
+     <TEXT>Enter Company Name.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>004</MSGNR>
-     <TEXT>Company Code &amp;1 already exists.</TEXT>
+     <TEXT>Select Company.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>005</MSGNR>
-     <TEXT>Enter a Warehouse Name.</TEXT>
+     <TEXT>Select Country.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>006</MSGNR>
-     <TEXT>Select a Company Code.</TEXT>
+     <TEXT>Select Currency.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>007</MSGNR>
-     <TEXT>Warehouse &amp;1 already exists.</TEXT>
+     <TEXT>Enter Item description.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>008</MSGNR>
-     <TEXT>Enter VAT description.</TEXT>
+     <TEXT>Select Item Type.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>009</MSGNR>
-     <TEXT>VAT Code &amp;1 already exists.</TEXT>
+     <TEXT>Select Item Group.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>010</MSGNR>
-     <TEXT>VAT percentage must be between 0 and 100.</TEXT>
+     <TEXT>Select Base Unit of Measure.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
@@ -78,85 +78,139 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>012</MSGNR>
-     <TEXT>Enter Item description.</TEXT>
+     <TEXT>Enter VAT description.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>013</MSGNR>
-     <TEXT>Enter an Item type.</TEXT>
+     <TEXT>Select Default VAT Code.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>014</MSGNR>
-     <TEXT>Select an Item Group.</TEXT>
+     <TEXT>VAT percentage must be between 0 and 100.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>015</MSGNR>
-     <TEXT>Select a Default VAT Code.</TEXT>
+     <TEXT>Enter Warehouse Name.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>016</MSGNR>
-     <TEXT>Select a Base Unit of Measure.</TEXT>
-    </T100>
-    <T100>
-     <SPRSL>E</SPRSL>
-     <ARBGB>ZMC_MERP</ARBGB>
-     <MSGNR>017</MSGNR>
-     <TEXT>Company Code &amp;1 does not exist.</TEXT>
-    </T100>
-    <T100>
-     <SPRSL>E</SPRSL>
-     <ARBGB>ZMC_MERP</ARBGB>
-     <MSGNR>018</MSGNR>
-     <TEXT>Company Code &apos;&amp;1&apos; used in &apos;&amp;2&apos;.</TEXT>
-    </T100>
-    <T100>
-     <SPRSL>E</SPRSL>
-     <ARBGB>ZMC_MERP</ARBGB>
-     <MSGNR>019</MSGNR>
-     <TEXT>Could not generate next Warehouse Code sequence.</TEXT>
-    </T100>
-    <T100>
-     <SPRSL>E</SPRSL>
-     <ARBGB>ZMC_MERP</ARBGB>
-     <MSGNR>020</MSGNR>
-     <TEXT>VAT Rate &apos;&amp;1&apos; used in &apos;&amp;2&apos;.</TEXT>
+     <TEXT>Enter Prefix</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>021</MSGNR>
-     <TEXT>Could not generate next VAT Rate sequence.</TEXT>
+     <TEXT>Business Partner &amp;1 does not exist.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>022</MSGNR>
-     <TEXT>Item Group &apos;&amp;1&apos; used in &apos;&amp;2&apos;.</TEXT>
+     <TEXT>Company Code &amp;1 does not exist.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>023</MSGNR>
-     <TEXT>Could not generate next Item Group sequence.</TEXT>
+     <TEXT>Item &amp;1 does not exist.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>024</MSGNR>
-     <TEXT>Item &apos;&amp;1&apos; used in &apos;&amp;2&apos;.</TEXT>
+     <TEXT>Item Group &amp;1 does not exist.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP</ARBGB>
      <MSGNR>025</MSGNR>
-     <TEXT>Could not generate next Item sequence.</TEXT>
+     <TEXT>VAT Code &amp;1 does not exist.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>026</MSGNR>
+     <TEXT>Warehouse &amp;1 does not exist.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>041</MSGNR>
+     <TEXT>Business Partner &amp;1 is used in &amp;2.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>042</MSGNR>
+     <TEXT>Company Code &amp;1 is used in &amp;2.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>043</MSGNR>
+     <TEXT>Item &amp;1 is used in &amp;2.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>044</MSGNR>
+     <TEXT>Item Group &amp;1 is used in &amp;2.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>045</MSGNR>
+     <TEXT>VAT Rate &amp;1 is used in &amp;2.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>046</MSGNR>
+     <TEXT>Warehouse &amp;1 is used in &amp;2.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>061</MSGNR>
+     <TEXT>Failed to generate Business Partner code.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>062</MSGNR>
+     <TEXT>Failed to generate Company Code.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>063</MSGNR>
+     <TEXT>Failed to generate Item code.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>064</MSGNR>
+     <TEXT>Failed to generate Item Group code.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>065</MSGNR>
+     <TEXT>Failed to generate VAT Rate code.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP</ARBGB>
+     <MSGNR>066</MSGNR>
+     <TEXT>Failed to generate Warehouse code.</TEXT>
     </T100>
    </T100>
   </asx:values>

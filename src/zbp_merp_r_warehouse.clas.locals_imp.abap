@@ -174,7 +174,14 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
 
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
       IF lr_entity->WarehouseCode IS INITIAL.
-        DATA(lv_next_wh_code) = zcl_merp_num_range_util=>get_next_warehouse_code_nro( ).
+
+        DATA(lv_next_wh_code) = VALUE string( ).
+
+        TRY.
+            lv_next_wh_code = zcl_merp_num_range_util=>get_next_warehouse_code_nro( ).
+          CATCH cx_number_ranges.
+            CLEAR lv_next_wh_code.
+        ENDTRY.
 
         IF lv_next_wh_code IS NOT INITIAL.
           " Map generated business key to the draft/content creation ID (%cid)
@@ -210,7 +217,71 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD precheck_delete.
-    " Intentional no-op: Delete authorization and dependencies are handled downstream or in underlying layers
+    IF keys IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    TYPES: BEGIN OF ty_key,
+             warehousecode TYPE zmerp_warehouse_code,
+           END OF ty_key.
+
+    TYPES: BEGIN OF ty_dependency,
+             warehousecode TYPE zmerp_warehouse_code,
+             usedinentity  TYPE zmerp_entity_name,
+           END OF ty_dependency.
+
+    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY warehousecode.
+    DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY warehousecode.
+    DATA lv_failed_added TYPE abap_bool.
+
+    " Collect key values and remove potential duplicates to optimize SQL predicate standard
+    lt_keys = VALUE #( FOR key IN keys WHERE ( WarehouseCode IS NOT INITIAL ) ( warehousecode = key-WarehouseCode ) ).
+    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING warehousecode.
+
+    IF lt_keys IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    " Bulk check database dependencies for collected key set
+    SELECT DISTINCT
+           usage~WarehouseCode AS warehousecode,
+           usage~UsedInEntity  AS usedinentity
+      FROM zmerp_i_warehouse_usage AS usage
+      INNER JOIN @lt_keys AS key ON usage~WarehouseCode = key~warehousecode
+      INTO TABLE @lt_dependencies.
+
+    IF lt_dependencies IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    LOOP AT keys REFERENCE INTO DATA(lr_key).
+      lv_failed_added = abap_false.
+
+      " ABAP runtime automatically performs a highly efficient binary boundary scan here
+      LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
+        WHERE warehousecode = lr_key->WarehouseCode.
+
+        " Record entity failure state ONCE per key
+        IF lv_failed_added = abap_false.
+          APPEND VALUE #(
+            %tky        = lr_key->%tky
+            %fail-cause = if_abap_behv=>cause-dependency
+          ) TO failed-warehouse.
+          lv_failed_added = abap_true.
+        ENDIF.
+
+        " Report explicit dependency error message to UI
+        APPEND VALUE #(
+          %tky                  = lr_key->%tky
+          %element-WarehouseCode = if_abap_behv=>mk-on
+          %msg                  = NEW zcm_merp_messages(
+                                      textid   = zcm_merp_messages=>warehouse_in_use
+                                      attr1    = CONV #( lr_dep->warehousecode )
+                                      attr2    = CONV #( lr_dep->usedinentity )
+                                      severity = if_abap_behv_message=>severity-error )
+        ) TO reported-warehouse.
+      ENDLOOP.
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.

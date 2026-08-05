@@ -46,6 +46,12 @@ CLASS zcl_merp_initial_setup DEFINITION
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
+    "! Populates initial business partners seed data into ZMERP_BUS_PART table.
+    "! @parameter out | Console output object for logging setup progress
+    CLASS-METHODS setup_business_partners
+      IMPORTING
+        out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
 ENDCLASS.
 
 
@@ -68,6 +74,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     setup_warehouses( out ).
     setup_item_groups( out ).
     setup_items( out ).
+    setup_business_partners( out ).
 
     " Dynamically sync NRO levels with real DB record counts
     zcl_merp_num_range_util=>sync_intervals_from_db( ).
@@ -97,6 +104,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     lt_comp_code = VALUE #(
       ( company_code          = '1000'
         company_name          = 'MERP Deutschland GmbH'
+        company_prefix        = 'DE'
         currency_code         = 'EUR'
         country               = 'DE'
         created_by            = lv_user
@@ -107,6 +115,18 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
       ( company_code          = '2000'
         company_name          = 'MERP Trading GmbH'
+        company_prefix        = 'TR'
+        currency_code         = 'EUR'
+        country               = 'DE'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( company_code          = '3000'
+        company_name          = 'Modevi GmbH'
+        company_prefix        = 'MD'
         currency_code         = 'EUR'
         country               = 'DE'
         created_by            = lv_user
@@ -463,6 +483,228 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
     IF out IS BOUND.
       out->write( |[Item]: Successfully inserted { sy-dbcnt } rows.| ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD setup_business_partners.
+    DATA: lt_bp        TYPE TABLE OF zmerp_bus_part,
+          lv_user      TYPE abp_creation_user,
+          lv_timestamp TYPE abp_creation_tstmpl.
+
+    TRY.
+        lv_user = cl_abap_context_info=>get_user_technical_name( ).
+      CATCH cx_abap_context_info_error.
+        lv_user = 'INITIAL_SETUP'.
+    ENDTRY.
+
+    GET TIME STAMP FIELD lv_timestamp.
+
+    " Clear active and draft tables
+    DELETE FROM zmerp_bus_part.
+    DELETE FROM zmerp_bus_part_d.
+
+    lt_bp = VALUE #(
+      " --- Suppliers (is_supplier = 'X', is_customer = ' ') ---
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 1 )
+        partner_name          = 'Bosch-Siemens Hausgeräte GmbH'
+        is_customer           = abap_false
+        is_supplier           = abap_true
+        tax_number            = 'DE129323400'
+        address               = 'Carl-Wery-Straße 34'
+        city                  = 'München'
+        country               = 'DE'
+        phone                 = '+49 89 459001'
+        email                 = 'contact@bshg.com'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 2 )
+        partner_name          = 'Miele & Cie. KG'
+        is_customer           = abap_false
+        is_supplier           = abap_true
+        tax_number            = 'DE126788901'
+        address               = 'Carl-Miele-Straße 29'
+        city                  = 'Gütersloh'
+        country               = 'DE'
+        phone                 = '+49 5241 890'
+        email                 = 'info@miele.de'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 3 )
+        partner_name          = 'DeLonghi Deutschland GmbH'
+        is_customer           = abap_false
+        is_supplier           = abap_true
+        tax_number            = 'DE811234567'
+        address               = 'Carl-Ulrich-Straße 4'
+        city                  = 'Neu-Isenburg'
+        country               = 'DE'
+        phone                 = '+49 6102 5990'
+        email                 = 'service@delonghi.de'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 4 )
+        partner_name          = 'Samsung Electronics GmbH'
+        is_customer           = abap_false
+        is_supplier           = abap_true
+        tax_number            = 'DE113546789'
+        address               = 'Am Kronberger Hang 6'
+        city                  = 'Schwalbach am Taunus'
+        country               = 'DE'
+        phone                 = '+49 6196 660'
+        email                 = 'info@samsung.de'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 5 )
+        partner_name          = 'Sony Europe B.V. Zweigniederlassung Deutschland'
+        is_customer           = abap_false
+        is_supplier           = abap_true
+        tax_number            = 'DE815678910'
+        address               = 'Kemperplatz 1'
+        city                  = 'Berlin'
+        country               = 'DE'
+        phone                 = '+49 30 585800'
+        email                 = 'info@sony.de'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      " --- Customers (is_supplier = ' ', is_customer = 'X') ---
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 6 )
+        partner_name          = 'Media-Saturn Retail Group GmbH'
+        is_customer           = abap_true
+        is_supplier           = abap_false
+        tax_number            = 'DE130123456'
+        address               = 'Media-Saturn-Str. 1'
+        city                  = 'Ingolstadt'
+        country               = 'DE'
+        phone                 = '+49 841 6340'
+        email                 = 'einkauf@mediamarkt.de'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 7 )
+        partner_name          = 'Expert SE'
+        is_customer           = abap_true
+        is_supplier           = abap_false
+        tax_number            = 'DE115678123'
+        address               = 'Bayernstraße 4'
+        city                  = 'Langenhagen'
+        country               = 'DE'
+        phone                 = '+49 511 78080'
+        email                 = 'zentrale@expert.de'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 8 )
+        partner_name          = 'Euronics Deutschland eG'
+        is_customer           = abap_true
+        is_supplier           = abap_false
+        tax_number            = 'DE147890123'
+        address               = 'Berliner Straße 11'
+        city                  = 'Ditzingen'
+        country               = 'DE'
+        phone                 = '+49 7156 9280'
+        email                 = 'info@euronics.de'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 9 )
+        partner_name          = 'Elektro-Service Müller GmbH'
+        is_customer           = abap_true
+        is_supplier           = abap_false
+        tax_number            = 'DE289012345'
+        address               = 'Trierer Straße 12'
+        city                  = 'Kusel'
+        country               = 'DE'
+        phone                 = '+49 6381 1234'
+        email                 = 'service@elektro-mueller.de'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 10 )
+        partner_name          = 'Küchenstudio Schmidt GmbH'
+        is_customer           = abap_true
+        is_supplier           = abap_false
+        tax_number            = 'DE301234567'
+        address               = 'Zeil 45'
+        city                  = 'Frankfurt am Main'
+        country               = 'DE'
+        phone                 = '+49 69 987654'
+        email                 = 'vertrieb@kuechen-schmidt.de'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      " --- Both Customer and Supplier (is_supplier = 'X', is_customer = 'X') ---
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 11 )
+        partner_name          = 'ElectronicPartner GmbH & Co. KG'
+        is_customer           = abap_true
+        is_supplier           = abap_true
+        tax_number            = 'DE119345678'
+        address               = 'Mündelheimer Weg 40'
+        city                  = 'Düsseldorf'
+        country               = 'DE'
+        phone                 = '+49 211 41560'
+        email                 = 'partner@electronicpartner.de'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+
+      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 12 )
+        partner_name          = 'Conrad Electronic SE'
+        is_customer           = abap_true
+        is_supplier           = abap_true
+        tax_number            = 'DE133123789'
+        address               = 'Klaus-Conrad-Straße 1'
+        city                  = 'Hirschau'
+        country               = 'DE'
+        phone                 = '+49 9622 300'
+        email                 = 'b2b@conrad.de'
+        created_by            = lv_user
+        created_at            = lv_timestamp
+        local_last_changed_by = lv_user
+        local_last_changed_at = lv_timestamp
+        last_changed_at       = lv_timestamp )
+    ).
+
+    INSERT zmerp_bus_part FROM TABLE @lt_bp.
+
+    IF out IS BOUND.
+      out->write( |[Business Partner]: Successfully inserted { sy-dbcnt } rows.| ).
     ENDIF.
   ENDMETHOD.
 

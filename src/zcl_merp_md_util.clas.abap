@@ -115,7 +115,7 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
 
 
   METHOD check_dependencies.
-    IF it_keys IS INITIAL.
+    IF it_keys IS INITIAL OR iv_usage_cds IS INITIAL OR iv_key_field_name IS INITIAL.
       RETURN.
     ENDIF.
 
@@ -126,21 +126,19 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
 
     TYPES tt_string_range TYPE RANGE OF string.
 
-    DATA lt_keys         TYPE SORTED TABLE OF string WITH NON-UNIQUE KEY table_line.
+    DATA lt_keys         TYPE SORTED TABLE OF string WITH UNIQUE KEY table_line.
     DATA lt_dependencies TYPE STANDARD TABLE OF ty_dep WITH EMPTY KEY.
 
     lt_keys = it_keys.
-    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING table_line.
 
     DATA(lv_select_clause) = |{ iv_key_field_name } AS key_field, UsedInEntity|.
     DATA(lv_total_lines)   = lines( lt_keys ).
     DATA(lv_offset)        = 1.
 
-    CONSTANTS lc_batch_size       TYPE i VALUE 500.
-    CONSTANTS lc_max_ui_messages TYPE i VALUE 10.
+    CONSTANTS lc_batch_size TYPE i VALUE 500.
 
     TRY.
-        " Processing in chunks of 500 to prevent HANA SQL statement limit overflow
+        " Batch processing (500 items max) to avoid HANA SQL statement buffer limits
         WHILE lv_offset <= lv_total_lines.
 
           DATA(lt_batch_range) = VALUE tt_string_range(
@@ -176,19 +174,15 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA(lv_msg_count) = 0.
-
+    " Instantiate error message object for every found dependency
     LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep).
-      lv_msg_count = lv_msg_count + 1.
-
       INSERT VALUE #(
         key_value = lr_dep->key_field
-        msg       = COND #( WHEN lv_msg_count <= lc_max_ui_messages
-                            THEN NEW zcm_merp_messages(
-                                   textid   = is_textid
-                                   attr1    = lr_dep->key_field
-                                   attr2    = CONV #( lr_dep->usedinentity )
-                                   severity = if_abap_behv_message=>severity-error ) )
+        msg       = NEW zcm_merp_messages(
+                      textid   = is_textid
+                      attr1    = lr_dep->key_field
+                      attr2    = CONV #( lr_dep->usedinentity )
+                      severity = if_abap_behv_message=>severity-error )
       ) INTO TABLE rt_blocked_keys.
     ENDLOOP.
   ENDMETHOD.

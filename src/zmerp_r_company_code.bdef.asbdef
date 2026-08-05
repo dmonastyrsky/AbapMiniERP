@@ -16,10 +16,12 @@ authorization master( global )
   delete ( precheck );
 
   field ( mandatory : create, readonly : update ) CompanyCode;
-  field ( mandatory ) CompanyName, CurrencyCode, Country;
+  field ( mandatory ) CompanyName, CompanyPrefix, CurrencyCode, Country;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
 
-  validation validateMandatoryFields on save { create; update; field CompanyName, CurrencyCode, Country; }
+  determination formatFields on modify { field CompanyPrefix; }
+
+  validation validateMandatoryFields on save { create; update; field CompanyName, CompanyPrefix, CurrencyCode, Country; }
 
   draft action Edit;
   draft action Activate optimized;
@@ -34,6 +36,7 @@ authorization master( global )
   {
     CompanyCode          = company_code;
     CompanyName          = company_name;
+    CompanyPrefix        = company_prefix;
     CurrencyCode         = currency_code;
     Country              = country;
     CreatedBy            = created_by;

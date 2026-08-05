@@ -18,4 +18,11 @@ use etag
   use action Resume;
   use action Prepare;
 
+  side effects
+  {
+    determine action Prepare
+      executed on field CompanyPrefix
+      affects field CompanyPrefix, messages;
+  }
+
 }

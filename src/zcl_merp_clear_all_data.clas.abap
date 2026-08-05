@@ -39,14 +39,42 @@ CLASS zcl_merp_clear_all_data IMPLEMENTATION.
       out->write( '==================================================' ).
     ENDIF.
 
-    " Clear entities (Draft + Active)
-    clear_entity( iv_label = 'Company Code' iv_active_tab = 'ZMERP_COMP_CODE' iv_draft_tab = 'ZMERP_COMP_D'     out = out ).
-    clear_entity( iv_label = 'Warehouse'    iv_active_tab = 'ZMERP_WAREHOUSE' iv_draft_tab = 'ZMERP_WHSE_D'     out = out ).
-    clear_entity( iv_label = 'VAT Rate'     iv_active_tab = 'ZMERP_VAT_RATE'  iv_draft_tab = 'ZMERP_VATR_D'     out = out ).
-    clear_entity( iv_label = 'Item Group'   iv_active_tab = 'ZMERP_ITEM_GROUP' iv_draft_tab = 'ZMERP_ITEM_GRP_D' out = out ).
+    " Clear entities using metadata constants from zif_merp_constants
+    clear_entity(
+      iv_label      = 'Business Partner'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_tab_bp )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_dtab_bp )
+      out           = out ).
 
-    " Example for future entities:
-    " clear_entity( iv_label = 'Business Partner' iv_active_tab = 'ZMERP_BP' iv_draft_tab = 'ZMERP_BP_D' out = out ).
+    clear_entity(
+      iv_label      = 'Item'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_tab_item )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_dtab_item )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Item Group'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_tab_ig )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_dtab_ig )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Warehouse'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_tab_wh )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_dtab_wh )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'VAT Rate'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_tab_vat )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_dtab_vat )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Company Code'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_tab_comp )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_dtab_comp )
+      out           = out ).
 
     IF out IS BOUND.
       out->write( '==================================================' ).

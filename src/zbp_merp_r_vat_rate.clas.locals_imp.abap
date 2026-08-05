@@ -145,7 +145,14 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
 
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
       IF lr_entity->VatCode IS INITIAL.
-        DATA(lv_next_vat_code) = zcl_merp_num_range_util=>get_next_vat_code_nro( ).
+
+        DATA(lv_next_vat_code) = VALUE string( ).
+
+        TRY.
+            lv_next_vat_code = zcl_merp_num_range_util=>get_next_vat_code_nro( ).
+          CATCH cx_number_ranges.
+            CLEAR lv_next_vat_code.
+        ENDTRY.
 
         IF lv_next_vat_code IS NOT INITIAL.
           " Map generated business key to the draft/content creation ID (%cid)

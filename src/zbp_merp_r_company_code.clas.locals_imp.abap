@@ -17,6 +17,11 @@ CLASS lhc_zmerp_r_company_code DEFINITION INHERITING FROM cl_abap_behavior_handl
     "! Pre-checks deletion dependencies in referenced entities.
     METHODS precheck_delete FOR PRECHECK
       IMPORTING keys FOR DELETE CompanyCode.
+
+    "! Formats inputs on modification.
+    METHODS formatFields FOR DETERMINE ON MODIFY
+      IMPORTING keys FOR CompanyCode~formatFields.
+
 ENDCLASS.
 
 CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
@@ -49,7 +54,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
     " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_company_code IN LOCAL MODE
       ENTITY CompanyCode
-      FIELDS ( CompanyName CurrencyCode Country )
+      FIELDS ( CompanyName CompanyPrefix CurrencyCode Country )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_comp_codes).
 
@@ -69,6 +74,18 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
                                    textid   = zcm_merp_messages=>enter_company_name
                                    severity = if_abap_behv_message=>severity-error )
           %element-CompanyName = if_abap_behv=>mk-on
+        ) TO reported-companycode.
+      ENDIF.
+
+      IF lr_comp_code->CompanyPrefix IS INITIAL.
+        lv_has_error = abap_true.
+        APPEND VALUE #(
+          %tky                   = lr_comp_code->%tky
+          %state_area            = c_state_area_mandatory
+          %msg                   = NEW zcm_merp_messages(
+                                     textid   = zcm_merp_messages=>enter_company_prefix
+                                     severity = if_abap_behv_message=>severity-error )
+          %element-CompanyPrefix = if_abap_behv=>mk-on
         ) TO reported-companycode.
       ENDIF.
 
@@ -104,6 +121,43 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         ) TO failed-companycode.
       ENDIF.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD formatFields.
+
+    " Read entity fields in local mode to bypass global authorization checks during validation
+    READ ENTITIES OF zmerp_r_company_code IN LOCAL MODE
+      ENTITY CompanyCode
+      FIELDS ( CompanyPrefix )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_comp_codes).
+
+    IF lt_comp_codes IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    DATA lt_update TYPE TABLE FOR UPDATE zmerp_r_company_code.
+
+    LOOP AT lt_comp_codes REFERENCE INTO DATA(lr_comp_code).
+      IF lr_comp_code->CompanyPrefix IS NOT INITIAL.
+        DATA(lv_format_prefix) = to_upper( lr_comp_code->CompanyPrefix ).
+
+        IF lr_comp_code->CompanyPrefix <> lv_format_prefix.
+          APPEND VALUE #(
+            %tky                  = lr_comp_code->%tky
+            CompanyPrefix         = lv_format_prefix
+            %control-CompanyPrefix = if_abap_behv=>mk-on
+          ) TO lt_update.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+
+    IF lt_update IS NOT INITIAL.
+      MODIFY ENTITIES OF zmerp_r_company_code IN LOCAL MODE
+        ENTITY CompanyCode
+        UPDATE FIELDS ( CompanyPrefix )
+        WITH lt_update.
+    ENDIF.
   ENDMETHOD.
 
   METHOD precheck_delete.

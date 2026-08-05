@@ -17,6 +17,10 @@ define root view entity ZMERP_C_COMPANY_CODE
       @Search.ranking: #HIGH
       @Search.fuzzinessThreshold: 0.7
       CompanyName,
+      
+      @Search.defaultSearchElement: true
+      @Search.ranking: #HIGH
+      CompanyPrefix,
 
       @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CurrencyStdVH', element: 'Currency' }, useForValidation: true }]
       CurrencyCode,
