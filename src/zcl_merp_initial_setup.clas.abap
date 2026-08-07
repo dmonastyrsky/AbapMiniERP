@@ -16,6 +16,41 @@ CLASS zcl_merp_initial_setup DEFINITION
   PROTECTED SECTION.
   PRIVATE SECTION.
 
+    "! Retrieves the current technical user name or falls back to default.
+    CLASS-METHODS get_current_user
+      RETURNING
+        VALUE(rv_user) TYPE abp_creation_user .
+
+    "! Retrieves the current system timestamp.
+    CLASS-METHODS get_current_timestamp
+      RETURNING
+        VALUE(rv_timestamp) TYPE abp_creation_tstmpl .
+
+    "! Fills common administrative audit fields for a given internal table.
+    "! @parameter ct_data | Internal table containing standard audit fields
+    CLASS-METHODS fill_audit_fields
+      CHANGING
+        ct_data TYPE ANY TABLE .
+
+    "! Writes a text line to the console runner if bound.
+    CLASS-METHODS write_log
+      IMPORTING
+        iv_text TYPE string
+        out     TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
+    "! Logs successful database insert status for an entity.
+    CLASS-METHODS write_insert_log
+      IMPORTING
+        iv_entity_name TYPE string
+        iv_count       TYPE i
+        out            TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
+    "! Clears active and draft database tables for a setup domain.
+    CLASS-METHODS clear_table_data
+      IMPORTING
+        iv_active_table TYPE tabname
+        iv_draft_table  TYPE tabname OPTIONAL .
+
     "! Populates initial company codes seed data into ZMERP_COMP_CODE table.
     "! @parameter out | Console output object for logging setup progress
     CLASS-METHODS setup_company_codes
@@ -64,11 +99,9 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
 
   METHOD execute.
-    IF out IS BOUND.
-      out->write( '=== Starting Initial Data Setup for Mini ERP ===' ).
-    ENDIF.
+    write_log( iv_text = '=== Starting Initial Data Setup for Mini ERP ===' out = out ).
 
-    " Insert seed data using formatted keys
+    " Insert seed data using formatted keys and interface constants
     setup_company_codes( out ).
     setup_vat_rates( out ).
     setup_warehouses( out ).
@@ -79,306 +112,221 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     " Dynamically sync NRO levels with real DB record counts
     zcl_merp_num_range_util=>sync_intervals_from_db( ).
 
+    write_log( iv_text = '=== Initial Data Setup Completed Successfully ===' out = out ).
+  ENDMETHOD.
+
+
+  METHOD get_current_user.
+    TRY.
+        rv_user = cl_abap_context_info=>get_user_technical_name( ).
+      CATCH cx_abap_context_info_error.
+        rv_user = 'INITIAL_SETUP'.
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD get_current_timestamp.
+    GET TIME STAMP FIELD rv_timestamp.
+  ENDMETHOD.
+
+
+  METHOD fill_audit_fields.
+    DATA(lv_user)      = get_current_user( ).
+    DATA(lv_timestamp) = get_current_timestamp( ).
+
+    LOOP AT ct_data ASSIGNING FIELD-SYMBOL(<ls_row>).
+      ASSIGN COMPONENT 'CREATED_BY' OF STRUCTURE <ls_row> TO FIELD-SYMBOL(<lv_cb>).
+      IF sy-subrc = 0. <lv_cb> = lv_user. ENDIF.
+
+      ASSIGN COMPONENT 'CREATED_AT' OF STRUCTURE <ls_row> TO FIELD-SYMBOL(<lv_ca>).
+      IF sy-subrc = 0. <lv_ca> = lv_timestamp. ENDIF.
+
+      ASSIGN COMPONENT 'LOCAL_LAST_CHANGED_BY' OF STRUCTURE <ls_row> TO FIELD-SYMBOL(<lv_lcb>).
+      IF sy-subrc = 0. <lv_lcb> = lv_user. ENDIF.
+
+      ASSIGN COMPONENT 'LOCAL_LAST_CHANGED_AT' OF STRUCTURE <ls_row> TO FIELD-SYMBOL(<lv_lca>).
+      IF sy-subrc = 0. <lv_lca> = lv_timestamp. ENDIF.
+
+      ASSIGN COMPONENT 'LAST_CHANGED_AT' OF STRUCTURE <ls_row> TO FIELD-SYMBOL(<lv_lch>).
+      IF sy-subrc = 0. <lv_lch> = lv_timestamp. ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD write_log.
     IF out IS BOUND.
-      out->write( '=== Initial Data Setup Completed Successfully ===' ).
+      out->write( iv_text ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD write_insert_log.
+    write_log(
+      iv_text = |[{ iv_entity_name }]: Successfully inserted { iv_count } rows.|
+      out     = out
+    ).
+  ENDMETHOD.
+
+
+  METHOD clear_table_data.
+    DELETE FROM (iv_active_table).
+    IF iv_draft_table IS NOT INITIAL.
+      DELETE FROM (iv_draft_table).
     ENDIF.
   ENDMETHOD.
 
 
   METHOD setup_company_codes.
-    DATA: lt_comp_code TYPE TABLE OF zmerp_comp_code,
-          lv_user      TYPE abp_creation_user,
-          lv_timestamp TYPE abp_creation_tstmpl.
+    clear_table_data( iv_active_table = CONV tabname( zif_merp_constants=>c_comp-table_db ) ).
 
-    TRY.
-        lv_user = cl_abap_context_info=>get_user_technical_name( ).
-      CATCH cx_abap_context_info_error.
-        lv_user = 'INITIAL_SETUP'.
-    ENDTRY.
-
-    GET TIME STAMP FIELD lv_timestamp.
-
-    " Clear active and draft tables
-    DELETE FROM zmerp_comp_code.
+    DATA lt_comp_code TYPE TABLE OF zmerp_comp_code.
 
     lt_comp_code = VALUE #(
-      ( company_code          = '1000'
-        company_name          = 'MERP Deutschland GmbH'
-        company_prefix        = 'DE'
-        currency_code         = 'EUR'
-        country               = 'DE'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
+      ( company_code   = '1000'
+        company_name   = 'MERP Deutschland GmbH'
+        company_prefix = 'DE'
+        currency_code  = 'EUR'
+        country        = 'DE' )
 
-      ( company_code          = '2000'
-        company_name          = 'MERP Trading GmbH'
-        company_prefix        = 'TR'
-        currency_code         = 'EUR'
-        country               = 'DE'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
+      ( company_code   = '2000'
+        company_name   = 'MERP Trading GmbH'
+        company_prefix = 'TR'
+        currency_code  = 'EUR'
+        country        = 'DE' )
 
-      ( company_code          = '3000'
-        company_name          = 'Modevi GmbH'
-        company_prefix        = 'MD'
-        currency_code         = 'EUR'
-        country               = 'DE'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
+      ( company_code   = '3000'
+        company_name   = 'Modevi GmbH'
+        company_prefix = 'MD'
+        currency_code  = 'EUR'
+        country        = 'DE' )
     ).
 
-    INSERT zmerp_comp_code FROM TABLE @lt_comp_code.
+    fill_audit_fields( CHANGING ct_data = lt_comp_code ).
 
-    IF out IS BOUND.
-      out->write( |[Company Code]: Successfully inserted { sy-dbcnt } rows.| ).
-    ENDIF.
+    INSERT zmerp_comp_code FROM TABLE @lt_comp_code.
+    write_insert_log( iv_entity_name = 'Company Code' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
 
 
   METHOD setup_vat_rates.
-    DATA: lt_vat_rates TYPE TABLE OF zmerp_vat_rate,
-          lv_user      TYPE abp_creation_user,
-          lv_timestamp TYPE abp_creation_tstmpl.
-
-    TRY.
-        lv_user = cl_abap_context_info=>get_user_technical_name( ).
-      CATCH cx_abap_context_info_error.
-        lv_user = 'INITIAL_SETUP'.
-    ENDTRY.
-
-    GET TIME STAMP FIELD lv_timestamp.
-
-    " Clear active and draft tables
-    DELETE FROM zmerp_vat_rate.
-    DELETE FROM zmerp_vatr_d.
-
-    lt_vat_rates = VALUE #(
-      ( vat_code              = zcl_merp_num_range_util=>format_vat_code( 1 )
-        description           = 'VAT 0%'
-        percentage            = '0.00'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( vat_code              = zcl_merp_num_range_util=>format_vat_code( 2 )
-        description           = 'VAT 7%'
-        percentage            = '7.00'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( vat_code              = zcl_merp_num_range_util=>format_vat_code( 3 )
-        description           = 'VAT 19%'
-        percentage            = '19.00'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
+    clear_table_data(
+      iv_active_table = CONV tabname( zif_merp_constants=>c_vat-table_db )
+      iv_draft_table  = CONV tabname( zif_merp_constants=>c_vat-table_draft )
     ).
 
-    INSERT zmerp_vat_rate FROM TABLE @lt_vat_rates.
+    DATA lt_vat_rates TYPE TABLE OF zmerp_vat_rate.
 
-    IF out IS BOUND.
-      out->write( |[VAT Rate]: Successfully inserted { sy-dbcnt } rows.| ).
-    ENDIF.
+    lt_vat_rates = VALUE #(
+      ( vat_code    = zcl_merp_num_range_util=>format_vat_code( 1 )
+        description = 'VAT 0%'
+        percentage  = '0.00' )
+
+      ( vat_code    = zcl_merp_num_range_util=>format_vat_code( 2 )
+        description = 'VAT 7%'
+        percentage  = '7.00' )
+
+      ( vat_code    = zcl_merp_num_range_util=>format_vat_code( 3 )
+        description = 'VAT 19%'
+        percentage  = '19.00' )
+    ).
+
+    fill_audit_fields( CHANGING ct_data = lt_vat_rates ).
+
+    INSERT zmerp_vat_rate FROM TABLE @lt_vat_rates.
+    write_insert_log( iv_entity_name = 'VAT Rate' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
 
 
   METHOD setup_warehouses.
-    DATA: lt_warehouses TYPE TABLE OF zmerp_warehouse,
-          lv_user       TYPE abp_creation_user,
-          lv_timestamp  TYPE abp_creation_tstmpl.
-
-    TRY.
-        lv_user = cl_abap_context_info=>get_user_technical_name( ).
-      CATCH cx_abap_context_info_error.
-        lv_user = 'INITIAL_SETUP'.
-    ENDTRY.
-
-    GET TIME STAMP FIELD lv_timestamp.
-
-    " Clear active and draft tables
-    DELETE FROM zmerp_warehouse.
-    DELETE FROM zmerp_whse_d.
-
-    lt_warehouses = VALUE #(
-      ( warehouse_code        = zcl_merp_num_range_util=>format_warehouse_code( 1 )
-        warehouse_name        = 'Hauptlager Kusel'
-        company_code          = '1000'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( warehouse_code        = zcl_merp_num_range_util=>format_warehouse_code( 2 )
-        warehouse_name        = 'Hauptlager Frankfurt'
-        company_code          = '1000'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( warehouse_code        = zcl_merp_num_range_util=>format_warehouse_code( 3 )
-        warehouse_name        = 'Lager Berlin'
-        company_code          = '1000'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( warehouse_code        = zcl_merp_num_range_util=>format_warehouse_code( 4 )
-        warehouse_name        = 'Retourlager Frankfurt'
-        company_code          = '1000'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( warehouse_code        = zcl_merp_num_range_util=>format_warehouse_code( 5 )
-        warehouse_name        = 'Hauptlager Hamburg'
-        company_code          = '2000'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( warehouse_code        = zcl_merp_num_range_util=>format_warehouse_code( 6 )
-        warehouse_name        = 'Lager München'
-        company_code          = '2000'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( warehouse_code        = zcl_merp_num_range_util=>format_warehouse_code( 7 )
-        warehouse_name        = 'Transitlager Hamburg'
-        company_code          = '2000'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
+    clear_table_data(
+      iv_active_table = CONV tabname( zif_merp_constants=>c_wh-table_db )
+      iv_draft_table  = CONV tabname( zif_merp_constants=>c_wh-table_draft )
     ).
 
-    INSERT zmerp_warehouse FROM TABLE @lt_warehouses.
+    DATA lt_warehouses TYPE TABLE OF zmerp_warehouse.
 
-    IF out IS BOUND.
-      out->write( |[Warehouse]: Successfully inserted { sy-dbcnt } rows.| ).
-    ENDIF.
+    lt_warehouses = VALUE #(
+      ( warehouse_code = zcl_merp_num_range_util=>format_warehouse_code( 1 )
+        warehouse_name = 'Hauptlager Kusel'
+        company_code   = '1000' )
+
+      ( warehouse_code = zcl_merp_num_range_util=>format_warehouse_code( 2 )
+        warehouse_name = 'Hauptlager Frankfurt'
+        company_code   = '1000' )
+
+      ( warehouse_code = zcl_merp_num_range_util=>format_warehouse_code( 3 )
+        warehouse_name = 'Lager Berlin'
+        company_code   = '1000' )
+
+      ( warehouse_code = zcl_merp_num_range_util=>format_warehouse_code( 4 )
+        warehouse_name = 'Retourlager Frankfurt'
+        company_code   = '1000' )
+
+      ( warehouse_code = zcl_merp_num_range_util=>format_warehouse_code( 5 )
+        warehouse_name = 'Hauptlager Hamburg'
+        company_code   = '2000' )
+
+      ( warehouse_code = zcl_merp_num_range_util=>format_warehouse_code( 6 )
+        warehouse_name = 'Lager München'
+        company_code   = '2000' )
+
+      ( warehouse_code = zcl_merp_num_range_util=>format_warehouse_code( 7 )
+        warehouse_name = 'Transitlager Hamburg'
+        company_code   = '2000' )
+    ).
+
+    fill_audit_fields( CHANGING ct_data = lt_warehouses ).
+
+    INSERT zmerp_warehouse FROM TABLE @lt_warehouses.
+    write_insert_log( iv_entity_name = 'Warehouse' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
 
 
   METHOD setup_item_groups.
-    DATA: lt_item_groups TYPE TABLE OF zmerp_item_group,
-          lv_user        TYPE abp_creation_user,
-          lv_timestamp   TYPE abp_creation_tstmpl.
-
-    TRY.
-        lv_user = cl_abap_context_info=>get_user_technical_name( ).
-      CATCH cx_abap_context_info_error.
-        lv_user = 'INITIAL_SETUP'.
-    ENDTRY.
-
-    GET TIME STAMP FIELD lv_timestamp.
-
-    " Clear active and draft tables
-    DELETE FROM zmerp_item_group.
-    DELETE FROM zmerp_item_grp_d.
+    clear_table_data(
+      iv_active_table = CONV tabname( zif_merp_constants=>c_ig-table_db )
+      iv_draft_table  = CONV tabname( zif_merp_constants=>c_ig-table_draft )
+    ).
 
     DATA(lv_vat19) = zcl_merp_num_range_util=>format_vat_code( 3 ).
     DATA(lv_vat7)  = zcl_merp_num_range_util=>format_vat_code( 2 ).
 
+    DATA lt_item_groups TYPE TABLE OF zmerp_item_group.
+
     lt_item_groups = VALUE #(
-      ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 1 )
-        description           = 'Major Home Appliances'
-        default_vat_code      = lv_vat19
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
+      ( item_group_code  = zcl_merp_num_range_util=>format_item_grp_code( 1 )
+        description      = 'Major Home Appliances'
+        default_vat_code = lv_vat19 )
 
-      ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 2 )
-        description           = 'Small Kitchen Appliances'
-        default_vat_code      = lv_vat19
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
+      ( item_group_code  = zcl_merp_num_range_util=>format_item_grp_code( 2 )
+        description      = 'Small Kitchen Appliances'
+        default_vat_code = lv_vat19 )
 
-      ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 3 )
-        description           = 'Consumer Electronics'
-        default_vat_code      = lv_vat19
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
+      ( item_group_code  = zcl_merp_num_range_util=>format_item_grp_code( 3 )
+        description      = 'Consumer Electronics'
+        default_vat_code = lv_vat19 )
 
-      ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 4 )
-        description           = 'Accessories & Supplies'
-        default_vat_code      = lv_vat19
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
+      ( item_group_code  = zcl_merp_num_range_util=>format_item_grp_code( 4 )
+        description      = 'Accessories & Supplies'
+        default_vat_code = lv_vat19 )
 
-      ( item_group_code       = zcl_merp_num_range_util=>format_item_grp_code( 5 )
-        description           = 'Installation & Support Services'
-        default_vat_code      = lv_vat7
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
+      ( item_group_code  = zcl_merp_num_range_util=>format_item_grp_code( 5 )
+        description      = 'Installation & Support Services'
+        default_vat_code = lv_vat7 )
     ).
 
-    INSERT zmerp_item_group FROM TABLE @lt_item_groups.
+    fill_audit_fields( CHANGING ct_data = lt_item_groups ).
 
-    IF out IS BOUND.
-      out->write( |[Item Group]: Successfully inserted { sy-dbcnt } rows.| ).
-    ENDIF.
+    INSERT zmerp_item_group FROM TABLE @lt_item_groups.
+    write_insert_log( iv_entity_name = 'Item Group' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
 
 
   METHOD setup_items.
-    DATA: lt_items     TYPE TABLE OF zmerp_item,
-          lv_user      TYPE abp_creation_user,
-          lv_timestamp TYPE abp_creation_tstmpl.
-
-    TRY.
-        lv_user = cl_abap_context_info=>get_user_technical_name( ).
-      CATCH cx_abap_context_info_error.
-        lv_user = 'INITIAL_SETUP'.
-    ENDTRY.
-
-    GET TIME STAMP FIELD lv_timestamp.
-
-    " Clear active and draft tables
-    DELETE FROM zmerp_item.
-    DELETE FROM zmerp_item_d.
+    clear_table_data(
+      iv_active_table = CONV tabname( zif_merp_constants=>c_item-table_db )
+      iv_draft_table  = CONV tabname( zif_merp_constants=>c_item-table_draft )
+    ).
 
     " Formatted Group Codes
     DATA(lv_grp1) = zcl_merp_num_range_util=>format_item_grp_code( 1 ).
@@ -386,6 +334,8 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     DATA(lv_grp3) = zcl_merp_num_range_util=>format_item_grp_code( 3 ).
     DATA(lv_grp4) = zcl_merp_num_range_util=>format_item_grp_code( 4 ).
     DATA(lv_grp5) = zcl_merp_num_range_util=>format_item_grp_code( 5 ).
+
+    DATA lt_items TYPE TABLE OF zmerp_item.
 
     lt_items = VALUE #(
       " Group 1: Major Home Appliances
@@ -483,243 +433,166 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
         base_unit_of_measure = 'H' )
     ).
 
-    " Dynamically pull default_vat_code from Item Group using ZCL_MERP_MD_UTIL
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
-      lr_item->default_vat_code      = zcl_merp_md_util=>get_item_group_default_vat( lr_item->item_group_code ).
-      lr_item->created_by           = lv_user.
-      lr_item->created_at           = lv_timestamp.
-      lr_item->local_last_changed_by = lv_user.
-      lr_item->local_last_changed_at = lv_timestamp.
-      lr_item->last_changed_at      = lv_timestamp.
+      lr_item->default_vat_code = zcl_merp_md_util=>get_item_group_default_vat( lr_item->item_group_code ).
     ENDLOOP.
 
-    INSERT zmerp_item FROM TABLE @lt_items.
+    fill_audit_fields( CHANGING ct_data = lt_items ).
 
-    IF out IS BOUND.
-      out->write( |[Item]: Successfully inserted { sy-dbcnt } rows.| ).
-    ENDIF.
+    INSERT zmerp_item FROM TABLE @lt_items.
+    write_insert_log( iv_entity_name = 'Item' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
 
 
   METHOD setup_business_partners.
-    DATA: lt_bp        TYPE TABLE OF zmerp_bus_part,
-          lv_user      TYPE abp_creation_user,
-          lv_timestamp TYPE abp_creation_tstmpl.
-
-    TRY.
-        lv_user = cl_abap_context_info=>get_user_technical_name( ).
-      CATCH cx_abap_context_info_error.
-        lv_user = 'INITIAL_SETUP'.
-    ENDTRY.
-
-    GET TIME STAMP FIELD lv_timestamp.
-
-    " Clear active and draft tables
-    DELETE FROM zmerp_bus_part.
-    DELETE FROM zmerp_bus_part_d.
-
-    lt_bp = VALUE #(
-      " --- Suppliers (is_supplier = 'X', is_customer = ' ') ---
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 1 )
-        partner_name          = 'Bosch-Siemens Hausgeräte GmbH'
-        is_customer           = abap_false
-        is_supplier           = abap_true
-        tax_number            = 'DE129323400'
-        address               = 'Carl-Wery-Straße 34'
-        city                  = 'München'
-        country               = 'DE'
-        phone                 = '+49 89 459001'
-        email                 = 'contact@bshg.com'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 2 )
-        partner_name          = 'Miele & Cie. KG'
-        is_customer           = abap_false
-        is_supplier           = abap_true
-        tax_number            = 'DE126788901'
-        address               = 'Carl-Miele-Straße 29'
-        city                  = 'Gütersloh'
-        country               = 'DE'
-        phone                 = '+49 5241 890'
-        email                 = 'info@miele.de'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 3 )
-        partner_name          = 'DeLonghi Deutschland GmbH'
-        is_customer           = abap_false
-        is_supplier           = abap_true
-        tax_number            = 'DE811234567'
-        address               = 'Carl-Ulrich-Straße 4'
-        city                  = 'Neu-Isenburg'
-        country               = 'DE'
-        phone                 = '+49 6102 5990'
-        email                 = 'service@delonghi.de'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 4 )
-        partner_name          = 'Samsung Electronics GmbH'
-        is_customer           = abap_false
-        is_supplier           = abap_true
-        tax_number            = 'DE113546789'
-        address               = 'Am Kronberger Hang 6'
-        city                  = 'Schwalbach am Taunus'
-        country               = 'DE'
-        phone                 = '+49 6196 660'
-        email                 = 'info@samsung.de'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 5 )
-        partner_name          = 'Sony Europe B.V. Zweigniederlassung Deutschland'
-        is_customer           = abap_false
-        is_supplier           = abap_true
-        tax_number            = 'DE815678910'
-        address               = 'Kemperplatz 1'
-        city                  = 'Berlin'
-        country               = 'DE'
-        phone                 = '+49 30 585800'
-        email                 = 'info@sony.de'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      " --- Customers (is_supplier = ' ', is_customer = 'X') ---
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 6 )
-        partner_name          = 'Media-Saturn Retail Group GmbH'
-        is_customer           = abap_true
-        is_supplier           = abap_false
-        tax_number            = 'DE130123456'
-        address               = 'Media-Saturn-Str. 1'
-        city                  = 'Ingolstadt'
-        country               = 'DE'
-        phone                 = '+49 841 6340'
-        email                 = 'einkauf@mediamarkt.de'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 7 )
-        partner_name          = 'Expert SE'
-        is_customer           = abap_true
-        is_supplier           = abap_false
-        tax_number            = 'DE115678123'
-        address               = 'Bayernstraße 4'
-        city                  = 'Langenhagen'
-        country               = 'DE'
-        phone                 = '+49 511 78080'
-        email                 = 'zentrale@expert.de'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 8 )
-        partner_name          = 'Euronics Deutschland eG'
-        is_customer           = abap_true
-        is_supplier           = abap_false
-        tax_number            = 'DE147890123'
-        address               = 'Berliner Straße 11'
-        city                  = 'Ditzingen'
-        country               = 'DE'
-        phone                 = '+49 7156 9280'
-        email                 = 'info@euronics.de'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 9 )
-        partner_name          = 'Elektro-Service Müller GmbH'
-        is_customer           = abap_true
-        is_supplier           = abap_false
-        tax_number            = 'DE289012345'
-        address               = 'Trierer Straße 12'
-        city                  = 'Kusel'
-        country               = 'DE'
-        phone                 = '+49 6381 1234'
-        email                 = 'service@elektro-mueller.de'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 10 )
-        partner_name          = 'Küchenstudio Schmidt GmbH'
-        is_customer           = abap_true
-        is_supplier           = abap_false
-        tax_number            = 'DE301234567'
-        address               = 'Zeil 45'
-        city                  = 'Frankfurt am Main'
-        country               = 'DE'
-        phone                 = '+49 69 987654'
-        email                 = 'vertrieb@kuechen-schmidt.de'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      " --- Both Customer and Supplier (is_supplier = 'X', is_customer = 'X') ---
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 11 )
-        partner_name          = 'ElectronicPartner GmbH & Co. KG'
-        is_customer           = abap_true
-        is_supplier           = abap_true
-        tax_number            = 'DE119345678'
-        address               = 'Mündelheimer Weg 40'
-        city                  = 'Düsseldorf'
-        country               = 'DE'
-        phone                 = '+49 211 41560'
-        email                 = 'partner@electronicpartner.de'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
-
-      ( partner_code          = zcl_merp_num_range_util=>format_bp_code( 12 )
-        partner_name          = 'Conrad Electronic SE'
-        is_customer           = abap_true
-        is_supplier           = abap_true
-        tax_number            = 'DE133123789'
-        address               = 'Klaus-Conrad-Straße 1'
-        city                  = 'Hirschau'
-        country               = 'DE'
-        phone                 = '+49 9622 300'
-        email                 = 'b2b@conrad.de'
-        created_by            = lv_user
-        created_at            = lv_timestamp
-        local_last_changed_by = lv_user
-        local_last_changed_at = lv_timestamp
-        last_changed_at       = lv_timestamp )
+    clear_table_data(
+      iv_active_table = CONV tabname( zif_merp_constants=>c_bp-table_db )
+      iv_draft_table  = CONV tabname( zif_merp_constants=>c_bp-table_draft )
     ).
 
-    INSERT zmerp_bus_part FROM TABLE @lt_bp.
+    DATA lt_bp TYPE TABLE OF zmerp_bus_part.
 
-    IF out IS BOUND.
-      out->write( |[Business Partner]: Successfully inserted { sy-dbcnt } rows.| ).
-    ENDIF.
+    lt_bp = VALUE #(
+      " --- Suppliers ---
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 1 )
+        partner_name = 'Bosch-Siemens Hausgeräte GmbH'
+        is_customer  = abap_false
+        is_supplier  = abap_true
+        tax_number   = 'DE129323400'
+        address      = 'Carl-Wery-Straße 34'
+        city         = 'München'
+        country      = 'DE'
+        phone        = '+49 89 459001'
+        email        = 'contact@bshg.com' )
+
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 2 )
+        partner_name = 'Miele & Cie. KG'
+        is_customer  = abap_false
+        is_supplier  = abap_true
+        tax_number   = 'DE126788901'
+        address      = 'Carl-Miele-Straße 29'
+        city         = 'Gütersloh'
+        country      = 'DE'
+        phone        = '+49 5241 890'
+        email        = 'info@miele.de' )
+
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 3 )
+        partner_name = 'DeLonghi Deutschland GmbH'
+        is_customer  = abap_false
+        is_supplier  = abap_true
+        tax_number   = 'DE811234567'
+        address      = 'Carl-Ulrich-Straße 4'
+        city         = 'Neu-Isenburg'
+        country      = 'DE'
+        phone        = '+49 6102 5990'
+        email        = 'service@delonghi.de' )
+
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 4 )
+        partner_name = 'Samsung Electronics GmbH'
+        is_customer  = abap_false
+        is_supplier  = abap_true
+        tax_number   = 'DE113546789'
+        address      = 'Am Kronberger Hang 6'
+        city         = 'Schwalbach am Taunus'
+        country      = 'DE'
+        phone        = '+49 6196 660'
+        email        = 'info@samsung.de' )
+
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 5 )
+        partner_name = 'Sony Europe B.V. Zweigniederlassung Deutschland'
+        is_customer  = abap_false
+        is_supplier  = abap_true
+        tax_number   = 'DE815678910'
+        address      = 'Kemperplatz 1'
+        city         = 'Berlin'
+        country      = 'DE'
+        phone        = '+49 30 585800'
+        email        = 'info@sony.de' )
+
+      " --- Customers ---
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 6 )
+        partner_name = 'Media-Saturn Retail Group GmbH'
+        is_customer  = abap_true
+        is_supplier  = abap_false
+        tax_number   = 'DE130123456'
+        address      = 'Media-Saturn-Str. 1'
+        city         = 'Ingolstadt'
+        country      = 'DE'
+        phone        = '+49 841 6340'
+        email        = 'einkauf@mediamarkt.de' )
+
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 7 )
+        partner_name = 'Expert SE'
+        is_customer  = abap_true
+        is_supplier  = abap_false
+        tax_number   = 'DE115678123'
+        address      = 'Bayernstraße 4'
+        city         = 'Langenhagen'
+        country      = 'DE'
+        phone        = '+49 511 78080'
+        email        = 'zentrale@expert.de' )
+
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 8 )
+        partner_name = 'Euronics Deutschland eG'
+        is_customer  = abap_true
+        is_supplier  = abap_false
+        tax_number   = 'DE147890123'
+        address      = 'Berliner Straße 11'
+        city         = 'Ditzingen'
+        country      = 'DE'
+        phone        = '+49 7156 9280'
+        email        = 'info@euronics.de' )
+
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 9 )
+        partner_name = 'Elektro-Service Müller GmbH'
+        is_customer  = abap_true
+        is_supplier  = abap_false
+        tax_number   = 'DE289012345'
+        address      = 'Trierer Straße 12'
+        city         = 'Kusel'
+        country      = 'DE'
+        phone        = '+49 6381 1234'
+        email        = 'service@elektro-mueller.de' )
+
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 10 )
+        partner_name = 'Küchenstudio Schmidt GmbH'
+        is_customer  = abap_true
+        is_supplier  = abap_false
+        tax_number   = 'DE301234567'
+        address      = 'Zeil 45'
+        city         = 'Frankfurt am Main'
+        country      = 'DE'
+        phone        = '+49 69 987654'
+        email        = 'vertrieb@kuechen-schmidt.de' )
+
+      " --- Both ---
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 11 )
+        partner_name = 'ElectronicPartner GmbH & Co. KG'
+        is_customer  = abap_true
+        is_supplier  = abap_true
+        tax_number   = 'DE119345678'
+        address      = 'Mündelheimer Weg 40'
+        city         = 'Düsseldorf'
+        country      = 'DE'
+        phone        = '+49 211 41560'
+        email        = 'partner@electronicpartner.de' )
+
+      ( partner_code = zcl_merp_num_range_util=>format_bp_code( 12 )
+        partner_name = 'Conrad Electronic SE'
+        is_customer  = abap_true
+        is_supplier  = abap_true
+        tax_number   = 'DE133123789'
+        address      = 'Klaus-Conrad-Straße 1'
+        city         = 'Hirschau'
+        country      = 'DE'
+        phone        = '+49 9622 300'
+        email        = 'b2b@conrad.de' )
+    ).
+
+    fill_audit_fields( CHANGING ct_data = lt_bp ).
+
+    INSERT zmerp_bus_part FROM TABLE @lt_bp.
+    write_insert_log( iv_entity_name = 'Business Partner' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
 
 ENDCLASS.

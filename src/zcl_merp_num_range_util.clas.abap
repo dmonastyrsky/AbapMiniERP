@@ -187,15 +187,10 @@ CLASS zcl_merp_num_range_util DEFINITION
   PRIVATE SECTION.
 
     " Internal Helpers
-    "! Generic sequential number generator based on the max existing key in active and draft tables.
+    "! Generic sequential number generator based on entity metadata.
     CLASS-METHODS get_next_number
       IMPORTING
-        iv_prefix        TYPE string
-        iv_table         TYPE string
-        iv_field         TYPE string
-        iv_draft_table   TYPE string OPTIONAL
-        iv_draft_field   TYPE string OPTIONAL
-        iv_total_length  TYPE i DEFAULT 10
+        is_meta          TYPE zif_merp_constants=>ty_entity_metadata
       RETURNING
         VALUE(rv_number) TYPE string
       RAISING
@@ -218,16 +213,14 @@ CLASS zcl_merp_num_range_util DEFINITION
       RETURNING
         VALUE(rv_numeric) TYPE int8.
 
-    "! Generic number generator wrapping Standard SAP Number Range Runtime API.
+    "! Generic number generator wrapping Standard SAP Number Range Runtime API based on entity metadata.
     CLASS-METHODS get_next_number_from_nro
       IMPORTING
-        iv_nro_object   TYPE cl_numberrange_runtime=>nr_object
-        iv_prefix       TYPE string
-        iv_total_length TYPE i
+        is_meta        TYPE zif_merp_constants=>ty_entity_metadata
       RETURNING
-        VALUE(rv_code)  TYPE string.
+        VALUE(rv_code) TYPE string.
 
-     "! Returns list of all configured NRO object names for administration.
+    "! Returns list of all configured NRO object names for administration.
     CLASS-METHODS get_nro_objects
       RETURNING
         VALUE(rt_objects) TYPE string_table.
@@ -238,12 +231,10 @@ CLASS zcl_merp_num_range_util DEFINITION
         iv_object TYPE cl_numberrange_intervals=>nr_object
         iv_level  TYPE int8 DEFAULT 0.
 
-    "! Reads maximum numeric suffix from database for specific table and field.
+    "! Reads maximum numeric suffix from database for specific entity metadata.
     CLASS-METHODS get_max_level_from_db
       IMPORTING
-        iv_table       TYPE string
-        iv_field       TYPE string
-        iv_prefix      TYPE string
+        is_meta         TYPE zif_merp_constants=>ty_entity_metadata
       RETURNING
         VALUE(rv_level) TYPE int8.
 
@@ -252,60 +243,27 @@ ENDCLASS.
 CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
   METHOD get_next_bp_code.
-    rv_bp_code = get_next_number(
-      iv_prefix       = zif_merp_constants=>c_prefix_bp
-      iv_table        = zif_merp_constants=>c_tab_bp
-      iv_field        = zif_merp_constants=>c_fld_bp
-      iv_draft_table  = zif_merp_constants=>c_dtab_bp
-      iv_draft_field  = zif_merp_constants=>c_dfld_bp
-      iv_total_length = zif_merp_constants=>c_length_bp ).
+    rv_bp_code = get_next_number( zif_merp_constants=>c_bp ).
   ENDMETHOD.
 
   METHOD get_next_item_code.
-    rv_item_code = get_next_number(
-      iv_prefix       = zif_merp_constants=>c_prefix_item
-      iv_table        = zif_merp_constants=>c_tab_item
-      iv_field        = zif_merp_constants=>c_fld_item
-      iv_draft_table  = zif_merp_constants=>c_dtab_item
-      iv_draft_field  = zif_merp_constants=>c_dfld_item
-      iv_total_length = zif_merp_constants=>c_length_item ).
+    rv_item_code = get_next_number( zif_merp_constants=>c_item ).
   ENDMETHOD.
 
   METHOD get_next_item_group_code.
-    rv_item_group_code = get_next_number(
-      iv_prefix       = zif_merp_constants=>c_prefix_ig
-      iv_table        = zif_merp_constants=>c_tab_ig
-      iv_field        = zif_merp_constants=>c_fld_ig
-      iv_draft_table  = zif_merp_constants=>c_dtab_ig
-      iv_draft_field  = zif_merp_constants=>c_dfld_ig
-      iv_total_length = zif_merp_constants=>c_length_ig ).
+    rv_item_group_code = get_next_number( zif_merp_constants=>c_ig ).
   ENDMETHOD.
 
   METHOD get_next_vat_code.
-    rv_vat_code = get_next_number(
-      iv_prefix       = zif_merp_constants=>c_prefix_vat
-      iv_table        = zif_merp_constants=>c_tab_vat
-      iv_field        = zif_merp_constants=>c_fld_vat
-      iv_draft_table  = zif_merp_constants=>c_dtab_vat
-      iv_draft_field  = zif_merp_constants=>c_dfld_vat
-      iv_total_length = zif_merp_constants=>c_length_vat ).
+    rv_vat_code = get_next_number( zif_merp_constants=>c_vat ).
   ENDMETHOD.
 
   METHOD get_next_warehouse_code.
-    rv_wh_id = get_next_number(
-      iv_prefix       = zif_merp_constants=>c_prefix_wh
-      iv_table        = zif_merp_constants=>c_tab_wh
-      iv_field        = zif_merp_constants=>c_fld_wh
-      iv_draft_table  = zif_merp_constants=>c_dtab_wh
-      iv_draft_field  = zif_merp_constants=>c_dfld_wh
-      iv_total_length = zif_merp_constants=>c_length_wh ).
+    rv_wh_id = get_next_number( zif_merp_constants=>c_wh ).
   ENDMETHOD.
 
   METHOD get_next_bp_code_nro.
-    rv_bp_code = get_next_number_from_nro(
-      iv_nro_object   = zif_merp_constants=>c_nro_bp
-      iv_prefix       = zif_merp_constants=>c_prefix_bp
-      iv_total_length = zif_merp_constants=>c_length_bp ).
+    rv_bp_code = get_next_number_from_nro( zif_merp_constants=>c_bp ).
 
     IF rv_bp_code IS INITIAL.
       rv_bp_code = get_next_bp_code( ).
@@ -313,10 +271,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_next_item_code_nro.
-    rv_item_code = get_next_number_from_nro(
-      iv_nro_object   = zif_merp_constants=>c_nro_item
-      iv_prefix       = zif_merp_constants=>c_prefix_item
-      iv_total_length = zif_merp_constants=>c_length_item ).
+    rv_item_code = get_next_number_from_nro( zif_merp_constants=>c_item ).
 
     IF rv_item_code IS INITIAL.
       rv_item_code = get_next_item_code( ).
@@ -324,10 +279,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_next_item_group_code_nro.
-    rv_item_group_code = get_next_number_from_nro(
-      iv_nro_object   = zif_merp_constants=>c_nro_ig
-      iv_prefix       = zif_merp_constants=>c_prefix_ig
-      iv_total_length = zif_merp_constants=>c_length_ig ).
+    rv_item_group_code = get_next_number_from_nro( zif_merp_constants=>c_ig ).
 
     IF rv_item_group_code IS INITIAL.
       rv_item_group_code = get_next_item_group_code( ).
@@ -335,10 +287,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_next_vat_code_nro.
-    rv_vat_code = get_next_number_from_nro(
-      iv_nro_object   = zif_merp_constants=>c_nro_vat
-      iv_prefix       = zif_merp_constants=>c_prefix_vat
-      iv_total_length = zif_merp_constants=>c_length_vat ).
+    rv_vat_code = get_next_number_from_nro( zif_merp_constants=>c_vat ).
 
     IF rv_vat_code IS INITIAL.
       rv_vat_code = get_next_vat_code( ).
@@ -346,10 +295,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_next_warehouse_code_nro.
-    rv_wh_id = get_next_number_from_nro(
-      iv_nro_object   = zif_merp_constants=>c_nro_wh
-      iv_prefix       = zif_merp_constants=>c_prefix_wh
-      iv_total_length = zif_merp_constants=>c_length_wh ).
+    rv_wh_id = get_next_number_from_nro( zif_merp_constants=>c_wh ).
 
     IF rv_wh_id IS INITIAL.
       rv_wh_id = get_next_warehouse_code( ).
@@ -395,36 +341,36 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
   METHOD format_bp_code.
     rv_code = format_code(
       iv_number       = iv_number
-      iv_prefix       = zif_merp_constants=>c_prefix_bp
-      iv_total_length = zif_merp_constants=>c_length_bp ).
+      iv_prefix       = zif_merp_constants=>c_bp-prefix
+      iv_total_length = zif_merp_constants=>c_bp-length ).
   ENDMETHOD.
 
   METHOD format_item_code.
     rv_code = format_code(
       iv_number       = iv_number
-      iv_prefix       = zif_merp_constants=>c_prefix_item
-      iv_total_length = zif_merp_constants=>c_length_item ).
+      iv_prefix       = zif_merp_constants=>c_item-prefix
+      iv_total_length = zif_merp_constants=>c_item-length ).
   ENDMETHOD.
 
   METHOD format_item_grp_code.
     rv_code = format_code(
       iv_number       = iv_number
-      iv_prefix       = zif_merp_constants=>c_prefix_ig
-      iv_total_length = zif_merp_constants=>c_length_ig ).
+      iv_prefix       = zif_merp_constants=>c_ig-prefix
+      iv_total_length = zif_merp_constants=>c_ig-length ).
   ENDMETHOD.
 
   METHOD format_vat_code.
     rv_code = format_code(
       iv_number       = iv_number
-      iv_prefix       = zif_merp_constants=>c_prefix_vat
-      iv_total_length = zif_merp_constants=>c_length_vat ).
+      iv_prefix       = zif_merp_constants=>c_vat-prefix
+      iv_total_length = zif_merp_constants=>c_vat-length ).
   ENDMETHOD.
 
   METHOD format_warehouse_code.
     rv_code = format_code(
       iv_number       = iv_number
-      iv_prefix       = zif_merp_constants=>c_prefix_wh
-      iv_total_length = zif_merp_constants=>c_length_wh ).
+      iv_prefix       = zif_merp_constants=>c_wh-prefix
+      iv_total_length = zif_merp_constants=>c_wh-length ).
   ENDMETHOD.
 
   METHOD setup_intervals.
@@ -457,32 +403,32 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
   METHOD sync_bp_interval.
     save_interval(
-      iv_object = zif_merp_constants=>c_nro_bp
-      iv_level  = get_max_level_from_db( iv_table = zif_merp_constants=>c_tab_bp iv_field = zif_merp_constants=>c_fld_bp iv_prefix = zif_merp_constants=>c_prefix_bp ) ).
+      iv_object = zif_merp_constants=>c_bp-number_object
+      iv_level  = get_max_level_from_db( zif_merp_constants=>c_bp ) ).
   ENDMETHOD.
 
   METHOD sync_item_interval.
     save_interval(
-      iv_object = zif_merp_constants=>c_nro_item
-      iv_level  = get_max_level_from_db( iv_table = zif_merp_constants=>c_tab_item iv_field = zif_merp_constants=>c_fld_item iv_prefix = zif_merp_constants=>c_prefix_item ) ).
+      iv_object = zif_merp_constants=>c_item-number_object
+      iv_level  = get_max_level_from_db( zif_merp_constants=>c_item ) ).
   ENDMETHOD.
 
   METHOD sync_item_grp_interval.
     save_interval(
-      iv_object = zif_merp_constants=>c_nro_ig
-      iv_level  = get_max_level_from_db( iv_table = zif_merp_constants=>c_tab_ig iv_field = zif_merp_constants=>c_fld_ig iv_prefix = zif_merp_constants=>c_prefix_ig ) ).
+      iv_object = zif_merp_constants=>c_ig-number_object
+      iv_level  = get_max_level_from_db( zif_merp_constants=>c_ig ) ).
   ENDMETHOD.
 
   METHOD sync_vat_interval.
     save_interval(
-      iv_object = zif_merp_constants=>c_nro_vat
-      iv_level  = get_max_level_from_db( iv_table = zif_merp_constants=>c_tab_vat iv_field = zif_merp_constants=>c_fld_vat iv_prefix = zif_merp_constants=>c_prefix_vat ) ).
+      iv_object = zif_merp_constants=>c_vat-number_object
+      iv_level  = get_max_level_from_db( zif_merp_constants=>c_vat ) ).
   ENDMETHOD.
 
   METHOD sync_warehouse_interval.
     save_interval(
-      iv_object = zif_merp_constants=>c_nro_wh
-      iv_level  = get_max_level_from_db( iv_table = zif_merp_constants=>c_tab_wh iv_field = zif_merp_constants=>c_fld_wh iv_prefix = zif_merp_constants=>c_prefix_wh ) ).
+      iv_object = zif_merp_constants=>c_wh-number_object
+      iv_level  = get_max_level_from_db( zif_merp_constants=>c_wh ) ).
   ENDMETHOD.
 
   METHOD save_interval.
@@ -526,30 +472,30 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
   METHOD get_max_level_from_db.
     DATA(lv_max_code) = get_max_code_from_db(
-      iv_table  = iv_table
-      iv_field  = iv_field
-      iv_prefix = iv_prefix ).
+      iv_table  = is_meta-table_db
+      iv_field  = is_meta-field_db
+      iv_prefix = is_meta-prefix ).
 
     rv_level = extract_numeric_suffix(
       iv_code   = lv_max_code
-      iv_offset = strlen( iv_prefix ) ).
+      iv_offset = strlen( is_meta-prefix ) ).
   ENDMETHOD.
 
   METHOD get_next_number.
-    DATA(lv_prefix_length) = strlen( iv_prefix ).
+    DATA(lv_prefix_length) = strlen( is_meta-prefix ).
 
     DATA(lv_max_active) = get_max_code_from_db(
-      iv_table  = iv_table
-      iv_field  = iv_field
-      iv_prefix = iv_prefix ).
+      iv_table  = is_meta-table_db
+      iv_field  = is_meta-field_db
+      iv_prefix = is_meta-prefix ).
 
     DATA(lv_max_draft) = COND string(
-      WHEN iv_draft_table IS NOT INITIAL
-       AND iv_draft_field IS NOT INITIAL
+      WHEN is_meta-table_draft IS NOT INITIAL
+       AND is_meta-field_draft IS NOT INITIAL
       THEN get_max_code_from_db(
-             iv_table  = iv_draft_table
-             iv_field  = iv_draft_field
-             iv_prefix = iv_prefix ) ).
+             iv_table  = is_meta-table_draft
+             iv_field  = is_meta-field_draft
+             iv_prefix = is_meta-prefix ) ).
 
     DATA(lv_max_numeric) = nmax(
       val1 = extract_numeric_suffix(
@@ -562,9 +508,9 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     lv_max_numeric += 1.
 
     rv_number = format_code(
-      iv_prefix       = iv_prefix
+      iv_prefix       = is_meta-prefix
       iv_number       = lv_max_numeric
-      iv_total_length = iv_total_length ).
+      iv_total_length = is_meta-length ).
 
     " Raise standard number range exception if sequence is exhausted or invalid
     IF rv_number IS INITIAL.
@@ -626,15 +572,15 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
         cl_numberrange_runtime=>number_get(
           EXPORTING
             nr_range_nr = '01'
-            object      = iv_nro_object
+            object      = is_meta-number_object
           IMPORTING
             number      = lv_raw_number ).
 
         TRY.
             rv_code = format_code(
               iv_number       = CONV int8( lv_raw_number )
-              iv_prefix       = iv_prefix
-              iv_total_length = iv_total_length ).
+              iv_prefix       = is_meta-prefix
+              iv_total_length = is_meta-length ).
           CATCH cx_sy_conversion_error cx_sy_arithmetic_overflow.
             CLEAR rv_code.
         ENDTRY.
@@ -646,11 +592,11 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
   METHOD get_nro_objects.
     rt_objects = VALUE #(
-      ( CONV string( zif_merp_constants=>c_nro_bp ) )
-      ( CONV string( zif_merp_constants=>c_nro_item ) )
-      ( CONV string( zif_merp_constants=>c_nro_ig ) )
-      ( CONV string( zif_merp_constants=>c_nro_vat ) )
-      ( CONV string( zif_merp_constants=>c_nro_wh ) )
+      ( CONV string( zif_merp_constants=>c_bp-number_object ) )
+      ( CONV string( zif_merp_constants=>c_item-number_object ) )
+      ( CONV string( zif_merp_constants=>c_ig-number_object ) )
+      ( CONV string( zif_merp_constants=>c_vat-number_object ) )
+      ( CONV string( zif_merp_constants=>c_wh-number_object ) )
     ).
   ENDMETHOD.
 

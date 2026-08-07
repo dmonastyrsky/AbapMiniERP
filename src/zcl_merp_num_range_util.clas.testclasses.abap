@@ -1,4 +1,4 @@
-" use this source file for your ABAP unit test classes
+*"* use this source file for your ABAP unit test classes
 CLASS lcl_test DEFINITION FINAL FOR TESTING
   DURATION SHORT
   RISK LEVEL HARMLESS.
@@ -36,10 +36,10 @@ CLASS lcl_test IMPLEMENTATION.
     " Initialize SQL Test Double for physical tables accessed via Dynamic OSQL
     mo_sql_double = cl_osql_test_environment=>create(
       i_dependency_list = VALUE #(
-        ( CONV #( zif_merp_constants=>c_tab_wh ) )
-        ( CONV #( zif_merp_constants=>c_dtab_wh ) )
-        ( CONV #( zif_merp_constants=>c_tab_vat ) )
-        ( CONV #( zif_merp_constants=>c_dtab_vat ) )
+        ( CONV #( zif_merp_constants=>c_wh-table_db ) )
+        ( CONV #( zif_merp_constants=>c_wh-table_draft ) )
+        ( CONV #( zif_merp_constants=>c_vat-table_db ) )
+        ( CONV #( zif_merp_constants=>c_vat-table_draft ) )
       ) ).
   ENDMETHOD.
 
@@ -100,9 +100,14 @@ CLASS lcl_test IMPLEMENTATION.
     DATA(lv_res) = zcl_merp_num_range_util=>format_warehouse_code( 12 ).
 
     " Assert
+    DATA(lv_expected) = zcl_merp_num_range_util=>format_code(
+      iv_number       = 12
+      iv_prefix       = zif_merp_constants=>c_wh-prefix
+      iv_total_length = zif_merp_constants=>c_wh-length ).
+
     cl_abap_unit_assert=>assert_equals(
       act = lv_res
-      exp = 'WH012'
+      exp = lv_expected
       msg = 'Warehouse domain convenience formatter failed' ).
   ENDMETHOD.
 
@@ -121,11 +126,11 @@ CLASS lcl_test IMPLEMENTATION.
   METHOD test_get_next_wh_with_data.
     " 1. Arrange
     DATA lt_active TYPE STANDARD TABLE OF zmerp_warehouse.
-    lt_active = VALUE #( ( warehouse_code = 'WH00003' ) ).
+    lt_active = VALUE #( ( warehouse_code = zcl_merp_num_range_util=>format_warehouse_code( 3 ) ) ).
     mo_sql_double->insert_test_data( lt_active ).
 
     DATA lt_draft TYPE STANDARD TABLE OF zmerp_whse_d.
-    lt_draft = VALUE #( ( warehousecode = 'WH00005' ) ).
+    lt_draft = VALUE #( ( warehousecode = zcl_merp_num_range_util=>format_warehouse_code( 5 ) ) ).
     mo_sql_double->insert_test_data( lt_draft ).
 
     " 2. Act
@@ -142,16 +147,17 @@ CLASS lcl_test IMPLEMENTATION.
   METHOD test_get_next_vat_with_prefix.
     " 1. Arrange
     DATA lt_active TYPE STANDARD TABLE OF zmerp_vat_rate.
-    lt_active = VALUE #( ( vat_code = 'V009' ) ).
+    lt_active = VALUE #( ( vat_code = zcl_merp_num_range_util=>format_vat_code( 9 ) ) ).
     mo_sql_double->insert_test_data( lt_active ).
 
     " 2. Act
     DATA(lv_next_code) = zcl_merp_num_range_util=>get_next_vat_code( ).
 
     " 3. Assert
+    DATA(lv_expected) = zcl_merp_num_range_util=>format_vat_code( 10 ).
     cl_abap_unit_assert=>assert_equals(
       act = lv_next_code
-      exp = 'V010'
+      exp = lv_expected
       msg = 'Prefix handling with numeric suffix increment failed for VAT code' ).
   ENDMETHOD.
 
@@ -159,8 +165,8 @@ CLASS lcl_test IMPLEMENTATION.
     " 1. Arrange
     " Ensure that corrupted or non-numeric DB records are gracefully ignored during max calculation
     DATA lt_active TYPE STANDARD TABLE OF zmerp_warehouse.
-    lt_active = VALUE #( ( warehouse_code = 'WH00ABC' )
-                         ( warehouse_code = 'WH00003' ) ).
+    lt_active = VALUE #( ( warehouse_code = |{ zif_merp_constants=>c_wh-prefix }00ABC| )
+                         ( warehouse_code = zcl_merp_num_range_util=>format_warehouse_code( 3 ) ) ).
     mo_sql_double->insert_test_data( lt_active ).
 
     " 2. Act
@@ -177,8 +183,13 @@ CLASS lcl_test IMPLEMENTATION.
   METHOD test_get_next_wh_case_insens.
     " 1. Arrange
     " Verify that lowercase prefixes in DB are evaluated properly without breaking the counter
+    DATA(lv_low_prefix) = to_lower( zif_merp_constants=>c_wh-prefix ).
+    DATA(lv_num_part)   = zcl_merp_num_range_util=>add_leading_zeros(
+      iv_value  = 4
+      iv_length = zif_merp_constants=>c_wh-length - strlen( zif_merp_constants=>c_wh-prefix ) ).
+
     DATA lt_active TYPE STANDARD TABLE OF zmerp_warehouse.
-    lt_active = VALUE #( ( warehouse_code = 'wh00004' ) ).
+    lt_active = VALUE #( ( warehouse_code = |{ lv_low_prefix }{ lv_num_part }| ) ).
     mo_sql_double->insert_test_data( lt_active ).
 
     " 2. Act
@@ -195,8 +206,11 @@ CLASS lcl_test IMPLEMENTATION.
   METHOD test_get_next_wh_max_reached.
     " 1. Arrange
     " Assert that a standard check exception is thrown once the maximum number range sequence is exhausted
+    DATA(lv_max_num_len) = zif_merp_constants=>c_wh-length - strlen( zif_merp_constants=>c_wh-prefix ).
+    DATA(lv_max_nines)   = REPEAT( val = '9' occ = lv_max_num_len ).
+
     DATA lt_active TYPE STANDARD TABLE OF zmerp_warehouse.
-    lt_active = VALUE #( ( warehouse_code = 'WH99999' ) ).
+    lt_active = VALUE #( ( warehouse_code = |{ zif_merp_constants=>c_wh-prefix }{ lv_max_nines }| ) ).
     mo_sql_double->insert_test_data( lt_active ).
 
     " 2. Act & 3. Assert
@@ -223,4 +237,3 @@ CLASS lcl_test IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-
