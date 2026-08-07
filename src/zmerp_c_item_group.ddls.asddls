@@ -20,6 +20,8 @@ define root view entity ZMERP_C_ITEM_GROUP
 
       @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_VAT_RATE_VH', element: 'VatCode' }, useForValidation: true }]
       DefaultVatCode,
+      
+      IsBlocked,
 
       CreatedBy,
       CreatedAt,

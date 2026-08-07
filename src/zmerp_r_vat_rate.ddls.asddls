@@ -10,6 +10,8 @@ define root view entity ZMERP_R_VAT_RATE
 
       description           as Description,
       percentage            as Percentage,
+      
+      is_blocked            as IsBlocked,
 
       @Semantics.user.createdBy: true
       created_by            as CreatedBy,

@@ -14,6 +14,11 @@ define view entity ZMERP_I_ITEM_VH
       @Search.ranking: #HIGH
       @Search.fuzzinessThreshold: 0.7
       Description,
+      
+      @Search.defaultSearchElement: true
+      @Search.ranking: #HIGH
+      @Search.fuzzinessThreshold: 0.8
+      Article,
 
       @ObjectModel.text.element: [ 'ItemTypeDescription' ]
       @UI.textArrangement: #TEXT_ONLY
@@ -30,3 +35,6 @@ define view entity ZMERP_I_ITEM_VH
       DefaultVatCode,  
       _DefaultVATRate.Description as DefaultVATRateDescription
 }
+
+where
+  IsBlocked = ''

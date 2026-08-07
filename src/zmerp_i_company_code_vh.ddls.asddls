@@ -25,3 +25,6 @@ define view entity ZMERP_I_COMPANY_CODE_VH
       Country,
       _CountryText.CountryName as CountryName
 }
+
+where
+  IsBlocked = ''

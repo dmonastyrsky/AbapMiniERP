@@ -26,3 +26,6 @@ define view entity ZMERP_I_BUS_PARTNER_VH
       Country,
       _CountryText.CountryName as CountryName
 }
+
+where
+  IsBlocked = ''

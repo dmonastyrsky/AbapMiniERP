@@ -11,6 +11,8 @@ define root view entity ZMERP_R_ITEM_GROUP
       description           as Description,
       @ObjectModel.foreignKey.association: '_DefaultVATRate'
       default_vat_code      as DefaultVatCode,
+      
+      is_blocked            as IsBlocked,
 
       @Semantics.user.createdBy: true
       created_by            as CreatedBy,

@@ -34,6 +34,8 @@ define root view entity ZMERP_C_BUS_PARTNER
 
       Phone,
       Email,
+      
+      IsBlocked,
 
       CreatedBy,
       CreatedAt,

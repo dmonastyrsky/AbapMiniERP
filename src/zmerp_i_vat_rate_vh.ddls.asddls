@@ -19,3 +19,6 @@ define view entity ZMERP_I_VAT_RATE_VH
 
       Percentage
 }
+
+where
+  IsBlocked = ''

@@ -391,16 +391,19 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       " Group 1: Major Home Appliances
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 1 )
         description          = 'Washing Machine Bosch Series 6'
+        article              = 'BSH-WM-600'
         item_type            = 'P'
         item_group_code      = lv_grp1
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 2 )
         description          = 'Refrigerator Siemens iQ500'
+        article              = 'SIE-RF-500'
         item_type            = 'P'
         item_group_code      = lv_grp1
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 3 )
         description          = 'Dishwasher Miele G7000'
+        article              = 'MIE-DW-700'
         item_type            = 'P'
         item_group_code      = lv_grp1
         base_unit_of_measure = 'EA' )
@@ -408,16 +411,19 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       " Group 2: Small Kitchen Appliances
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 4 )
         description          = 'Espresso Machine DeLonghi Magnifica'
+        article              = 'DLG-EM-100'
         item_type            = 'P'
         item_group_code      = lv_grp2
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 5 )
         description          = 'Electric Kettle Philips Daily Collection'
+        article              = 'PHL-EK-200'
         item_type            = 'P'
         item_group_code      = lv_grp2
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 6 )
         description          = 'Toaster Tefal Express 2-Slot'
+        article              = 'TEF-TS-300'
         item_type            = 'P'
         item_group_code      = lv_grp2
         base_unit_of_measure = 'EA' )
@@ -425,16 +431,19 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       " Group 3: Consumer Electronics
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 7 )
         description          = 'Smart TV Samsung 55 Inch OLED'
+        article              = 'SAM-TV-55O'
         item_type            = 'P'
         item_group_code      = lv_grp3
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 8 )
         description          = 'Soundbar Sony HT-S400 2.1ch'
+        article              = 'SNE-SB-400'
         item_type            = 'P'
         item_group_code      = lv_grp3
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 9 )
         description          = 'Wireless Headphones Bose QuietComfort 45'
+        article              = 'BOS-HP-QC45'
         item_type            = 'P'
         item_group_code      = lv_grp3
         base_unit_of_measure = 'EA' )
@@ -442,16 +451,19 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       " Group 4: Accessories & Supplies
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 10 )
         description          = 'HDMI Cable 2.0 High Speed (2m)'
+        article              = 'ACC-HDMI-02'
         item_type            = 'P'
         item_group_code      = lv_grp4
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 11 )
         description          = 'Washing Machine Water Inlet Hose (1.5m)'
+        article              = 'ACC-HOSE-15'
         item_type            = 'P'
         item_group_code      = lv_grp4
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 12 )
         description          = 'Descaling Solution for Coffee Machines 500ml'
+        article              = 'ACC-DESC-50'
         item_type            = 'P'
         item_group_code      = lv_grp4
         base_unit_of_measure = 'BOT' )
@@ -459,11 +471,13 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       " Group 5: Installation & Support Services
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 13 )
         description          = 'Home Appliance Installation Service'
+        article              = 'SRV-INST-01'
         item_type            = 'S'
         item_group_code      = lv_grp5
         base_unit_of_measure = 'H' )
       ( item_code            = zcl_merp_num_range_util=>format_item_code( 14 )
         description          = 'Extended Warranty & On-site Repair Service'
+        article              = 'SRV-REPR-02'
         item_type            = 'S'
         item_group_code      = lv_grp5
         base_unit_of_measure = 'H' )

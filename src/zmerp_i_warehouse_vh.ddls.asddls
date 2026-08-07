@@ -20,3 +20,6 @@ define view entity ZMERP_I_WAREHOUSE_VH
   CompanyCode,     
   _CompanyCode.CompanyName as CompanyName
 }
+
+where
+  IsBlocked = ''

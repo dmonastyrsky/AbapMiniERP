@@ -16,6 +16,11 @@ define root view entity ZMERP_C_ITEM
       @Search.ranking: #HIGH
       @Search.fuzzinessThreshold: 0.7
       Description,
+      
+      @Search.defaultSearchElement: true
+      @Search.ranking: #HIGH
+      @Search.fuzzinessThreshold: 0.8
+      Article,
 
       @ObjectModel.text.element: ['ItemTypeDescription']
       @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_ITEM_TYPE_VH', element: 'ItemTypeCode' }, useForValidation: true }]
@@ -32,6 +37,8 @@ define root view entity ZMERP_C_ITEM
             
       @Consumption.valueHelpDefinition: [{ entity: { name: 'I_UnitOfMeasureStdVH', element: 'UnitOfMeasure' }, useForValidation: true }]
       BaseUnitOfMeasure,
+      
+      IsBlocked,
 
       CreatedBy,
       CreatedAt,

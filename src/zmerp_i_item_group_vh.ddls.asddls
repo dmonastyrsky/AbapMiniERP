@@ -20,3 +20,6 @@ define view entity ZMERP_I_ITEM_GROUP_VH
   DefaultVatCode,  
   _DefaultVATRate.Description as DefaultVATRateDescription
 }
+
+where
+  IsBlocked = ''

@@ -29,6 +29,8 @@ define root view entity ZMERP_C_COMPANY_CODE
       @ObjectModel.text.element: [ 'CountryName' ]
       Country,
       _CountryText.CountryName as CountryName,
+      
+      IsBlocked,
 
       CreatedBy,
       CreatedAt,

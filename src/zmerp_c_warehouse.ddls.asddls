@@ -19,6 +19,8 @@ define root view entity ZMERP_C_WAREHOUSE
 
       @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_COMPANY_CODE_VH', element: 'CompanyCode' }, useForValidation: true }]
       CompanyCode,
+      
+      IsBlocked,           
 
       CreatedBy,
       CreatedAt,

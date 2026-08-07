@@ -10,7 +10,8 @@ define root view entity ZMERP_R_COMPANY_CODE
   association [0..1] to I_CountryText  as _CountryText  on $projection.Country      = _CountryText.Country
                                                        and _CountryText.Language    = $session.system_language
   association [0..1] to I_Currency     as _Currency     on $projection.CurrencyCode = _Currency.Currency
-  association [0..1] to I_Country      as _Country      on $projection.Country      = _Country.Country
+  association [0..1] to I_Country      as _Country      on $projection.Country      = _Country.Country  
+  
 {
       
   key company_code          as CompanyCode,
@@ -22,6 +23,8 @@ define root view entity ZMERP_R_COMPANY_CODE
 
       @ObjectModel.foreignKey.association: '_Country'
       country               as Country,
+      
+      is_blocked            as IsBlocked,
 
       @Semantics.user.createdBy: true
       created_by            as CreatedBy,

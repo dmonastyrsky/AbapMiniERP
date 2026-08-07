@@ -11,7 +11,9 @@ define root view entity ZMERP_R_WAREHOUSE
 
       @ObjectModel.foreignKey.association: '_CompanyCode'
       company_code          as CompanyCode,
-
+      
+      is_blocked            as IsBlocked,
+         
       @Semantics.user.createdBy: true
       created_by            as CreatedBy,
       @Semantics.systemDateTime.createdAt: true

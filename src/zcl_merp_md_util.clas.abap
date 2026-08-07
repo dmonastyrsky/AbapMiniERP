@@ -81,6 +81,11 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
     ENDIF.
 
     DATA(lt_local_groups) = it_item_group_codes.
+    DELETE lt_local_groups WHERE table_line IS INITIAL.
+
+    IF lt_local_groups IS INITIAL.
+      RETURN.
+    ENDIF.
 
     SORT lt_local_groups BY table_line.
     DELETE ADJACENT DUPLICATES FROM lt_local_groups COMPARING table_line.

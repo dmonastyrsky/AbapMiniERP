@@ -21,6 +21,8 @@ define root view entity ZMERP_R_BUS_PARTNER
       country               as Country,
       phone                 as Phone,
       email                 as Email,
+      
+      is_blocked            as IsBlocked,
 
       @Semantics.user.createdBy: true
       created_by            as CreatedBy,

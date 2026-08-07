@@ -12,6 +12,7 @@ define root view entity ZMERP_R_ITEM
   @ObjectModel.text.element: ['Description']
   key item_code             as ItemCode,
       description           as Description,
+      article               as Article,
       
       item_type             as ItemTypeCode, 
 
@@ -22,6 +23,8 @@ define root view entity ZMERP_R_ITEM
       default_vat_code      as DefaultVatCode,
 
       base_unit_of_measure  as BaseUnitOfMeasure,
+      
+      is_blocked            as IsBlocked,
 
       @Semantics.user.createdBy: true
       created_by            as CreatedBy,

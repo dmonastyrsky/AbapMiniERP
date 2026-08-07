@@ -73,6 +73,10 @@ annotate view ZMERP_C_COMPANY_CODE with
   @UI.lineItem: [{ position: 40, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'OrgGroup', position: 20 }]
   Country;
+  
+  @UI.lineItem: [{ position: 50, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'OrgGroup', position: 30 }]
+  IsBlocked;
 
   @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 10 }]
   CreatedBy;

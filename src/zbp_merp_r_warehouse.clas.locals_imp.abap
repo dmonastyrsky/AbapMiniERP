@@ -123,8 +123,7 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
              companycode TYPE zmerp_company_code,
            END OF ty_company_code.
 
-    " Standard table prevents short dumps on duplicate user input
-    DATA lt_companies_to_check TYPE STANDARD TABLE OF ty_company_code WITH EMPTY KEY.
+    DATA lt_companies_to_check TYPE SORTED TABLE OF ty_company_code WITH NON-UNIQUE KEY companycode.
 
     lt_companies_to_check = VALUE #(
       FOR <whse_src> IN lt_warehouses
@@ -136,17 +135,18 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Bulk verification into a sorted structure for binary search lookup
-    DATA lt_existing_db TYPE SORTED TABLE OF ty_company_code WITH UNIQUE KEY companycode.
+    " Eliminate duplicates to optimize DB call and prevent potential dumps
+    DELETE ADJACENT DUPLICATES FROM lt_companies_to_check COMPARING companycode.
 
     " Privileged access bypasses DCL rules to check existence regardless of user access restrictions
     SELECT DISTINCT CompanyCode AS companycode
       FROM zmerp_r_company_code WITH PRIVILEGED ACCESS
       FOR ALL ENTRIES IN @lt_companies_to_check
       WHERE CompanyCode = @lt_companies_to_check-companycode
-      INTO TABLE @lt_existing_db.
+      INTO TABLE @DATA(lt_existing_db).
 
     LOOP AT lt_warehouses REFERENCE INTO DATA(lr_whse) WHERE CompanyCode IS NOT INITIAL.
+      " Binary search is performed automatically and faster because lt_existing_db has a unique key
       IF NOT line_exists( lt_existing_db[ companycode = lr_whse->CompanyCode ] ).
         " Mark entity instance as failed due to missing foreign key relationship
         APPEND VALUE #(

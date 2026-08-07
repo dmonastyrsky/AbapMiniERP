@@ -38,6 +38,7 @@ authorization master( global )
     WarehouseCode        = warehouse_code;
     WarehouseName        = warehouse_name;
     CompanyCode          = company_code;
+    IsBlocked            = is_blocked;
     CreatedBy            = created_by;
     CreatedAt            = created_at;
     LocalLastChangedBy   = local_last_changed_by;

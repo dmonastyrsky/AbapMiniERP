@@ -39,6 +39,7 @@ authorization master( global )
     CompanyPrefix        = company_prefix;
     CurrencyCode         = currency_code;
     Country              = country;
+    IsBlocked            = is_blocked;
     CreatedBy            = created_by;
     CreatedAt            = created_at;
     LocalLastChangedBy   = local_last_changed_by;

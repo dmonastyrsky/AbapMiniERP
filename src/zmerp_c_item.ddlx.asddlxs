@@ -44,8 +44,14 @@ annotate view ZMERP_C_ITEM with
   @UI.selectionField: [{ position: 20 }]
   Description;
 
+  @UI.lineItem: [{ position: 22, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 22 }]
+  @UI.selectionField: [{ position: 22 }]
+  Article;
+
+  @EndUserText.label: 'Item Type'
   @UI.textArrangement: #TEXT_ONLY
-  @UI.lineItem: [{ position: 25, importance: #MEDIUM }]
+  @UI.lineItem: [{ position: 25, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 25 }]
   @UI.selectionField: [{ position: 25 }]
   ItemTypeCode;
@@ -59,14 +65,19 @@ annotate view ZMERP_C_ITEM with
 
   @EndUserText.label: 'Default VAT Code'
   @UI.textArrangement: #TEXT_ONLY
-  @UI.lineItem: [{ position: 40, importance: #HIGH }]
+  @UI.lineItem: [{ position: 40, importance: #MEDIUM }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 40 }]
   DefaultVatCode;
 
-  @EndUserText.label: 'Base Unit of Measure'
+  @EndUserText.label: 'Base UoM'
   @UI.lineItem: [{ position: 50, importance: #MEDIUM }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 50 }]
   BaseUnitOfMeasure;
+  
+  @EndUserText.label: 'Blocked'
+  @UI.lineItem: [{ position: 60, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 60 }]
+  IsBlocked;
 
   @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 10 }]
   CreatedBy;

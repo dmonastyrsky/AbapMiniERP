@@ -19,6 +19,8 @@ define root view entity ZMERP_C_VAT_RATE
       Description,
 
       Percentage,
+      
+      IsBlocked,
 
       CreatedBy,
       CreatedAt,

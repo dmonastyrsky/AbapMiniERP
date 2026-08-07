@@ -36,6 +36,7 @@ authorization master ( global )
     ItemGroupCode      = item_group_code;
     Description        = description;
     DefaultVatCode     = default_vat_code;
+    IsBlocked          = is_blocked;
     CreatedBy          = created_by;
     CreatedAt          = created_at;
     LocalLastChangedBy = local_last_changed_by;

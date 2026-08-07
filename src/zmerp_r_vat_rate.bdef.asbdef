@@ -38,6 +38,7 @@ authorization master( global )
     VatCode            = vat_code;
     Description        = description;
     Percentage         = percentage;
+    IsBlocked          = is_blocked;
     CreatedBy          = created_by;
     CreatedAt          = created_at;
     LocalLastChangedBy = local_last_changed_by;

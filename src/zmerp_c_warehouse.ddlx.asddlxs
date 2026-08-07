@@ -49,6 +49,10 @@ annotate view ZMERP_C_WAREHOUSE with
   @UI.selectionField: [{ position: 30 }]
   @UI.textArrangement: #TEXT_FIRST
   CompanyCode;
+  
+  @UI.lineItem: [{ position: 40, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 40}]
+  IsBlocked;
 
   @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 10 }]
   CreatedBy;
