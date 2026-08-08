@@ -1,70 +1,102 @@
-# Mini ERP — Core Master Data & Enterprise Engine (SAP RAP)
+# Mini ERP – Procurement, Inventory and Sales
 
-[English](README.md) | [Українська](README.uk.md) | [Deutsch](README.de.md)
+[English](README.md) | [Deutsch](README.de.md) | [Українська](README.ua.md)
 
-![SAP S/4HANA](https://img.shields.io/badge/SAP-S%2F4HANA%20Cloud-008FD3?style=flat&logo=sap)
-![ABAP Cloud](https://img.shields.io/badge/Language-ABAP%20Cloud-blue?style=flat)
-![RAP Framework](https://img.shields.io/badge/Framework-SAP%20RAP%20(Strict%202)-green?style=flat)
-![OData V4](https://img.shields.io/badge/Protocol-OData%20V4-orange?style=flat)
+[![SAP ABAP Cloud](https://img.shields.io/badge/SAP-ABAP%20Cloud-0FAAFF?style=flat-square&logo=sap)](https://www.sap.com)
+[![SAP RAP](https://img.shields.io/badge/Model-SAP%20RAP%20(Managed)-0073C6?style=flat-square)](https://help.sap.com)
+[![Clean Core](https://img.shields.io/badge/Architecture-Clean%20Core%20Compliant-green?style=flat-square)](#6-clean-core-principles)
+[![Status](https://img.shields.io/badge/Status-Master%20Data%20Complete%20%7C%20Transactions%20In%20Progress-orange?style=flat-square)](#3-implementation-status--roadmap)
 
----
-
-## 📌 About the Project
-
-**Mini ERP** is a demonstration project of a core enterprise system built on **ABAP Cloud** and the **SAP RESTful Application Programming Model (RAP)**.
-
-The project demonstrates modern enterprise application development following **Clean Core** principles, featuring full **Draft capabilities** for stateful UX in SAP Fiori, transactional business logic validations, and **OData V4** service integration.
+**Version:** 1.0 (MVP)
 
 ---
 
-## 🏢 Business Objects (Master Data)
+## 1. Project Overview
 
-The repository currently includes the foundational Master Data entities:
+Mini ERP is a demonstration ERP application developed using the SAP ABAP Cloud programming model and the SAP RESTful Application Programming Model (RAP) on SAP BTP ABAP Environment.
 
-### 1. Company Code
-* **Purpose**: Management of corporate legal entities and organizational structures.
-* **Features**:
-  * Associations with standard released CDS views (`I_Currency`, `I_Country`).
-  * Custom validations for mandatory fields and code uniqueness.
+The project implements a simplified procurement, inventory, and sales process while following modern SAP development practices, including SAP Clean Core principles, RAP Business Objects, CDS View Entities, OData V4 services, and SAP Fiori Elements.
 
-### 2. Warehouse
-* **Purpose**: Storage location management associated with company codes.
-* **Features**:
-  * Foreign key association to `Company Code` with automated OData V4 framework validation (`useForValidation: true`).
-  * Fiori Text Arrangement (`#TEXT_FIRST`) displaying `Company Name (Code)` in lists and object pages.
-  * Multi-field search capabilities with Fuzzy Search threshold enabled.
+The application serves as a portfolio project demonstrating cloud-ready ABAP development, strict layer separation, and enterprise design patterns.
 
-### 3. VAT Rate
-* **Purpose**: Tax code and rate management for financial calculations in sales and procurement.
-* **Features**:
-  * Maintenance of tax codes, business descriptions (`Standard Rate 19%`, `Reduced Rate 7%`, `Zero Rate 0%`), and tax percentages.
-  * Range validation ensuring the tax percentage stays between `0.00` and `100.00%`.
-  * Mandatory field and duplicate key checks.
+Detailed technical architecture and domain model specifications are available in the [Architecture & Technical Design Documentation](docs/Architecture.md).
 
 ---
 
-## 🗺 Roadmap
+## 2. Technology Stack
 
-Upcoming modules planned for integration:
-
-* 📦 **Item Groups & Products/Services**: Material groups, product master data, and service items.
-* 🤝 **Business Partners**: Customers and Vendors master data.
-* 🧾 **Sales & Purchase Documents**: Transactional processing (Purchase Orders, Sales Orders, Invoices).
-
----
-
-## 🛠 Technical Architecture & UX
-
-* **RAP Strict Mode 2**: Compliance with modern transactional standards in SAP S/4HANA Cloud.
-* **Full Draft Support**: Seamless stateful editing and session handling in SAP Fiori Elements.
-* **State Area Messaging**: Field-bound error messages directly mapped to UI controls (`%element`).
-* **Automated Data Seed**: Unified initial setup class (`ZCL_MERP_INITIAL_SETUP`) for quick test environment seeding.
+- **Platform:** SAP BTP ABAP Environment
+- **IDE:** Eclipse ADT (ABAP Development Tools)
+- **Programming Model:** SAP RESTful Application Programming Model (RAP)
+- **Data Modeling:** ABAP Core Data Services (CDS View Entities)
+- **Persistence:** Transparent Tables with RAP Draft Support
+- **Services:** OData V4 UI Services
+- **UI Framework:** SAP Fiori Elements
+- **Development Standard:** SAP Clean Core / ABAP Cloud
 
 ---
 
-## 🚀 How to Run
+## 3. Implementation Status & Roadmap
 
-1. Clone the repository into your ABAP package using **abapGit** in Eclipse ADT.
-2. Activate all project objects (`Ctrl + Shift + F3`).
-3. Run class `ZCL_MERP_INITIAL_SETUP` (`F9`) to generate initial demo datasets.
-4. Launch the **Fiori Elements Preview** via Service Binding `ZUI_MERP_O4`.
+The project is structured into two main phases.
+
+### Phase 1: Master Data Management (Completed)
+- **Company Code:** Enterprise legal entities (Manual Keying).
+- **Warehouse:** Physical storage locations tied to Company Codes (Auto-generated Key).
+- **Business Partner:** Customers, Suppliers, or combined entities (Auto-generated Key).
+- **Item Group:** Product classification with default VAT assignment (Auto-generated Key).
+- **Item Master:** Tangible Products and intangible Services (Auto-generated Key).
+- **VAT Rate:** Tax configuration engine (Auto-generated Key).
+
+### Phase 2: Transactional Engine & Inventory (In Progress)
+- **Purchase Orders & Goods Receipts:** Procurement lifecycle with partial receipts support.
+- **Sales Orders & Goods Issues:** Sales lifecycle with strict stock checks.
+- **Dynamic Stock Calculation:** Real-time inventory calculation (`Stock = Receipts - Issues`) calculated dynamically via CDS View Entities without persistent stock tables.
+
+---
+
+## 4. Key Architectural Features
+
+### Hybrid Number Range Engine (`ZCL_MERP_NUM_RANGE_UTIL`)
+- **Primary Key Allocation:** Standard SAP Number Range Object (NRO) API via `cl_numberrange_runtime`.
+- **DB Max Fallback:** Dynamic OSQL fallback scanning both Active and Draft tables (`nmax`) to prevent key collisions during parallel user draft sessions.
+- **NRO Synchronization:** Automated interval leveling via `cl_numberrange_intervals` after seed execution.
+
+### Automated Tax & Value Inheritance (`ZCL_MERP_MD_UTIL`)
+- **Hierarchical VAT Determination:** Item VAT Code inherits from `Item Master` -> `Item Group Default` -> `Manual Fallback`.
+- **Delete Prechecks:** Relational integrity validation preventing deletion of referenced Master Data entities before database triggers occur.
+
+### Automated Initial Setup (`ZCL_MERP_INITIAL_SETUP`)
+- Console runner implementing `IF_OO_ADT_CLASSRUN`.
+- Populates seed data across all 6 Master Data entities.
+- Clears both Active and RAP Draft tables during initialization.
+- Automatically syncs NRO sequence levels to reflect seeded records.
+
+---
+
+## 5. Service Binding & UI Preview
+
+The OData V4 service `ZUI_MERP_O4` exposes all Master Data entities for SAP Fiori Elements consumption.
+
+---
+
+## 6. Clean Core Principles
+
+- **Strict ABAP Cloud Scope:** Zero usage of deprecated ABAP statements or unreleased SAP standard APIs.
+- **RAP Draft Capabilities:** Built-in state handling for transactional stateless HTTP communication.
+- **Automated Auditing:** Unified population of audit fields (`CREATED_BY`, `CREATED_AT`, `LAST_CHANGED_AT`, etc.).
+
+---
+
+## 7. Setup & Execution
+
+1. Import the repository into your SAP BTP ABAP Environment using **abapGit** in Eclipse ADT.
+2. Activate CDS View Entities, Behavior Definitions, and Service Bindings in hierarchical order.
+3. Open Service Binding `ZUI_MERP_O4` and click **Publish** (or **Unpublish / Publish**) to register the local OData V4 endpoint.
+4. Run class `ZCL_MERP_INITIAL_SETUP` in Eclipse ADT (`F9`) to populate seed data and synchronize Number Ranges.
+5. Preview applications via Fiori Elements Preview in the Service Binding editor.
+
+---
+
+## 📄 Related Documentation
+- 📘 [Architecture & Technical Design Specifications](docs/Architecture.md)
