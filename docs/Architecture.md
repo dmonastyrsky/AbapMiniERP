@@ -37,7 +37,27 @@ The system uses standardized prefixes, fixed-length formatting, and dedicated Nu
 
 ---
 
-## 3. Transactional Document Architecture (Phase 2 Design)
+## 3. Master Data Governance & Integrity Patterns
+
+To enforce data consistency, prevent orphan records, and govern record lifecycle under ABAP Cloud, the Master Data domain employs two standardized design patterns across all Business Objects:
+
+### 3.1. Relational Integrity via Bulk Prechecks (`precheck_delete`)
+Before any Master Data entity is deleted, RAP triggers the `precheck_delete` operation in the respective Behavior Implementation class (e.g., `ZBP_MERP_R_COMPANY_CODE`). 
+
+To avoid performance bottlenecks during multi-record deletions, the check uses a bulk query pattern:
+- **Key Deduplication:** Target keys from the RAP `keys` table are collected and deduplicated (`DELETE ADJACENT DUPLICATES`).
+- **Bulk SQL Dependency Scan:** A single `SELECT DISTINCT` query is executed against a dedicated CDS Usage View (e.g., `ZMERP_I_COMPANY_CODE_USAGE`) using an internal table JOIN (`INNER JOIN @lt_keys`).
+- **In-Memory Matching:** Identified dependencies are mapped back to individual records in memory via binary search (`LOOP AT ... WHERE`).
+- **RAP Fail & Message Reporting:** If dependencies exist, the record is flagged with `%fail-cause = if_abap_behv=>cause-dependency`, and a user-friendly error message (`ZCM_MERP_MESSAGES`) is returned to the UI, preventing the deletion.
+
+### 3.2. Soft Blocking and Value Help Governance
+To deactivate Master Data entities without breaking historical transactional records, all 6 entities implement an `IsBlocked` (`ZMERP_IS_BLOCKED`) field:
+- **Data Preservation:** Blocked entities remain in the database for auditability and reporting.
+- **Selection Prevention:** All dedicated Value Help CDS View Entities (e.g., `ZMERP_I_COMPANY_CODE_VH`, `ZMERP_I_VAT_RATE_VH`) enforce an explicit condition `WHERE IsBlocked = ''`. This ensures blocked Master Data records cannot be selected in new transactional documents (PO, SO, Inventory Movements).
+
+---
+
+## 4. Transactional Document Architecture (Phase 2 Design)
 
 Transactional documents follow a Header (1) to Line Items (N) composition structure:
 - **Procurement Chain:** Purchase Order -> Goods Receipt
@@ -50,7 +70,7 @@ Transactional documents follow a Header (1) to Line Items (N) composition struct
 
 ---
 
-## 4. Dynamic Inventory Calculation Concept
+## 5. Dynamic Inventory Calculation Concept
 
 Inventory balances are not statically stored in persistent tables. Current stock levels are calculated dynamically in real time from posted inventory movement documents:
 

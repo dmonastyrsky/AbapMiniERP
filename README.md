@@ -64,7 +64,14 @@ The project is structured into two main phases.
 
 ### Automated Tax & Value Inheritance (`ZCL_MERP_MD_UTIL`)
 - **Hierarchical VAT Determination:** Item VAT Code inherits from `Item Master` -> `Item Group Default` -> `Manual Fallback`.
-- **Delete Prechecks:** Relational integrity validation preventing deletion of referenced Master Data entities before database triggers occur.
+
+### Relational Integrity & Usage Prechecks
+- **Bulk Precheck Pattern:** Implemented in RAP Behavior Handlers (`precheck_delete`) across all 6 Master Data BOs to prevent deletion of in-use entities.
+- **Bulk SQL Optimization:** Queries dedicated CDS Usage Views (`ZMERP_I_<ENTITY>_USAGE`) with deduplicated key sets to eliminate $N+1$ query overhead.
+
+### Operational Status Governance
+- **Soft Blocking:** Master Data records use an `IsBlocked` flag to preserve historical data integrity instead of hard deletion.
+- **Value Help Filtering:** All operational Value Help Views (`ZMERP_I_<ENTITY>_VH`) enforce `WHERE IsBlocked = ''` to prevent selection of inactive records in downstream documents.
 
 ### Automated Initial Setup (`ZCL_MERP_INITIAL_SETUP`)
 - Console runner implementing `IF_OO_ADT_CLASSRUN`.

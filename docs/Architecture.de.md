@@ -1,6 +1,6 @@
 # Mini-ERP – Architektur & Technisches Design
 
-[Base ⬅ Zurück zu README.de.md](../README.de.md) | [English](Architecture.md) | [Deutsch](Architecture.de.md) | [Українська](Architecture.ua.md)
+[⬅ Zurück zu README.de.md](../README.de.md) | [English](Architecture.md) | [Deutsch](Architecture.de.md) | [Українська](Architecture.ua.md)
 
 ## 1. Domain Data Model (Domänen-Datenmodell)
 
@@ -37,7 +37,27 @@ Das System verwendet standardisierte Präfixe, Formatierungen mit fester Länge 
 
 ---
 
-## 3. Transactional Document Architecture (Transaktionsbeleg-Architektur — Design Phase 2)
+## 3. Master Data Governance & Integrity Patterns (Stammdaten-Governance & Integritätsmuster)
+
+Um die Datenkonsistenz zu gewährleisten, verwaiste Datensätze zu verhindern und den Lebenszyklus von Datensätzen unter ABAP Cloud zu steuern, verwendet die Stammdaten-Domäne zwei standardisierte Entwurfsmuster über alle Geschäftsobjekte hinweg:
+
+### 3.1. Relationale Integrität über Bulk-Vorprüfungen (`precheck_delete`)
+Bevor eine Stammdaten-Entität gelöscht wird, löst RAP die Operation `precheck_delete` in der entsprechenden Verhaltensimplementierungsklasse (z. B. `ZBP_MERP_R_COMPANY_CODE`) aus.
+
+Um Leistungsengpässe beim Löschen mehrerer Datensätze zu vermeiden, verwendet die Prüfung ein Massenabfragemuster (Bulk Query Pattern):
+- **Schlüssel-Deduplizierung:** Zielschlüssel aus der RAP-Tabelle `keys` werden gesammelt und dedupliziert (`DELETE ADJACENT DUPLICATES`).
+- **Massen-SQL-Abhängigkeitsscan:** Eine einzelne `SELECT DISTINCT`-Abfrage wird gegen eine dedizierte CDS Usage View (z. B. `ZMERP_I_COMPANY_CODE_USAGE`) unter Verwendung eines internen Tabellen-JOINs (`INNER JOIN @lt_keys`) ausgeführt.
+- **In-Memory-Abgleich:** Identifizierte Abhängigkeiten werden über eine binäre Suche (`LOOP AT ... WHERE`) im Speicher den einzelnen Datensätzen zugeordnet.
+- **RAP Fail & Meldungsrückgabe:** Wenn Abhängigkeiten bestehen, wird der Datensatz mit `%fail-cause = if_abap_behv=>cause-dependency` markiert und eine benutzerfreundliche Fehlermeldung (`ZCM_MERP_MESSAGES`) an die UI zurückgegeben, was das Löschen verhindert.
+
+### 3.2. Soft Blocking und Value Help-Governance
+Um Stammdaten-Entitäten zu deaktivieren, ohne historische Transaktionsdaten zu beschädigen, implementieren alle 6 Entitäten ein `IsBlocked`-Feld (`ZMERP_IS_BLOCKED`):
+- **Datenerhaltung:** Blockierte Entitäten verbleiben zur Überprüfbarkeit und Berichterstattung in der Datenbank.
+- **Auswahlsperre:** Alle dedizierten Value Help CDS View Entities (z. B. `ZMERP_I_COMPANY_CODE_VH`, `ZMERP_I_VAT_RATE_VH`) erzwingen die explizite Bedingung `WHERE IsBlocked = ''`. Dies stellt sicher, dass blockierte Stammdatensätze nicht in neuen Transaktionsbelegen (Bestellungen, Kundenaufträge, Lagerbewegungen) ausgewählt werden können.
+
+---
+
+## 4. Transactional Document Architecture (Transaktionsbeleg-Architektur — Design Phase 2)
 
 Transaktionsbelege folgen einer Kompositionsstruktur von Kopf (1) zu Positionen (N) (Header to Line Items):
 - **Procurement Chain (Beschaffungskette):** Purchase Order (Bestellung) -> Goods Receipt (Wareneingang)
@@ -50,7 +70,7 @@ Transaktionsbelege folgen einer Kompositionsstruktur von Kopf (1) zu Positionen 
 
 ---
 
-## 4. Dynamic Inventory Calculation Concept (Konzept der dynamischen Bestandsberechnung)
+## 5. Dynamic Inventory Calculation Concept (Konzept der dynamischen Bestandsberechnung)
 
 Lagerbestände werden nicht statisch in persistenten Tabellen gespeichert. Die aktuellen Bestände werden in Echtzeit dynamisch aus den gebuchten Lagerbewegungsbelegen berechnet:
 

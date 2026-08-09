@@ -60,11 +60,18 @@ Das Projekt ist in zwei Hauptphasen unterteilt.
 ### Hybride Nummernkreis-Engine (`ZCL_MERP_NUM_RANGE_UTIL`)
 - **Primärschlüsselzuweisung:** Standard SAP Number Range Object (NRO) API über `cl_numberrange_runtime`.
 - **DB Max Fallback:** Dynamischer Open-SQL-Fallback, der sowohl aktive Tabellen als auch Entwurfstabellen (`nmax`) scannt, um Schlüsselkollisionen während paralleler Benutzer-Draft-Sitzungen zu verhindern.
-- **NRO-Synchronisation:** Automatische Intervallanpassung über `cl_numbernumber_intervals` nach der Ausführung des Initial-Setups (Seed).
+- **NRO-Synchronisation:** Automatische Intervallanpassung über `cl_numberrange_intervals` nach der Ausführung des Initial-Setups (Seed).
 
 ### Automatische Steuer- und Wertererbung (`ZCL_MERP_MD_UTIL`)
 - **Hierarchische Ermittlung der MwSt.:** Der Artikel-Steuercode vererbt sich aus `Item Master` -> `Item Group Default` -> `Manual Fallback` (Manueller Rückfallwert).
-- **Lösch-Vorprüfungen:** Validierung der relationalen Integrität, die das Löschen von referenzierten Master Data-Entitäten verhindert, bevor Datenbank-Trigger greifen.
+
+### Relationale Integrität & Verwendungsprüfungen
+- **Bulk-Precheck-Muster:** Implementiert in RAP Behavior Handlern (`precheck_delete`) über alle 6 Stammdaten-BOs hinweg, um das Löschen verwendeter Entitäten zu verhindern.
+- **Bulk-SQL-Optimierung:** Fragt dedizierte CDS Usage Views (`ZMERP_I_<ENTITY>_USAGE`) mit bereinigten Schlüsselsets ab, um den $N+1$-Abfrage-Overhead zu eliminieren.
+
+### Operationales Status-Management
+- **Soft Blocking:** Stammdatensätze verwenden ein `IsBlocked`-Flag, um die historische Datenintegrität anstelle von hartem Löschen zu wahren.
+- **Value Help-Filterung:** Alle operativen Value Help Views (`ZMERP_I_<ENTITY>_VH`) erzwingen `WHERE IsBlocked = ''`, um die Auswahl inaktiver Datensätze in nachgelagerten Belegen zu verhindern.
 
 ### Automatisiertes Initial-Setup (`ZCL_MERP_INITIAL_SETUP`)
 - Console-Runner-Klasse, die das Interface `IF_OO_ADT_CLASSRUN` implementiert.
