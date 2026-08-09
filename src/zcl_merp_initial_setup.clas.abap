@@ -177,7 +177,11 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
 
   METHOD setup_company_codes.
-    clear_table_data( iv_active_table = CONV tabname( zif_merp_constants=>c_comp-table_db ) ).
+
+    clear_table_data(
+      iv_active_table = CONV tabname( zif_merp_constants=>c_comp-table_db )
+      iv_draft_table  = CONV tabname( zif_merp_constants=>c_comp-table_draft )
+    ).
 
     DATA lt_comp_code TYPE TABLE OF zmerp_comp_code.
 
