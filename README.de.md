@@ -40,13 +40,13 @@ Detaillierte technische Architektur- und Domänenmodell-Spezifikationen finden S
 
 Das Projekt ist in zwei Hauptphasen unterteilt.
 
-### Phase 1: Master Data Management (Stammdatenverwaltung) – Abgeschlossen
-- **Company Code (Buchungskreis):** Rechtliche Unternehmenseinheiten (Manuelle Schlüsseleingabe).
-- **Warehouse (Warehouse / Lager):** Physische Lagerorte, die an Company Codes gebunden sind (Automatisch generierter Schlüssel).
-- **Business Partner (Geschäftspartner):** Kunden, Lieferanten oder kombinierte Einheiten (Automatisch generierter Schlüssel).
-- **Item Group (Warengruppe):** Produktklassifizierung mit Standard-MwSt.-Zuordnung (Automatisch generierter Schlüssel).
-- **Item Master (Artikelstamm):** Materielle Produkte und immaterielle Dienstleistungen (Automatisch generierter Schlüssel).
-- **VAT Rate (Umsatzsteuersatz):** Steuerkonfigurations-Engine (Automatisch generierter Schlüssel).
+### Phase 1: Stammdatenverwaltung (Master Data Management) – Abgeschlossen
+- **Company Code (Unternehmen):** Operative Organisationseinheiten mit Länder- und Währungseinstellungen (Manuelle Schlüsselvergabe).
+- **Warehouse (Lager):** Physische Lagerorte, die einem Unternehmen zugeordnet sind (Automatische Schlüsselvergabe).
+- **Business Partner (Geschäftspartner):** Kunden, Lieferanten oder kombinierte Partner (Automatische Schlüsselvergabe).
+- **Item Group (Produktgruppen):** Produktklassifizierung mit Standard-MwSt.-Satz für automatische Vererbung (Automatische Schlüsselvergabe).
+- **Item (Produkte):** Materielle Produkte und immaterielle Dienstleistungen (Automatische Schlüsselvergabe).
+- **VAT Rate (MwSt.-Sätze):** Zentrale Engine für die Konfiguration und Pflege von Steuersätzen (Automatische Schlüsselvergabe).
 
 ### Phase 2: Transactional Engine & Inventory (Transaktions-Engine & Lagerhaltung) – In Arbeit
 - **Purchase Orders & Goods Receipts (Bestellungen & Wareneingänge):** Beschaffungslebenszyklus mit Unterstützung für Teilwareneingänge.

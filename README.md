@@ -41,12 +41,12 @@ Detailed technical architecture and domain model specifications are available in
 The project is structured into two main phases.
 
 ### Phase 1: Master Data Management (Completed)
-- **Company Code:** Enterprise legal entities (Manual Keying).
-- **Warehouse:** Physical storage locations tied to Company Codes (Auto-generated Key).
-- **Business Partner:** Customers, Suppliers, or combined entities (Auto-generated Key).
-- **Item Group:** Product classification with default VAT assignment (Auto-generated Key).
-- **Item Master:** Tangible Products and intangible Services (Auto-generated Key).
-- **VAT Rate:** Tax configuration engine (Auto-generated Key).
+- **Company Code:** Operational organizations with country and currency configuration (Manual Keying).
+- **Warehouse:** Storage locations assigned to a specific Company Code (Auto-generated Key).
+- **Business Partner:** Customers, suppliers, or entities combining both roles (Auto-generated Key).
+- **Item Group:** Product classifications with default tax configurations (Auto-generated Key).
+- **Item:** Tangible products and intangible services (Auto-generated Key).
+- **VAT Rate:** Central engine for tax percentage maintenance (Auto-generated Key).
 
 ### Phase 2: Transactional Engine & Inventory (In Progress)
 - **Purchase Orders & Goods Receipts:** Procurement lifecycle with partial receipts support.
