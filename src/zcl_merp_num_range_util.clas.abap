@@ -25,10 +25,10 @@ CLASS zcl_merp_num_range_util DEFINITION
         cx_number_ranges.
 
     "! Generates the next sequential Item Group code by searching the maximum existing value in active and draft tables.
-    "! @parameter rv_item_group_code | Generated formatted Item Group code string
-    CLASS-METHODS get_next_item_group_code
+    "! @parameter rv_item_grp_code | Generated formatted Item Group code string
+    CLASS-METHODS get_next_item_grp_code
       RETURNING
-        VALUE(rv_item_group_code) TYPE zmerp_item_group-item_group_code
+        VALUE(rv_item_grp_code) TYPE zmerp_item_group-item_group_code
       RAISING
         cx_number_ranges.
 
@@ -66,10 +66,10 @@ CLASS zcl_merp_num_range_util DEFINITION
         cx_number_ranges.
 
     "! Generates the next sequential Item Group code using standard SAP Number Range Runtime API.
-    "! @parameter rv_item_group_code | Generated formatted Item Group code string from NRO
-    CLASS-METHODS get_next_item_group_code_nro
+    "! @parameter rv_item_grp_code | Generated formatted Item Group code string from NRO
+    CLASS-METHODS get_next_item_grp_code_nro
       RETURNING
-        VALUE(rv_item_group_code) TYPE zmerp_item_group-item_group_code
+        VALUE(rv_item_grp_code) TYPE zmerp_item_group-item_group_code
       RAISING
         cx_number_ranges.
 
@@ -86,6 +86,62 @@ CLASS zcl_merp_num_range_util DEFINITION
     CLASS-METHODS get_next_warehouse_code_nro
       RETURNING
         VALUE(rv_wh_id) TYPE zmerp_warehouse-warehouse_code
+      RAISING
+        cx_number_ranges.
+
+    " Bulk NRO Generation Methods
+    "! Generates multiple sequential Business Partner codes using NRO API with DB fallback.
+    "! @parameter iv_count | Total count of sequential codes requested
+    "! @parameter rt_codes | Table of generated formatted Business Partner codes
+    CLASS-METHODS get_next_bp_codes_nro
+      IMPORTING
+        iv_count        TYPE i
+      RETURNING
+        VALUE(rt_codes) TYPE string_table
+      RAISING
+        cx_number_ranges.
+
+    "! Generates multiple sequential Item codes using NRO API with DB fallback.
+    "! @parameter iv_count | Total count of sequential codes requested
+    "! @parameter rt_codes | Table of generated formatted Item codes
+    CLASS-METHODS get_next_item_codes_nro
+      IMPORTING
+        iv_count        TYPE i
+      RETURNING
+        VALUE(rt_codes) TYPE string_table
+      RAISING
+        cx_number_ranges.
+
+    "! Generates multiple sequential Item Group codes using NRO API with DB fallback.
+    "! @parameter iv_count | Total count of sequential codes requested
+    "! @parameter rt_codes | Table of generated formatted Item Group codes
+    CLASS-METHODS get_next_item_grp_codes_nro
+      IMPORTING
+        iv_count        TYPE i
+      RETURNING
+        VALUE(rt_codes) TYPE string_table
+      RAISING
+        cx_number_ranges.
+
+    "! Generates multiple sequential VAT codes using NRO API with DB fallback.
+    "! @parameter iv_count | Total count of sequential codes requested
+    "! @parameter rt_codes | Table of generated formatted VAT codes
+    CLASS-METHODS get_next_vat_codes_nro
+      IMPORTING
+        iv_count        TYPE i
+      RETURNING
+        VALUE(rt_codes) TYPE string_table
+      RAISING
+        cx_number_ranges.
+
+    "! Generates multiple sequential Warehouse codes using NRO API with DB fallback.
+    "! @parameter iv_count | Total count of sequential codes requested
+    "! @parameter rt_codes | Table of generated formatted Warehouse codes
+    CLASS-METHODS get_next_wh_codes_nro
+      IMPORTING
+        iv_count        TYPE i
+      RETURNING
+        VALUE(rt_codes) TYPE string_table
       RAISING
         cx_number_ranges.
 
@@ -220,6 +276,30 @@ CLASS zcl_merp_num_range_util DEFINITION
       RETURNING
         VALUE(rv_code) TYPE string.
 
+    "! Generic bulk sequential number generator based on entity metadata.
+    "! @parameter is_meta  | Entity metadata configuration
+    "! @parameter iv_count | Total count of sequential codes requested
+    "! @parameter rt_codes | Table of generated formatted codes
+    CLASS-METHODS get_next_numbers
+      IMPORTING
+        is_meta         TYPE zif_merp_constants=>ty_entity_metadata
+        iv_count        TYPE i
+      RETURNING
+        VALUE(rt_codes) TYPE string_table
+      RAISING
+        cx_number_ranges.
+
+    "! Generic bulk number generator wrapping Standard SAP NRO Runtime API based on entity metadata.
+    "! @parameter is_meta  | Entity metadata configuration
+    "! @parameter iv_count | Total count of sequential codes requested
+    "! @parameter rt_codes | Table of generated formatted codes
+    CLASS-METHODS get_next_numbers_from_nro
+      IMPORTING
+        is_meta         TYPE zif_merp_constants=>ty_entity_metadata
+        iv_count        TYPE i
+      RETURNING
+        VALUE(rt_codes) TYPE string_table.
+
     "! Returns list of all configured NRO object names for administration.
     CLASS-METHODS get_nro_objects
       RETURNING
@@ -246,21 +326,26 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     rv_bp_code = get_next_number( zif_merp_constants=>c_bp ).
   ENDMETHOD.
 
+
   METHOD get_next_item_code.
     rv_item_code = get_next_number( zif_merp_constants=>c_item ).
   ENDMETHOD.
 
-  METHOD get_next_item_group_code.
-    rv_item_group_code = get_next_number( zif_merp_constants=>c_ig ).
+
+  METHOD get_next_item_grp_code.
+    rv_item_grp_code = get_next_number( zif_merp_constants=>c_ig ).
   ENDMETHOD.
+
 
   METHOD get_next_vat_code.
     rv_vat_code = get_next_number( zif_merp_constants=>c_vat ).
   ENDMETHOD.
 
+
   METHOD get_next_warehouse_code.
     rv_wh_id = get_next_number( zif_merp_constants=>c_wh ).
   ENDMETHOD.
+
 
   METHOD get_next_bp_code_nro.
     rv_bp_code = get_next_number_from_nro( zif_merp_constants=>c_bp ).
@@ -270,6 +355,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+
   METHOD get_next_item_code_nro.
     rv_item_code = get_next_number_from_nro( zif_merp_constants=>c_item ).
 
@@ -278,13 +364,15 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD get_next_item_group_code_nro.
-    rv_item_group_code = get_next_number_from_nro( zif_merp_constants=>c_ig ).
 
-    IF rv_item_group_code IS INITIAL.
-      rv_item_group_code = get_next_item_group_code( ).
+  METHOD get_next_item_grp_code_nro.
+    rv_item_grp_code = get_next_number_from_nro( zif_merp_constants=>c_ig ).
+
+    IF rv_item_grp_code IS INITIAL.
+      rv_item_grp_code = get_next_item_grp_code( ).
     ENDIF.
   ENDMETHOD.
+
 
   METHOD get_next_vat_code_nro.
     rv_vat_code = get_next_number_from_nro( zif_merp_constants=>c_vat ).
@@ -294,6 +382,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+
   METHOD get_next_warehouse_code_nro.
     rv_wh_id = get_next_number_from_nro( zif_merp_constants=>c_wh ).
 
@@ -302,13 +391,78 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+
+  METHOD get_next_bp_codes_nro.
+    rt_codes = get_next_numbers_from_nro(
+      is_meta  = zif_merp_constants=>c_bp
+      iv_count = iv_count ).
+
+    IF lines( rt_codes ) < iv_count.
+      rt_codes = get_next_numbers(
+        is_meta  = zif_merp_constants=>c_bp
+        iv_count = iv_count ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD get_next_item_codes_nro.
+    rt_codes = get_next_numbers_from_nro(
+      is_meta  = zif_merp_constants=>c_item
+      iv_count = iv_count ).
+
+    IF lines( rt_codes ) < iv_count.
+      rt_codes = get_next_numbers(
+        is_meta  = zif_merp_constants=>c_item
+        iv_count = iv_count ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD get_next_item_grp_codes_nro.
+    rt_codes = get_next_numbers_from_nro(
+      is_meta  = zif_merp_constants=>c_ig
+      iv_count = iv_count ).
+
+    IF lines( rt_codes ) < iv_count.
+      rt_codes = get_next_numbers(
+        is_meta  = zif_merp_constants=>c_ig
+        iv_count = iv_count ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD get_next_vat_codes_nro.
+    rt_codes = get_next_numbers_from_nro(
+      is_meta  = zif_merp_constants=>c_vat
+      iv_count = iv_count ).
+
+    IF lines( rt_codes ) < iv_count.
+      rt_codes = get_next_numbers(
+        is_meta  = zif_merp_constants=>c_vat
+        iv_count = iv_count ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD get_next_wh_codes_nro.
+    rt_codes = get_next_numbers_from_nro(
+      is_meta  = zif_merp_constants=>c_wh
+      iv_count = iv_count ).
+
+    IF lines( rt_codes ) < iv_count.
+      rt_codes = get_next_numbers(
+        is_meta  = zif_merp_constants=>c_wh
+        iv_count = iv_count ).
+    ENDIF.
+  ENDMETHOD.
+
+
   METHOD add_leading_zeros.
     rv_code = |{ iv_value WIDTH = iv_length PAD = '0' ALIGN = RIGHT }|.
   ENDMETHOD.
 
-  METHOD format_code.
 
-    " Ignore negative numeric values
+  METHOD format_code.
     TRY.
         IF CONV int8( iv_number ) < 0.
           RETURN.
@@ -338,12 +492,14 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     rv_code = |{ iv_prefix }{ lv_padded }|.
   ENDMETHOD.
 
+
   METHOD format_bp_code.
     rv_code = format_code(
       iv_number       = iv_number
       iv_prefix       = zif_merp_constants=>c_bp-prefix
       iv_total_length = zif_merp_constants=>c_bp-length ).
   ENDMETHOD.
+
 
   METHOD format_item_code.
     rv_code = format_code(
@@ -352,12 +508,14 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       iv_total_length = zif_merp_constants=>c_item-length ).
   ENDMETHOD.
 
+
   METHOD format_item_grp_code.
     rv_code = format_code(
       iv_number       = iv_number
       iv_prefix       = zif_merp_constants=>c_ig-prefix
       iv_total_length = zif_merp_constants=>c_ig-length ).
   ENDMETHOD.
+
 
   METHOD format_vat_code.
     rv_code = format_code(
@@ -366,12 +524,14 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       iv_total_length = zif_merp_constants=>c_vat-length ).
   ENDMETHOD.
 
+
   METHOD format_warehouse_code.
     rv_code = format_code(
       iv_number       = iv_number
       iv_prefix       = zif_merp_constants=>c_wh-prefix
       iv_total_length = zif_merp_constants=>c_wh-length ).
   ENDMETHOD.
+
 
   METHOD setup_intervals.
     DATA(lt_objects) = get_nro_objects( ).
@@ -383,6 +543,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+
   METHOD reset_intervals.
     DATA(lt_objects) = get_nro_objects( ).
 
@@ -393,6 +554,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+
   METHOD sync_intervals_from_db.
     sync_bp_interval( ).
     sync_item_interval( ).
@@ -401,11 +563,13 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     sync_warehouse_interval( ).
   ENDMETHOD.
 
+
   METHOD sync_bp_interval.
     save_interval(
       iv_object = zif_merp_constants=>c_bp-number_object
       iv_level  = get_max_level_from_db( zif_merp_constants=>c_bp ) ).
   ENDMETHOD.
+
 
   METHOD sync_item_interval.
     save_interval(
@@ -413,11 +577,13 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       iv_level  = get_max_level_from_db( zif_merp_constants=>c_item ) ).
   ENDMETHOD.
 
+
   METHOD sync_item_grp_interval.
     save_interval(
       iv_object = zif_merp_constants=>c_ig-number_object
       iv_level  = get_max_level_from_db( zif_merp_constants=>c_ig ) ).
   ENDMETHOD.
+
 
   METHOD sync_vat_interval.
     save_interval(
@@ -425,61 +591,13 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       iv_level  = get_max_level_from_db( zif_merp_constants=>c_vat ) ).
   ENDMETHOD.
 
+
   METHOD sync_warehouse_interval.
     save_interval(
       iv_object = zif_merp_constants=>c_wh-number_object
       iv_level  = get_max_level_from_db( zif_merp_constants=>c_wh ) ).
   ENDMETHOD.
 
-  METHOD save_interval.
-    DATA: lt_interval TYPE TABLE OF cl_numberrange_intervals=>nr_nriv_line,
-          ls_interval LIKE LINE OF lt_interval,
-          lv_error    TYPE cl_numberrange_intervals=>nr_error,
-          ls_error    TYPE cl_numberrange_intervals=>nr_error_inf.
-
-    ls_interval-nrrangenr  = '01'.
-    ls_interval-fromnumber = '0000000001'.
-    ls_interval-tonumber   = '9999999999'.
-    ls_interval-nrlevel    = add_leading_zeros( iv_value = iv_level iv_length = 10 ).
-    APPEND ls_interval TO lt_interval.
-
-    TRY.
-        cl_numberrange_intervals=>update(
-          EXPORTING
-            object   = iv_object
-            interval = lt_interval
-          IMPORTING
-            error     = lv_error
-            error_inf = ls_error ).
-
-      CATCH cx_number_ranges.
-        TRY.
-            cl_numberrange_intervals=>create(
-              EXPORTING
-                object   = iv_object
-                interval = lt_interval
-              IMPORTING
-                error     = lv_error
-                error_inf = ls_error ).
-          CATCH cx_number_ranges cx_root.
-            RETURN.
-        ENDTRY.
-      CATCH cx_root.
-        RETURN.
-    ENDTRY.
-
-  ENDMETHOD.
-
-  METHOD get_max_level_from_db.
-    DATA(lv_max_code) = get_max_code_from_db(
-      iv_table  = is_meta-table_db
-      iv_field  = is_meta-field_db
-      iv_prefix = is_meta-prefix ).
-
-    rv_level = extract_numeric_suffix(
-      iv_code   = lv_max_code
-      iv_offset = strlen( is_meta-prefix ) ).
-  ENDMETHOD.
 
   METHOD get_next_number.
     DATA(lv_prefix_length) = strlen( is_meta-prefix ).
@@ -512,11 +630,11 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       iv_number       = lv_max_numeric
       iv_total_length = is_meta-length ).
 
-    " Raise standard number range exception if sequence is exhausted or invalid
     IF rv_number IS INITIAL.
       RAISE EXCEPTION NEW cx_number_ranges( ).
     ENDIF.
   ENDMETHOD.
+
 
   METHOD get_max_code_from_db.
     DATA: BEGIN OF ls_result,
@@ -527,7 +645,6 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     DATA(lv_prefix_lower) = to_lower( iv_prefix ).
 
     TRY.
-        " Case-insensitive match for both UPPER and lower prefix variants
         DATA(lv_where) = |( { iv_field } LIKE '{ lv_prefix_upper }%' OR { iv_field } LIKE '{ lv_prefix_lower }%' )|.
         DATA(lv_order) = |{ iv_field } DESCENDING|.
 
@@ -545,6 +662,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
         CLEAR rv_code.
     ENDTRY.
   ENDMETHOD.
+
 
   METHOD extract_numeric_suffix.
     IF iv_code IS INITIAL OR strlen( iv_code ) <= iv_offset.
@@ -564,6 +682,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
         CLEAR rv_numeric.
     ENDTRY.
   ENDMETHOD.
+
 
   METHOD get_next_number_from_nro.
     DATA: lv_raw_number TYPE cl_numberrange_runtime=>nr_number.
@@ -590,6 +709,92 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     ENDTRY.
   ENDMETHOD.
 
+
+  METHOD get_next_numbers.
+    IF iv_count <= 0.
+      RETURN.
+    ENDIF.
+
+    DATA(lv_prefix_length) = strlen( is_meta-prefix ).
+
+    DATA(lv_max_active) = get_max_code_from_db(
+      iv_table  = is_meta-table_db
+      iv_field  = is_meta-field_db
+      iv_prefix = is_meta-prefix ).
+
+    DATA(lv_max_draft) = COND string(
+      WHEN is_meta-table_draft IS NOT INITIAL
+       AND is_meta-field_draft IS NOT INITIAL
+      THEN get_max_code_from_db(
+             iv_table  = is_meta-table_draft
+             iv_field  = is_meta-field_draft
+             iv_prefix = is_meta-prefix ) ).
+
+    DATA(lv_max_numeric) = nmax(
+      val1 = extract_numeric_suffix(
+               iv_code   = lv_max_active
+               iv_offset = lv_prefix_length )
+      val2 = extract_numeric_suffix(
+               iv_code   = lv_max_draft
+               iv_offset = lv_prefix_length ) ).
+
+    DO iv_count TIMES.
+      lv_max_numeric += 1.
+      DATA(lv_code) = format_code(
+        iv_prefix       = is_meta-prefix
+        iv_number       = lv_max_numeric
+        iv_total_length = is_meta-length ).
+
+      IF lv_code IS INITIAL.
+        CLEAR rt_codes.
+        RAISE EXCEPTION NEW cx_number_ranges( ).
+      ENDIF.
+
+      APPEND lv_code TO rt_codes.
+    ENDDO.
+  ENDMETHOD.
+
+
+  METHOD get_next_numbers_from_nro.
+    DATA lv_raw_number TYPE cl_numberrange_runtime=>nr_number.
+
+    IF iv_count <= 0.
+      RETURN.
+    ENDIF.
+
+    TRY.
+        cl_numberrange_runtime=>number_get(
+          EXPORTING
+            nr_range_nr = '01'
+            object      = is_meta-number_object
+            quantity    = CONV #( iv_count )
+          IMPORTING
+            number      = lv_raw_number ).
+
+        DATA(lv_last_num) = CONV int8( lv_raw_number ).
+        DATA(lv_start_num) = lv_last_num - iv_count + 1.
+
+        DO iv_count TIMES.
+          DATA(lv_curr_num) = lv_start_num + sy-index - 1.
+          DATA(lv_code) = format_code(
+            iv_number       = lv_curr_num
+            iv_prefix       = is_meta-prefix
+            iv_total_length = is_meta-length ).
+
+          IF lv_code IS INITIAL.
+            CLEAR rt_codes.
+            RETURN.
+          ENDIF.
+
+          APPEND lv_code TO rt_codes.
+        ENDDO.
+
+      CATCH cx_number_ranges cx_sy_conversion_error cx_sy_arithmetic_overflow.
+        CLEAR rt_codes.
+    ENDTRY.
+  ENDMETHOD.
+
+
   METHOD get_nro_objects.
     rt_objects = VALUE #(
       ( CONV string( zif_merp_constants=>c_bp-number_object ) )
@@ -598,6 +803,57 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       ( CONV string( zif_merp_constants=>c_vat-number_object ) )
       ( CONV string( zif_merp_constants=>c_wh-number_object ) )
     ).
+  ENDMETHOD.
+
+
+  METHOD save_interval.
+    DATA: lt_interval TYPE TABLE OF cl_numberrange_intervals=>nr_nriv_line,
+          ls_interval LIKE LINE OF lt_interval,
+          lv_error    TYPE cl_numberrange_intervals=>nr_error,
+          ls_error    TYPE cl_numberrange_intervals=>nr_error_inf.
+
+    ls_interval-nrrangenr  = '01'.
+    ls_interval-fromnumber = '0000000001'.
+    ls_interval-tonumber   = '9999999999'.
+    ls_interval-nrlevel    = add_leading_zeros( iv_value = iv_level iv_length = 10 ).
+    APPEND ls_interval TO lt_interval.
+
+    TRY.
+        cl_numberrange_intervals=>update(
+          EXPORTING
+            object    = iv_object
+            interval  = lt_interval
+          IMPORTING
+            error     = lv_error
+            error_inf = ls_error ).
+
+      CATCH cx_number_ranges.
+        TRY.
+            cl_numberrange_intervals=>create(
+              EXPORTING
+                object    = iv_object
+                interval  = lt_interval
+              IMPORTING
+                error     = lv_error
+                error_inf = ls_error ).
+          CATCH cx_number_ranges cx_root.
+            RETURN.
+        ENDTRY.
+      CATCH cx_root.
+        RETURN.
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD get_max_level_from_db.
+    DATA(lv_max_code) = get_max_code_from_db(
+      iv_table  = is_meta-table_db
+      iv_field  = is_meta-field_db
+      iv_prefix = is_meta-prefix ).
+
+    rv_level = extract_numeric_suffix(
+      iv_code   = lv_max_code
+      iv_offset = strlen( is_meta-prefix ) ).
   ENDMETHOD.
 
 ENDCLASS.

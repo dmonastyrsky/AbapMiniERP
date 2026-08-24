@@ -135,41 +135,61 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    DATA lx_nro_error TYPE REF TO cx_root.
+    DATA lt_codes     TYPE string_table.
+
+    " Step 1: Count entities requiring key generation using the secondary key
+    DATA(lv_needed_count) = REDUCE i( INIT count = 0
+                                       FOR entity IN entities USING KEY entity
+                                       WHERE ( PartnerCode IS INITIAL )
+                                       NEXT count += 1 ).
+
+    " Step 2: Bulk allocation via NRO utility with exception capture
+    IF lv_needed_count > 0.
+      TRY.
+          lt_codes = zcl_merp_num_range_util=>get_next_bp_codes_nro( iv_count = lv_needed_count ).
+        CATCH cx_number_ranges cx_root INTO lx_nro_error.
+          CLEAR lt_codes.
+      ENDTRY.
+    ENDIF.
+
+    DATA(lv_index) = 1.
+
+    " Step 3: Map keys to instances safely
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
       IF lr_entity->PartnerCode IS INITIAL.
+        READ TABLE lt_codes INDEX lv_index ASSIGNING FIELD-SYMBOL(<lv_code>).
 
-        DATA(lv_next_bp_code) = VALUE string( ).
-
-        TRY.
-            lv_next_bp_code = zcl_merp_num_range_util=>get_next_bp_code_nro( ).
-          CATCH cx_number_ranges.
-            CLEAR lv_next_bp_code.
-        ENDTRY.
-
-        IF lv_next_bp_code IS NOT INITIAL.
-          " Map generated business key to the draft/content creation ID (%cid)
+        IF sy-subrc = 0 AND <lv_code> IS NOT INITIAL.
+          " Map successfully generated key
           APPEND VALUE #(
             %cid        = lr_entity->%cid
             %is_draft   = lr_entity->%is_draft
-            PartnerCode = lv_next_bp_code
+            PartnerCode = CONV #( <lv_code> )
           ) TO mapped-businesspartner.
+
+          " Increment index ONLY after processing an auto-numbered entity
+          lv_index += 1.
         ELSE.
+          " Mark entity failure
           APPEND VALUE #(
             %cid        = lr_entity->%cid
             %is_draft   = lr_entity->%is_draft
             %fail-cause = if_abap_behv=>cause-unspecific
           ) TO failed-businesspartner.
 
+          " Report error with root cause exception reference if available
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
             %msg      = NEW zcm_merp_messages(
                           textid   = zcm_merp_messages=>bp_number_failed
+                          previous = lx_nro_error
                           severity = if_abap_behv_message=>severity-error )
           ) TO reported-businesspartner.
         ENDIF.
       ELSE.
-        " Preserve user-provided key if supplied during creation
+        " Retain explicitly provided code without affecting lt_codes indexing
         APPEND VALUE #(
           %cid        = lr_entity->%cid
           %is_draft   = lr_entity->%is_draft

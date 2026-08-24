@@ -91,7 +91,8 @@ ENDCLASS.
 
 
 
-CLASS zcl_merp_initial_setup IMPLEMENTATION.
+CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
+
 
   METHOD if_oo_adt_classrun~main.
     execute( out ).
@@ -116,6 +117,14 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD write_insert_log.
+    write_log(
+      iv_text = |[{ iv_entity_name }]: Successfully inserted { iv_count } rows.|
+      out     = out
+    ).
+  ENDMETHOD.
+
+
   METHOD get_current_user.
     TRY.
         rv_user = cl_abap_context_info=>get_user_technical_name( ).
@@ -127,6 +136,13 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
   METHOD get_current_timestamp.
     GET TIME STAMP FIELD rv_timestamp.
+  ENDMETHOD.
+
+
+  METHOD write_log.
+    IF out IS BOUND.
+      out->write( iv_text ).
+    ENDIF.
   ENDMETHOD.
 
 
@@ -150,29 +166,6 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       ASSIGN COMPONENT 'LAST_CHANGED_AT' OF STRUCTURE <ls_row> TO FIELD-SYMBOL(<lv_lch>).
       IF sy-subrc = 0. <lv_lch> = lv_timestamp. ENDIF.
     ENDLOOP.
-  ENDMETHOD.
-
-
-  METHOD write_log.
-    IF out IS BOUND.
-      out->write( iv_text ).
-    ENDIF.
-  ENDMETHOD.
-
-
-  METHOD write_insert_log.
-    write_log(
-      iv_text = |[{ iv_entity_name }]: Successfully inserted { iv_count } rows.|
-      out     = out
-    ).
-  ENDMETHOD.
-
-
-  METHOD clear_table_data.
-    DELETE FROM (iv_active_table).
-    IF iv_draft_table IS NOT INITIAL.
-      DELETE FROM (iv_draft_table).
-    ENDIF.
   ENDMETHOD.
 
 
@@ -599,4 +592,11 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     write_insert_log( iv_entity_name = 'Business Partner' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
 
+
+  METHOD clear_table_data.
+    DELETE FROM (iv_active_table).
+    IF iv_draft_table IS NOT INITIAL.
+      DELETE FROM (iv_draft_table).
+    ENDIF.
+  ENDMETHOD.
 ENDCLASS.

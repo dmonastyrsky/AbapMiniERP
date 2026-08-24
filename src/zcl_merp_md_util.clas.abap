@@ -61,7 +61,9 @@ CLASS zcl_merp_md_util DEFINITION
 ENDCLASS.
 
 
-CLASS zcl_merp_md_util IMPLEMENTATION.
+
+CLASS ZCL_MERP_MD_UTIL IMPLEMENTATION.
+
 
   METHOD get_item_group_default_vat.
     IF iv_item_group_code IS INITIAL.
@@ -97,6 +99,7 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
       INTO TABLE @rt_vat_codes.
 
   ENDMETHOD.
+
 
   METHOD validate_companies.
     IF it_company_codes IS INITIAL.
@@ -191,6 +194,4 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
       ) INTO TABLE rt_blocked_keys.
     ENDLOOP.
   ENDMETHOD.
-
 ENDCLASS.
-

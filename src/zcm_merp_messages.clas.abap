@@ -344,7 +344,10 @@ CLASS zcm_merp_messages DEFINITION
   PRIVATE SECTION.
 ENDCLASS.
 
-CLASS zcm_merp_messages IMPLEMENTATION.
+
+
+CLASS ZCM_MERP_MESSAGES IMPLEMENTATION.
+
 
   METHOD constructor ##ADT_SUPPRESS_GENERATION.
     super->constructor( previous = previous ).
@@ -368,5 +371,4 @@ CLASS zcm_merp_messages IMPLEMENTATION.
       if_t100_message~t100key = textid.
     ENDIF.
   ENDMETHOD.
-
 ENDCLASS.

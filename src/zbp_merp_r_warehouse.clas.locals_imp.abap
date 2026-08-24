@@ -8,8 +8,8 @@ CLASS lhc_zmerp_r_warehouse DEFINITION INHERITING FROM cl_abap_behavior_handler.
     "! Evaluates global authorizations for CUD operations.
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
       IMPORTING
-        REQUEST requested_authorizations FOR Warehouse
-        RESULT result.
+      REQUEST requested_authorizations FOR Warehouse
+      RESULT result.
 
     "! Validates mandatory fields before saving.
     METHODS validateMandatoryFields FOR VALIDATE ON SAVE
@@ -139,15 +139,15 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
     DELETE ADJACENT DUPLICATES FROM lt_companies_to_check COMPARING companycode.
 
     " Privileged access bypasses DCL rules to check existence regardless of user access restrictions
-    SELECT DISTINCT CompanyCode AS companycode
-      FROM zmerp_r_company_code WITH PRIVILEGED ACCESS
-      FOR ALL ENTRIES IN @lt_companies_to_check
-      WHERE CompanyCode = @lt_companies_to_check-companycode
-      INTO TABLE @DATA(lt_existing_db).
+    SELECT DISTINCT company~CompanyCode AS companycode
+      FROM zmerp_r_company_code WITH PRIVILEGED ACCESS AS company
+      INNER JOIN @lt_companies_to_check AS check_tab
+        ON company~CompanyCode = check_tab~companycode
+      INTO TABLE @DATA(lt_existing_companies).
 
     LOOP AT lt_warehouses REFERENCE INTO DATA(lr_whse) WHERE CompanyCode IS NOT INITIAL.
-      " Binary search is performed automatically and faster because lt_existing_db has a unique key
-      IF NOT line_exists( lt_existing_db[ companycode = lr_whse->CompanyCode ] ).
+      " Binary search is performed automatically and faster because lt_existing_companies has a unique key
+      IF NOT line_exists( lt_existing_companies[ companycode = lr_whse->CompanyCode ] ).
         " Mark entity instance as failed due to missing foreign key relationship
         APPEND VALUE #(
           %tky        = lr_whse->%tky
@@ -172,41 +172,61 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    DATA lx_nro_error    TYPE REF TO cx_root.
+    DATA lt_codes        TYPE string_table.
+
+    " Step 1: Count entities requiring key generation using the secondary key
+    DATA(lv_needed_count) = REDUCE i( INIT count = 0
+                                  FOR entity IN entities USING KEY entity
+                                  WHERE ( WarehouseCode IS INITIAL )
+                                  NEXT count += 1 ).
+
+    " Step 2: Bulk allocation via NRO utility with exception capture
+    IF lv_needed_count > 0.
+      TRY.
+          lt_codes = zcl_merp_num_range_util=>get_next_wh_codes_nro( iv_count = lv_needed_count ).
+        CATCH cx_number_ranges cx_root INTO lx_nro_error.
+          CLEAR lt_codes.
+      ENDTRY.
+    ENDIF.
+
+    DATA(lv_index) = 1.
+
+    " Step 3: Map keys to instances safely
     LOOP AT entities REFERENCE INTO DATA(lr_entity).
       IF lr_entity->WarehouseCode IS INITIAL.
+        READ TABLE lt_codes INDEX lv_index ASSIGNING FIELD-SYMBOL(<lv_code>).
 
-        DATA(lv_next_wh_code) = VALUE string( ).
-
-        TRY.
-            lv_next_wh_code = zcl_merp_num_range_util=>get_next_warehouse_code_nro( ).
-          CATCH cx_number_ranges.
-            CLEAR lv_next_wh_code.
-        ENDTRY.
-
-        IF lv_next_wh_code IS NOT INITIAL.
-          " Map generated business key to the draft/content creation ID (%cid)
+        IF sy-subrc = 0 AND <lv_code> IS NOT INITIAL.
+          " Map successfully generated key
           APPEND VALUE #(
             %cid          = lr_entity->%cid
             %is_draft     = lr_entity->%is_draft
-            WarehouseCode = lv_next_wh_code
+            WarehouseCode = CONV #( <lv_code> )
           ) TO mapped-warehouse.
+
+          " Increment index ONLY after processing an auto-numbered entity
+          lv_index += 1.
         ELSE.
+          " Mark entity failure
           APPEND VALUE #(
             %cid        = lr_entity->%cid
             %is_draft   = lr_entity->%is_draft
             %fail-cause = if_abap_behv=>cause-unspecific
           ) TO failed-warehouse.
 
+          " Report error with root cause exception reference if available
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
             %msg      = NEW zcm_merp_messages(
                           textid   = zcm_merp_messages=>warehouse_number_failed
+                          previous = lx_nro_error
                           severity = if_abap_behv_message=>severity-error )
           ) TO reported-warehouse.
         ENDIF.
       ELSE.
-        " Preserve user-provided key if supplied during creation
+        " Retain explicitly provided code without affecting lt_codes indexing
         APPEND VALUE #(
           %cid          = lr_entity->%cid
           %is_draft     = lr_entity->%is_draft

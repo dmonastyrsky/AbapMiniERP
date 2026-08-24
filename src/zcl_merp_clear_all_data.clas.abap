@@ -26,11 +26,15 @@ CLASS zcl_merp_clear_all_data DEFINITION
         out           TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 ENDCLASS.
 
-CLASS zcl_merp_clear_all_data IMPLEMENTATION.
+
+
+CLASS ZCL_MERP_CLEAR_ALL_DATA IMPLEMENTATION.
+
 
   METHOD if_oo_adt_classrun~main.
     execute( out ).
   ENDMETHOD.
+
 
   METHOD execute.
     IF out IS BOUND.
@@ -83,6 +87,7 @@ CLASS zcl_merp_clear_all_data IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+
   METHOD clear_entity.
     " 1. Clear Draft table if specified
     IF iv_draft_tab IS NOT INITIAL.
@@ -99,6 +104,7 @@ CLASS zcl_merp_clear_all_data IMPLEMENTATION.
       out           = out ).
   ENDMETHOD.
 
+
   METHOD clear_table.
     IF iv_table_name IS INITIAL.
       RETURN.
@@ -111,5 +117,4 @@ CLASS zcl_merp_clear_all_data IMPLEMENTATION.
       out->write( |[{ iv_label } ({ iv_table_name })]: Deleted { sy-dbcnt } rows.| ).
     ENDIF.
   ENDMETHOD.
-
 ENDCLASS.
