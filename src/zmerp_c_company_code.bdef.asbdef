@@ -20,9 +20,7 @@ use etag
 
   side effects
   {
-    determine action Prepare
-      executed on field CompanyPrefix
-      affects field CompanyPrefix, messages;
+    field CompanyPrefix affects $self;
   }
 
 }
