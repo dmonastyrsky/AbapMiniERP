@@ -1,0 +1,199 @@
+@Metadata.layer: #CORE
+@UI.headerInfo.title.type: #STANDARD
+@UI.headerInfo.title.value: 'ItemUUID'
+@UI.headerInfo.description.type: #STANDARD
+@UI.headerInfo.description.value: 'ItemUUID'
+annotate view ZMERP_C_PURCHASEORDERITM with
+{
+  @UI.facet: [ {
+    label: 'General Information', 
+    id: 'GeneralInfo', 
+    purpose: #STANDARD, 
+    position: 10 , 
+    type: #IDENTIFICATION_REFERENCE
+  } ]
+  @EndUserText.label: 'ItemUUID'
+  @UI.identification: [ {
+    position: 10 , 
+    label: 'ItemUUID'
+  } ]
+  @UI.lineItem: [ {
+    position: 10 , 
+    label: 'ItemUUID'
+  } ]
+  @UI.selectionField: [ {
+    position: 10 
+  } ]
+  ItemUUID;
+  
+  @EndUserText.label: 'HeaderUUID'
+  @UI.identification: [ {
+    position: 20 , 
+    label: 'HeaderUUID'
+  } ]
+  @UI.lineItem: [ {
+    position: 20 , 
+    label: 'HeaderUUID'
+  } ]
+  @UI.selectionField: [ {
+    position: 20 
+  } ]
+  HeaderUUID;
+  
+  @UI.identification: [ {
+    position: 30 
+  } ]
+  @UI.lineItem: [ {
+    position: 30 
+  } ]
+  @UI.selectionField: [ {
+    position: 30 
+  } ]
+  ItemNo;
+  
+  @UI.identification: [ {
+    position: 40 
+  } ]
+  @UI.lineItem: [ {
+    position: 40 
+  } ]
+  @UI.selectionField: [ {
+    position: 40 
+  } ]
+  ItemCode;
+  
+  @UI.identification: [ {
+    position: 50 
+  } ]
+  @UI.lineItem: [ {
+    position: 50 
+  } ]
+  @UI.selectionField: [ {
+    position: 50 
+  } ]
+  Quantity;
+  
+  @UI.identification: [ {
+    position: 60 
+  } ]
+  @UI.lineItem: [ {
+    position: 60 
+  } ]
+  @UI.selectionField: [ {
+    position: 60 
+  } ]
+  Price;
+  
+  @UI.identification: [ {
+    position: 70 
+  } ]
+  @UI.lineItem: [ {
+    position: 70 
+  } ]
+  @UI.selectionField: [ {
+    position: 70 
+  } ]
+  NetAmount;
+  
+  @UI.identification: [ {
+    position: 80 
+  } ]
+  @UI.lineItem: [ {
+    position: 80 
+  } ]
+  @UI.selectionField: [ {
+    position: 80 
+  } ]
+  VatCode;
+  
+  @UI.identification: [ {
+    position: 90 
+  } ]
+  @UI.lineItem: [ {
+    position: 90 
+  } ]
+  @UI.selectionField: [ {
+    position: 90 
+  } ]
+  VatAmount;
+  
+  @UI.identification: [ {
+    position: 100 
+  } ]
+  @UI.lineItem: [ {
+    position: 100 
+  } ]
+  @UI.selectionField: [ {
+    position: 100 
+  } ]
+  GrossAmount;
+  
+  @EndUserText.label: 'DeliveryCompleted'
+  @UI.identification: [ {
+    position: 110 , 
+    label: 'DeliveryCompleted'
+  } ]
+  @UI.lineItem: [ {
+    position: 110 , 
+    label: 'DeliveryCompleted'
+  } ]
+  @UI.selectionField: [ {
+    position: 110 
+  } ]
+  DeliveryCompleted;
+  
+  @UI.identification: [ {
+    position: 120 
+  } ]
+  @UI.lineItem: [ {
+    position: 120 
+  } ]
+  @UI.selectionField: [ {
+    position: 120 
+  } ]
+  CreatedBy;
+  
+  @UI.identification: [ {
+    position: 130 
+  } ]
+  @UI.lineItem: [ {
+    position: 130 
+  } ]
+  @UI.selectionField: [ {
+    position: 130 
+  } ]
+  CreatedAt;
+  
+  @UI.identification: [ {
+    position: 140 
+  } ]
+  @UI.lineItem: [ {
+    position: 140 
+  } ]
+  @UI.selectionField: [ {
+    position: 140 
+  } ]
+  LocalLastChangedBy;
+  
+  @UI.identification: [ {
+    position: 150 
+  } ]
+  @UI.lineItem: [ {
+    position: 150 
+  } ]
+  @UI.selectionField: [ {
+    position: 150 
+  } ]
+  LocalLastChangedAt;
+  
+  @UI.identification: [ {
+    position: 160 
+  } ]
+  @UI.lineItem: [ {
+    position: 160 
+  } ]
+  @UI.selectionField: [ {
+    position: 160 
+  } ]
+  LastChangedAt;
+}

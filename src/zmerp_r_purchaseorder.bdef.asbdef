@@ -1,0 +1,60 @@
+managed implementation in class ZBP_MERP_R_PURCHASEORDER unique;
+strict ( 2 );
+with draft;
+extensible;
+define behavior for ZMERP_R_PURCHASEORDER alias ZmerpRPurchaseorder
+persistent table ZMERP_PO_HDR
+extensible
+draft table ZMERP_PO_HDR_D
+etag master LocalLastChangedAt
+lock master total etag LastChangedAt
+authorization master( global )
+{
+  field ( readonly )
+   DocumentUUID,
+   ResponsiblePerson,
+   CreatedBy,
+   CreatedAt,
+   LocalLastChangedBy,
+   LocalLastChangedAt,
+   LastChangedAt;
+
+  field ( numbering : managed )
+   DocumentUUID;
+
+
+  create;
+  update;
+  delete;
+
+  draft action Activate optimized;
+  draft action Discard;
+  draft action Edit;
+  draft action Resume;
+  draft determine action Prepare;
+
+  mapping for ZMERP_PO_HDR corresponding extensible
+  {
+    DocumentUUID = DOCUMENT_UUID;
+    DocumentNumber = DOCUMENT_NUMBER;
+    DocumentDate = DOCUMENT_DATE;
+    PostingDate = POSTING_DATE;
+    CompanyCode = COMPANY_CODE;
+    WarehouseCode = WAREHOUSE_CODE;
+    BusinessPartner = BUSINESS_PARTNER;
+    Currency = CURRENCY;
+    TotalNetAmount = TOTAL_NET_AMOUNT;
+    TotalGrossAmount = TOTAL_GROSS_AMOUNT;
+    ResponsiblePerson = RESPONSIBLE_PERSON;
+    Remarks = REMARKS;
+    SupplierReference = SUPPLIER_REFERENCE;
+    DeliveryDate = DELIVERY_DATE;
+    Status = STATUS;
+    CreatedBy = CREATED_BY;
+    CreatedAt = CREATED_AT;
+    LocalLastChangedBy = LOCAL_LAST_CHANGED_BY;
+    LocalLastChangedAt = LOCAL_LAST_CHANGED_AT;
+    LastChangedAt = LAST_CHANGED_AT;
+  }
+
+}

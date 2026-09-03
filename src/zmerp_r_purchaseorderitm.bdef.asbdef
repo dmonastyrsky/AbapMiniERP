@@ -1,0 +1,57 @@
+managed implementation in class ZBP_MERP_R_PURCHASEORDERITM unique;
+strict ( 2 );
+with draft;
+extensible;
+define behavior for ZMERP_R_PURCHASEORDERITM alias ZmerpRPurchaseorderitm
+persistent table ZMERP_PO_ITM
+extensible
+draft table ZMERP_PO_ITM_D
+etag master LocalLastChangedAt
+lock master total etag LastChangedAt
+authorization master( global )
+{
+  field ( readonly )
+   ItemUUID,
+   CreatedBy,
+   CreatedAt,
+   LocalLastChangedBy,
+   LocalLastChangedAt,
+   LastChangedAt;
+
+  field ( numbering : managed )
+   ItemUUID;
+
+
+  create;
+  update;
+  delete;
+
+  draft action Activate optimized;
+  draft action Discard;
+  draft action Edit;
+  draft action Resume;
+  draft determine action Prepare;
+
+  mapping for ZMERP_PO_ITM corresponding extensible
+  {
+    ItemUUID = ITEM_UUID;
+    HeaderUUID = HEADER_UUID;
+    ItemNo = ITEM_NO;
+    ItemCode = ITEM_CODE;
+    Quantity = QUANTITY;
+    UnitOfMeasure = UNIT_OF_MEASURE;
+    Currency = CURRENCY;
+    Price = PRICE;
+    NetAmount = NET_AMOUNT;
+    VatCode = VAT_CODE;
+    VatAmount = VAT_AMOUNT;
+    GrossAmount = GROSS_AMOUNT;
+    DeliveryCompleted = DELIVERY_COMPLETED;
+    CreatedBy = CREATED_BY;
+    CreatedAt = CREATED_AT;
+    LocalLastChangedBy = LOCAL_LAST_CHANGED_BY;
+    LocalLastChangedAt = LOCAL_LAST_CHANGED_AT;
+    LastChangedAt = LAST_CHANGED_AT;
+  }
+
+}
