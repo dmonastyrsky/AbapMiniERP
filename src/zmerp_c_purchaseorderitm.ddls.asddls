@@ -1,78 +1,52 @@
+@EndUserText.label: 'Purchase Order Item Projection View'
+@AccessControl.authorizationCheck: #NOT_REQUIRED
 @Metadata.allowExtensions: true
-@Metadata.ignorePropagatedAnnotations: true
-@Endusertext: {
-  Label: '###GENERATED Core Data Service Entity'
-}
-@Objectmodel: {
-  Sapobjectnodetype.Name: 'ZMERP_PO_ITM'
-}
-@AccessControl.authorizationCheck: #MANDATORY
-define root view entity ZMERP_C_PURCHASEORDERITM
-  provider contract TRANSACTIONAL_QUERY
+@Search.searchable: true
+
+define view entity ZMERP_C_PURCHASEORDERITM
   as projection on ZMERP_R_PURCHASEORDERITM
-  association [1..1] to ZMERP_R_PURCHASEORDERITM as _BaseEntity on $projection.ITEMUUID = _BaseEntity.ITEMUUID
 {
   key ItemUUID,
-  HeaderUUID,
-  ItemNo,
-  ItemCode,
-  @Semantics: {
-    Quantity.Unitofmeasure: 'UnitOfMeasure'
-  }
-  Quantity,
-  @Consumption: {
-    Valuehelpdefinition: [ {
-      Entity.Element: 'UnitOfMeasure', 
-      Entity.Name: 'I_UnitOfMeasureStdVH', 
-      Useforvalidation: true
-    } ]
-  }
-  UnitOfMeasure,
-  @Consumption: {
-    Valuehelpdefinition: [ {
-      Entity.Element: 'Currency', 
-      Entity.Name: 'I_CurrencyStdVH', 
-      Useforvalidation: true
-    } ]
-  }
-  Currency,
-  @Semantics: {
-    Amount.Currencycode: 'Currency'
-  }
-  Price,
-  @Semantics: {
-    Amount.Currencycode: 'Currency'
-  }
-  NetAmount,
-  VatCode,
-  @Semantics: {
-    Amount.Currencycode: 'Currency'
-  }
-  VatAmount,
-  @Semantics: {
-    Amount.Currencycode: 'Currency'
-  }
-  GrossAmount,
-  DeliveryCompleted,
-  @Semantics: {
-    User.Createdby: true
-  }
-  CreatedBy,
-  @Semantics: {
-    Systemdatetime.Createdat: true
-  }
-  CreatedAt,
-  @Semantics: {
-    User.Localinstancelastchangedby: true
-  }
-  LocalLastChangedBy,
-  @Semantics: {
-    Systemdatetime.Localinstancelastchangedat: true
-  }
-  LocalLastChangedAt,
-  @Semantics: {
-    Systemdatetime.Lastchangedat: true
-  }
-  LastChangedAt,
-  _BaseEntity
+      HeaderUUID,
+
+      /* zmerp_s_doc_itm_common */
+      ItemNo,
+
+      @Search.defaultSearchElement: true
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_ITEM_VH', element: 'ItemCode' }, useForValidation: true }]
+      ItemCode,
+
+      Quantity,
+
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_UnitOfMeasureStdVH', element: 'UnitOfMeasure' }, useForValidation: true }]
+      UnitOfMeasure,
+
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CurrencyStdVH', element: 'Currency' }, useForValidation: true }]
+      Currency,
+
+      Price,
+      NetAmount,
+
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_VAT_RATE_VH', element: 'VatCode' }, useForValidation: true }]
+      VatCode,
+
+      VatAmount,
+      GrossAmount,
+
+      /* zmerp_po_itm */
+      DeliveryCompleted,
+
+      /* zmerp_s_admin */
+      CreatedBy,
+      CreatedAt,
+      LocalLastChangedBy,
+      LocalLastChangedAt,
+      LastChangedAt,
+
+      /* Redirected associations */
+      _PurchaseOrder : redirected to parent ZMERP_C_PURCHASEORDER,
+      _Item,
+      _VatRate,
+      _UnitOfMeasure,
+      _Currency
 }

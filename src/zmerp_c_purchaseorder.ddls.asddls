@@ -1,67 +1,70 @@
+@EndUserText.label: 'Purchase Order Projection View'
+@AccessControl.authorizationCheck: #NOT_REQUIRED
 @Metadata.allowExtensions: true
-@Metadata.ignorePropagatedAnnotations: true
-@Endusertext: {
-  Label: '###GENERATED Core Data Service Entity'
-}
-@Objectmodel: {
-  Sapobjectnodetype.Name: 'ZMERP_PO_HDR'
-}
-@AccessControl.authorizationCheck: #MANDATORY
+@Search.searchable: true
+@ObjectModel.semanticKey: ['DocumentNumber']
+
 define root view entity ZMERP_C_PURCHASEORDER
-  provider contract TRANSACTIONAL_QUERY
+  provider contract transactional_query
   as projection on ZMERP_R_PURCHASEORDER
-  association [1..1] to ZMERP_R_PURCHASEORDER as _BaseEntity on $projection.DOCUMENTUUID = _BaseEntity.DOCUMENTUUID
 {
   key DocumentUUID,
-  DocumentNumber,
-  DocumentDate,
-  PostingDate,
-  CompanyCode,
-  WarehouseCode,
-  BusinessPartner,
-  @Consumption: {
-    Valuehelpdefinition: [ {
-      Entity.Element: 'Currency', 
-      Entity.Name: 'I_CurrencyStdVH', 
-      Useforvalidation: true
-    } ]
-  }
-  Currency,
-  @Semantics: {
-    Amount.Currencycode: 'Currency'
-  }
-  TotalNetAmount,
-  @Semantics: {
-    Amount.Currencycode: 'Currency'
-  }
-  TotalGrossAmount,
-  @Semantics: {
-    User.Createdby: true
-  }
-  ResponsiblePerson,
-  Remarks,
-  SupplierReference,
-  DeliveryDate,
-  Status,
-  @Semantics: {
-    User.Createdby: true
-  }
-  CreatedBy,
-  @Semantics: {
-    Systemdatetime.Createdat: true
-  }
-  CreatedAt,
-  @Semantics: {
-    User.Localinstancelastchangedby: true
-  }
-  LocalLastChangedBy,
-  @Semantics: {
-    Systemdatetime.Localinstancelastchangedat: true
-  }
-  LocalLastChangedAt,
-  @Semantics: {
-    Systemdatetime.Lastchangedat: true
-  }
-  LastChangedAt,
-  _BaseEntity
+
+      /* zmerp_s_doc_hdr_common */
+      @Search.defaultSearchElement: true
+      @Search.ranking: #HIGH
+      DocumentNumber,
+
+      DocumentDate,
+      PostingDate,
+
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_COMPANY_CODE_VH', element: 'CompanyCode' }, useForValidation: true }]
+      CompanyCode,
+
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_WAREHOUSE_VH', element: 'WarehouseCode' }, useForValidation: true }]
+      WarehouseCode,
+
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_BUS_PARTNER_VH', element: 'PartnerCode' }, useForValidation: true }]
+      BusinessPartner,
+
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CurrencyStdVH', element: 'Currency' }, useForValidation: true }]
+      Currency,
+
+      TotalNetAmount,
+      TotalGrossAmount,
+      ResponsiblePerson,
+
+      @Search.defaultSearchElement: true
+      @Search.fuzzinessThreshold: 0.8
+      Remarks,
+
+      /* zmerp_po_hdr */
+      @Search.defaultSearchElement: true
+      SupplierReference,
+
+      DeliveryDate,
+
+      @ObjectModel.text.element: ['StatusDescription']
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_PO_STATUS_VH', element: 'Status' }, useForValidation: true }]
+      Status,
+
+      @EndUserText.label: 'Status Description'
+      _Status.Description as StatusDescription,
+
+      /* zmerp_s_admin */
+      CreatedBy,
+      CreatedAt,
+      LocalLastChangedBy,
+      LocalLastChangedAt,
+      LastChangedAt,
+
+      /* Redirected associations */
+      _Items            : redirected to composition child ZMERP_C_PURCHASEORDERITM,
+      _CompanyCode,
+      _Warehouse,
+      _BusinessPartner,
+      _Currency,
+
+      /* Exposed text association */
+      _Status
 }
