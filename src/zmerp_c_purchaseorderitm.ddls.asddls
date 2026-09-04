@@ -45,8 +45,8 @@ define view entity ZMERP_C_PURCHASEORDERITM
 
       /* Redirected associations */
       _PurchaseOrder : redirected to parent ZMERP_C_PURCHASEORDER,
-      _Item,
-      _VatRate,
+      _Item          : redirected to ZMERP_C_ITEM,
+      _VatRate       : redirected to ZMERP_C_VAT_RATE,
       _UnitOfMeasure,
       _Currency
 }

@@ -1,4 +1,4 @@
-@EndUserText.label: 'ZMERP_R_PURCHASEORDER'
+@EndUserText.label: 'Access Control for ZMERP_R_PURCHASEORDER'
 @MappingRole: true
 define role ZMERP_R_PURCHASEORDER {
   grant select on ZMERP_R_PURCHASEORDER

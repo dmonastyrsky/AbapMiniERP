@@ -3,7 +3,8 @@ strict ( 2 );
 extensible;
 use draft;
 use side effects;
-define behavior for ZMERP_C_PURCHASEORDER alias ZmerpCPurchaseorder
+
+define behavior for ZMERP_C_PURCHASEORDER alias PurchaseOrder
 extensible
 use etag
 {
@@ -11,10 +12,31 @@ use etag
   use update;
   use delete;
 
+  use action releaseDocument;
+  use action cancelDocument;
+
   use action Edit;
   use action Activate;
   use action Discard;
   use action Resume;
   use action Prepare;
 
+  use association _Items { create; with draft; }
+}
+
+define behavior for ZMERP_C_PURCHASEORDERITM alias PurchaseOrderItem
+extensible
+use etag
+{
+  use update;
+  use delete;
+
+  use association _PurchaseOrder { with draft; }
+
+  side effects {
+    field ItemCode affects field UnitOfMeasure, field VatCode;
+    field Quantity affects field NetAmount, field VatAmount, field GrossAmount, field _PurchaseOrder.TotalNetAmount, field _PurchaseOrder.TotalGrossAmount;
+    field Price affects field NetAmount, field VatAmount, field GrossAmount, field _PurchaseOrder.TotalNetAmount, field _PurchaseOrder.TotalGrossAmount;
+    field VatCode affects field VatAmount, field GrossAmount, field _PurchaseOrder.TotalGrossAmount;
+  }
 }

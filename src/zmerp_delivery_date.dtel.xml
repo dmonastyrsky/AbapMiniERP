@@ -3,20 +3,21 @@
  <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
    <DD04V>
-    <ROLLNAME>ZMERP_BUS_PART_CODE</ROLLNAME>
+    <ROLLNAME>ZMERP_DELIVERY_DATE</ROLLNAME>
     <DDLANGUAGE>E</DDLANGUAGE>
-    <DOMNAME>ZMERP_CODE10</DOMNAME>
     <HEADLEN>55</HEADLEN>
     <SCRLEN1>10</SCRLEN1>
     <SCRLEN2>20</SCRLEN2>
     <SCRLEN3>40</SCRLEN3>
-    <DDTEXT>Business Partner Code</DDTEXT>
-    <REPTEXT>Business Partner Code</REPTEXT>
-    <SCRTEXT_S>Partner</SCRTEXT_S>
-    <SCRTEXT_M>Partner</SCRTEXT_M>
-    <SCRTEXT_L>Partner Code</SCRTEXT_L>
+    <DDTEXT>Delivery Date</DDTEXT>
+    <REPTEXT>Delivery Date</REPTEXT>
+    <SCRTEXT_S>Deliv.Date</SCRTEXT_S>
+    <SCRTEXT_M>Delivery Date</SCRTEXT_M>
+    <SCRTEXT_L>Delivery Date</SCRTEXT_L>
     <DTELMASTER>E</DTELMASTER>
-    <REFKIND>D</REFKIND>
+    <DATATYPE>DATS</DATATYPE>
+    <LENG>000008</LENG>
+    <OUTPUTLEN>000010</OUTPUTLEN>
     <ABAP_LANGUAGE_VERSION>5</ABAP_LANGUAGE_VERSION>
    </DD04V>
   </asx:values>

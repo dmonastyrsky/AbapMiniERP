@@ -10,7 +10,6 @@ define root view entity ZMERP_C_PURCHASEORDER
 {
   key DocumentUUID,
 
-      /* zmerp_s_doc_hdr_common */
       @Search.defaultSearchElement: true
       @Search.ranking: #HIGH
       DocumentNumber,
@@ -25,20 +24,20 @@ define root view entity ZMERP_C_PURCHASEORDER
       WarehouseCode,
 
       @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_BUS_PARTNER_VH', element: 'PartnerCode' }, useForValidation: true }]
-      BusinessPartner,
+      BusinessPartnerCode,
 
       @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CurrencyStdVH', element: 'Currency' }, useForValidation: true }]
-      Currency,
+      CurrencyCode,
 
       TotalNetAmount,
       TotalGrossAmount,
+      
       ResponsiblePerson,
 
       @Search.defaultSearchElement: true
       @Search.fuzzinessThreshold: 0.8
       Remarks,
 
-      /* zmerp_po_hdr */
       @Search.defaultSearchElement: true
       SupplierReference,
 
@@ -51,20 +50,18 @@ define root view entity ZMERP_C_PURCHASEORDER
       @EndUserText.label: 'Status Description'
       _Status.Description as StatusDescription,
 
-      /* zmerp_s_admin */
       CreatedBy,
       CreatedAt,
       LocalLastChangedBy,
       LocalLastChangedAt,
       LastChangedAt,
 
-      /* Redirected associations */
-      _Items            : redirected to composition child ZMERP_C_PURCHASEORDERITM,
-      _CompanyCode,
-      _Warehouse,
-      _BusinessPartner,
-      _Currency,
+      _Items           : redirected to composition child ZMERP_C_PURCHASEORDERITM,
+      _CompanyCode     : redirected to ZMERP_C_COMPANY_CODE,
+      _Warehouse       : redirected to ZMERP_C_WAREHOUSE,
+      _BusinessPartner : redirected to ZMERP_C_BUS_PARTNER,
+      
+      _Currency,     
 
-      /* Exposed text association */
       _Status
 }

@@ -2,59 +2,120 @@ managed implementation in class ZBP_MERP_R_PURCHASEORDER unique;
 strict ( 2 );
 with draft;
 extensible;
-define behavior for ZMERP_R_PURCHASEORDER alias ZmerpRPurchaseorder
-persistent table ZMERP_PO_HDR
+
+define behavior for ZMERP_R_PURCHASEORDER alias PurchaseOrder
+persistent table zmerp_po_hdr
 extensible
-draft table ZMERP_PO_HDR_D
+draft table zmerp_po_hdr_d
 etag master LocalLastChangedAt
 lock master total etag LastChangedAt
-authorization master( global )
+authorization master ( global )
 {
-  field ( readonly )
-   DocumentUUID,
-   ResponsiblePerson,
-   CreatedBy,
-   CreatedAt,
-   LocalLastChangedBy,
-   LocalLastChangedAt,
-   LastChangedAt;
-
-  field ( numbering : managed )
-   DocumentUUID;
-
-
   create;
+  update;
+  delete ( precheck );
+
+  association _Items { create; with draft; }
+
+  field ( readonly, numbering : managed ) DocumentUUID;
+
+  field ( readonly ) DocumentNumber;
+  field ( readonly ) TotalNetAmount, TotalGrossAmount;
+  field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
+
+  field ( mandatory ) CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode, DocumentDate;
+
+  action ( features : instance ) releaseDocument result [1] $self;
+  action ( features : instance ) cancelDocument result [1] $self;
+
+  determination setHeaderDefaults on save { create; }
+
+  validation validateHeaderFields on save { create; update; field CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode, DocumentDate; }
+  validation validateDates on save { create; update; field DocumentDate, DeliveryDate; }
+
+  draft action Edit;
+  draft action Activate optimized;
+  draft action Discard;
+  draft action Resume;
+  draft determine action Prepare
+  {
+    validation validateHeaderFields;
+    validation validateDates;
+    validation ZMERP_R_PURCHASEORDERITM~validateItemFields;
+  }
+
+  mapping for zmerp_po_hdr
+  {
+    DocumentUUID        = document_uuid;
+    DocumentNumber      = document_number;
+    DocumentDate        = document_date;
+    PostingDate         = posting_date;
+    CompanyCode         = company_code;
+    WarehouseCode       = warehouse_code;
+    BusinessPartnerCode = business_partner_code;
+    CurrencyCode        = currency_code;
+    TotalNetAmount      = total_net_amount;
+    TotalGrossAmount    = total_gross_amount;
+    ResponsiblePerson   = responsible_person;
+    Remarks             = remarks;
+    SupplierReference   = supplier_reference;
+    DeliveryDate        = delivery_date;
+    Status              = status;
+    CreatedBy           = created_by;
+    CreatedAt           = created_at;
+    LocalLastChangedBy  = local_last_changed_by;
+    LocalLastChangedAt  = local_last_changed_at;
+    LastChangedAt       = last_changed_at;
+  }
+}
+
+define behavior for ZMERP_R_PURCHASEORDERITM alias PurchaseOrderItem
+persistent table zmerp_po_itm
+extensible
+draft table zmerp_po_itm_d
+etag master LocalLastChangedAt
+lock dependent by _PurchaseOrder
+authorization dependent by _PurchaseOrder
+{
   update;
   delete;
 
-  draft action Activate optimized;
-  draft action Discard;
-  draft action Edit;
-  draft action Resume;
-  draft determine action Prepare;
+  association _PurchaseOrder { with draft; }
 
-  mapping for ZMERP_PO_HDR corresponding extensible
+  field ( readonly, numbering : managed ) ItemUUID;
+  field ( readonly ) HeaderUUID;
+
+  field ( readonly ) ItemNo;
+  field ( readonly ) NetAmount, VatAmount, GrossAmount;
+  field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
+
+  field ( mandatory ) ItemCode, Quantity, Price, UnitOfMeasure, Currency;
+
+  determination setItemDefaults on modify { field ItemCode; }
+  determination calculateItemAmounts on modify { field Quantity, Price, VatCode; }
+  determination calculateHeaderTotals on modify { field NetAmount, GrossAmount; }
+
+  validation validateItemFields on save { create; update; field ItemCode, Quantity, Price; }
+
+  mapping for zmerp_po_itm
   {
-    DocumentUUID = DOCUMENT_UUID;
-    DocumentNumber = DOCUMENT_NUMBER;
-    DocumentDate = DOCUMENT_DATE;
-    PostingDate = POSTING_DATE;
-    CompanyCode = COMPANY_CODE;
-    WarehouseCode = WAREHOUSE_CODE;
-    BusinessPartner = BUSINESS_PARTNER;
-    Currency = CURRENCY;
-    TotalNetAmount = TOTAL_NET_AMOUNT;
-    TotalGrossAmount = TOTAL_GROSS_AMOUNT;
-    ResponsiblePerson = RESPONSIBLE_PERSON;
-    Remarks = REMARKS;
-    SupplierReference = SUPPLIER_REFERENCE;
-    DeliveryDate = DELIVERY_DATE;
-    Status = STATUS;
-    CreatedBy = CREATED_BY;
-    CreatedAt = CREATED_AT;
-    LocalLastChangedBy = LOCAL_LAST_CHANGED_BY;
-    LocalLastChangedAt = LOCAL_LAST_CHANGED_AT;
-    LastChangedAt = LAST_CHANGED_AT;
+    ItemUUID           = item_uuid;
+    HeaderUUID         = header_uuid;
+    ItemNo             = item_no;
+    ItemCode           = item_code;
+    Quantity           = quantity;
+    UnitOfMeasure      = unit_of_measure;
+    Currency           = currency;
+    Price              = price;
+    NetAmount          = net_amount;
+    VatCode            = vat_code;
+    VatAmount          = vat_amount;
+    GrossAmount        = gross_amount;
+    DeliveryCompleted  = delivery_completed;
+    CreatedBy          = created_by;
+    CreatedAt          = created_at;
+    LocalLastChangedBy = local_last_changed_by;
+    LocalLastChangedAt = local_last_changed_at;
+    LastChangedAt      = last_changed_at;
   }
-
 }

@@ -1,226 +1,138 @@
-@Metadata.layer: #CORE
-@UI.headerInfo.title.type: #STANDARD
-@UI.headerInfo.title.value: 'DocumentUUID'
-@UI.headerInfo.description.type: #STANDARD
-@UI.headerInfo.description.value: 'DocumentUUID'
+@Metadata.layer: #CUSTOMER
+
+@UI.headerInfo: {
+  typeName: 'Purchase Order',
+  typeNamePlural: 'Purchase Orders',
+  title: { value: 'DocumentNumber' },
+  description: { value: 'BusinessPartnerCode' }
+}
+
+@UI.presentationVariant: [{
+  sortOrder: [{ by: 'DocumentNumber', direction: #DESC }]
+}]
+
 annotate view ZMERP_C_PURCHASEORDER with
 {
-  @UI.facet: [ {
-    label: 'General Information', 
-    id: 'GeneralInfo', 
-    purpose: #STANDARD, 
-    position: 10 , 
-    type: #IDENTIFICATION_REFERENCE
-  } ]
-  @EndUserText.label: 'DocumentUUID'
-  @UI.identification: [ {
-    position: 10 , 
-    label: 'DocumentUUID'
-  } ]
-  @UI.lineItem: [ {
-    position: 10 , 
-    label: 'DocumentUUID'
-  } ]
-  @UI.selectionField: [ {
-    position: 10 
-  } ]
+  @UI.facet: [
+    {
+      id: 'GeneralHeaderSection',
+      purpose: #STANDARD,
+      type: #FIELDGROUP_REFERENCE,
+      label: 'General Information',
+      targetQualifier: 'GeneralGroup',
+      position: 10
+    },
+    {
+      id: 'DeliverySection',
+      purpose: #STANDARD,
+      type: #FIELDGROUP_REFERENCE,
+      label: 'Delivery & Supplier Details',
+      targetQualifier: 'DeliveryGroup',
+      position: 20
+    },
+    {
+      id: 'TotalsSection',
+      purpose: #STANDARD,
+      type: #FIELDGROUP_REFERENCE,
+      label: 'Totals',
+      targetQualifier: 'TotalsGroup',
+      position: 30
+    },
+    {
+      id: 'ItemsSection',
+      purpose: #STANDARD,
+      type: #LINEITEM_REFERENCE,
+      label: 'Line Items',
+      targetElement: '_Items',
+      position: 40
+    },
+    {
+      id: 'AdminHeaderSection',
+      purpose: #STANDARD,
+      type: #FIELDGROUP_REFERENCE,
+      label: 'Administrative Data',
+      targetQualifier: 'AdminGroup',
+      position: 50,
+      hidden: true
+    }
+  ]
+
+  @UI.hidden: true
   DocumentUUID;
-  
-  @UI.identification: [ {
-    position: 20 
-  } ]
-  @UI.lineItem: [ {
-    position: 20 
-  } ]
-  @UI.selectionField: [ {
-    position: 20 
-  } ]
+
+  @UI.lineItem: [{ position: 10, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 10 }]
+  @UI.selectionField: [{ position: 10 }]
   DocumentNumber;
-  
-  @UI.identification: [ {
-    position: 30 
-  } ]
-  @UI.lineItem: [ {
-    position: 30 
-  } ]
-  @UI.selectionField: [ {
-    position: 30 
-  } ]
-  DocumentDate;
-  
-  @UI.identification: [ {
-    position: 40 
-  } ]
-  @UI.lineItem: [ {
-    position: 40 
-  } ]
-  @UI.selectionField: [ {
-    position: 40 
-  } ]
-  PostingDate;
-  
-  @UI.identification: [ {
-    position: 50 
-  } ]
-  @UI.lineItem: [ {
-    position: 50 
-  } ]
-  @UI.selectionField: [ {
-    position: 50 
-  } ]
-  CompanyCode;
-  
-  @UI.identification: [ {
-    position: 60 
-  } ]
-  @UI.lineItem: [ {
-    position: 60 
-  } ]
-  @UI.selectionField: [ {
-    position: 60 
-  } ]
-  WarehouseCode;
-  
-  @UI.identification: [ {
-    position: 70 
-  } ]
-  @UI.lineItem: [ {
-    position: 70 
-  } ]
-  @UI.selectionField: [ {
-    position: 70 
-  } ]
-  BusinessPartner;
-  
-  @UI.identification: [ {
-    position: 80 
-  } ]
-  @UI.lineItem: [ {
-    position: 80 
-  } ]
-  @UI.selectionField: [ {
-    position: 80 
-  } ]
-  TotalNetAmount;
-  
-  @UI.identification: [ {
-    position: 90 
-  } ]
-  @UI.lineItem: [ {
-    position: 90 
-  } ]
-  @UI.selectionField: [ {
-    position: 90 
-  } ]
-  TotalGrossAmount;
-  
-  @UI.identification: [ {
-    position: 100 
-  } ]
-  @UI.lineItem: [ {
-    position: 100 
-  } ]
-  @UI.selectionField: [ {
-    position: 100 
-  } ]
-  ResponsiblePerson;
-  
-  @UI.identification: [ {
-    position: 110 
-  } ]
-  @UI.lineItem: [ {
-    position: 110 
-  } ]
-  @UI.selectionField: [ {
-    position: 110 
-  } ]
-  Remarks;
-  
-  @UI.identification: [ {
-    position: 120 
-  } ]
-  @UI.lineItem: [ {
-    position: 120 
-  } ]
-  @UI.selectionField: [ {
-    position: 120 
-  } ]
-  SupplierReference;
-  
-  @UI.identification: [ {
-    position: 130 
-  } ]
-  @UI.lineItem: [ {
-    position: 130 
-  } ]
-  @UI.selectionField: [ {
-    position: 130 
-  } ]
-  DeliveryDate;
-  
-  @UI.identification: [ {
-    position: 140 
-  } ]
-  @UI.lineItem: [ {
-    position: 140 
-  } ]
-  @UI.selectionField: [ {
-    position: 140 
-  } ]
+
+  @UI.lineItem: [{ position: 20, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 15 }]
+  @UI.selectionField: [{ position: 20 }]
   Status;
-  
-  @UI.identification: [ {
-    position: 150 
-  } ]
-  @UI.lineItem: [ {
-    position: 150 
-  } ]
-  @UI.selectionField: [ {
-    position: 150 
-  } ]
+
+  @UI.lineItem: [{ position: 30, importance: #MEDIUM }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 20 }]
+  @UI.selectionField: [{ position: 30 }]
+  DocumentDate;
+
+  @UI.lineItem: [{ position: 40, importance: #MEDIUM }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 30 }]
+  PostingDate;
+
+  @UI.lineItem: [{ position: 50, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 40 }]
+  @UI.selectionField: [{ position: 40 }]
+  CompanyCode;
+
+  @UI.lineItem: [{ position: 60, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 50 }]
+  @UI.selectionField: [{ position: 50 }]
+  WarehouseCode;
+
+  @UI.lineItem: [{ position: 70, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 60 }]
+  @UI.selectionField: [{ position: 60 }]
+  BusinessPartnerCode;
+
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 70 }]
+  CurrencyCode;
+
+  @UI.lineItem: [{ position: 80, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'TotalsGroup', position: 10 }]
+  TotalNetAmount;
+
+  @UI.lineItem: [{ position: 90, importance: #HIGH }]
+  @UI.fieldGroup: [{ qualifier: 'TotalsGroup', position: 20 }]
+  TotalGrossAmount;
+
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 80 }]
+  ResponsiblePerson;
+
+  @UI.multiLineText: true
+  @UI.lineItem: [{ position: 100, importance: #LOW }]
+  @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 90 }]
+  Remarks;
+
+  @UI.lineItem: [{ position: 75, importance: #MEDIUM }]
+  @UI.fieldGroup: [{ qualifier: 'DeliveryGroup', position: 10 }]
+  SupplierReference;
+
+  @UI.lineItem: [{ position: 78, importance: #MEDIUM }]
+  @UI.fieldGroup: [{ qualifier: 'DeliveryGroup', position: 20 }]
+  DeliveryDate;
+
+  @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 10 }]
   CreatedBy;
-  
-  @UI.identification: [ {
-    position: 160 
-  } ]
-  @UI.lineItem: [ {
-    position: 160 
-  } ]
-  @UI.selectionField: [ {
-    position: 160 
-  } ]
+
+  @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 20 }]
   CreatedAt;
-  
-  @UI.identification: [ {
-    position: 170 
-  } ]
-  @UI.lineItem: [ {
-    position: 170 
-  } ]
-  @UI.selectionField: [ {
-    position: 170 
-  } ]
+
+  @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 30 }]
   LocalLastChangedBy;
-  
-  @UI.identification: [ {
-    position: 180 
-  } ]
-  @UI.lineItem: [ {
-    position: 180 
-  } ]
-  @UI.selectionField: [ {
-    position: 180 
-  } ]
+
+  @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 40 }]
   LocalLastChangedAt;
-  
-  @UI.identification: [ {
-    position: 190 
-  } ]
-  @UI.lineItem: [ {
-    position: 190 
-  } ]
-  @UI.selectionField: [ {
-    position: 190 
-  } ]
+
+  @UI.fieldGroup: [{ qualifier: 'AdminGroup', position: 50 }]
   LastChangedAt;
 }
