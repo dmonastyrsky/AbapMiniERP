@@ -4,7 +4,8 @@ CLASS zcl_merp_md_util DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
-    TYPES tt_item_group_codes TYPE STANDARD TABLE OF zmerp_item_group_code WITH EMPTY KEY.
+    " Fixed: Changed WITH EMPTY KEY to WITH NON-UNIQUE KEY table_line to allow standard SORT and DELETE ADJACENT DUPLICATES
+    TYPES tt_item_group_codes TYPE STANDARD TABLE OF zmerp_item_group_code WITH NON-UNIQUE KEY table_line.
 
     TYPES: BEGIN OF ty_item_group_vat,
              item_group_code  TYPE zmerp_item_group_code,
@@ -12,7 +13,14 @@ CLASS zcl_merp_md_util DEFINITION
            END OF ty_item_group_vat,
            tt_item_group_vats TYPE SORTED TABLE OF ty_item_group_vat WITH UNIQUE KEY item_group_code.
 
-    TYPES tt_company_codes TYPE SORTED TABLE OF zmerp_company_code WITH UNIQUE KEY table_line.
+    " Fixed: Changed WITH EMPTY KEY to WITH NON-UNIQUE KEY table_line to allow standard SORT and DELETE ADJACENT DUPLICATES
+    TYPES tt_company_codes TYPE STANDARD TABLE OF zmerp_company_code WITH NON-UNIQUE KEY table_line.
+
+    TYPES: BEGIN OF ty_company_prefix,
+             company_code   TYPE zmerp_company_code,
+             company_prefix TYPE zmerp_company_prefix,
+           END OF ty_company_prefix,
+           tt_company_prefixes TYPE SORTED TABLE OF ty_company_prefix WITH UNIQUE KEY company_code.
 
     TYPES: BEGIN OF ty_dependency_result,
              key_value TYPE string,
@@ -33,6 +41,20 @@ CLASS zcl_merp_md_util DEFINITION
         it_item_group_codes TYPE tt_item_group_codes
       RETURNING
         VALUE(rt_vat_codes) TYPE tt_item_group_vats.
+
+    "! Retrieves company prefix for a single Company Code
+    CLASS-METHODS get_company_prefix
+      IMPORTING
+        iv_company_code  TYPE zmerp_company_code
+      RETURNING
+        VALUE(rv_prefix) TYPE zmerp_company_prefix.
+
+    "! Retrieves company prefixes for multiple Company Codes at once (Bulk Mode)
+    CLASS-METHODS get_companies_prefixes
+      IMPORTING
+        it_company_codes   TYPE tt_company_codes
+      RETURNING
+        VALUE(rt_prefixes) TYPE tt_company_prefixes.
 
     "! Validates existence of company codes and returns invalid entries
     CLASS-METHODS validate_companies
@@ -60,20 +82,19 @@ CLASS zcl_merp_md_util DEFINITION
   PRIVATE SECTION.
 ENDCLASS.
 
-
-
-CLASS ZCL_MERP_MD_UTIL IMPLEMENTATION.
-
+CLASS zcl_merp_md_util IMPLEMENTATION.
 
   METHOD get_item_group_default_vat.
     IF iv_item_group_code IS INITIAL.
       RETURN.
     ENDIF.
 
-    SELECT SINGLE default_vat_code
-      FROM zmerp_item_group
-      WHERE item_group_code = @iv_item_group_code
-      INTO @rv_vat_code.
+    DATA(lt_vats) = get_item_groups_default_vat( VALUE #( ( iv_item_group_code ) ) ).
+
+    ASSIGN lt_vats[ item_group_code = iv_item_group_code ] TO FIELD-SYMBOL(<ls_vat>).
+    IF sy-subrc = 0.
+      rv_vat_code = <ls_vat>-default_vat_code.
+    ENDIF.
   ENDMETHOD.
 
 
@@ -82,39 +103,86 @@ CLASS ZCL_MERP_MD_UTIL IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA(lt_local_groups) = it_item_group_codes.
-    DELETE lt_local_groups WHERE table_line IS INITIAL.
+    DATA(lt_local) = it_item_group_codes.
+    DELETE lt_local WHERE table_line IS INITIAL.
 
-    IF lt_local_groups IS INITIAL.
+    SORT lt_local.
+    DELETE ADJACENT DUPLICATES FROM lt_local.
+
+    IF lt_local IS INITIAL.
       RETURN.
     ENDIF.
 
-    SORT lt_local_groups BY table_line.
-    DELETE ADJACENT DUPLICATES FROM lt_local_groups COMPARING table_line.
-
     SELECT item_group_code, default_vat_code
       FROM zmerp_item_group
-      FOR ALL ENTRIES IN @lt_local_groups
-      WHERE item_group_code = @lt_local_groups-table_line
+      WHERE item_group_code IN ( SELECT table_line FROM @lt_local AS input )
       INTO TABLE @rt_vat_codes.
-
   ENDMETHOD.
 
+  METHOD get_company_prefix.
+    IF iv_company_code IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    DATA(lt_prefixes) = get_companies_prefixes( VALUE #( ( iv_company_code ) ) ).
+
+    ASSIGN lt_prefixes[ company_code = iv_company_code ] TO FIELD-SYMBOL(<ls_prefix>).
+    IF sy-subrc = 0.
+      rv_prefix = <ls_prefix>-company_prefix.
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD get_companies_prefixes.
+    IF it_company_codes IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    DATA(lt_local) = it_company_codes.
+    DELETE lt_local WHERE table_line IS INITIAL.
+
+    SORT lt_local.
+    DELETE ADJACENT DUPLICATES FROM lt_local.
+
+    IF lt_local IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    SELECT company_code,
+           company_prefix
+      FROM zmerp_comp_code
+      WHERE company_code IN ( SELECT table_line FROM @lt_local AS input )
+      INTO TABLE @rt_prefixes.
+
+    LOOP AT rt_prefixes ASSIGNING FIELD-SYMBOL(<ls_prefix>).
+      <ls_prefix>-company_prefix = condense( val = <ls_prefix>-company_prefix ).
+    ENDLOOP.
+  ENDMETHOD.
 
   METHOD validate_companies.
     IF it_company_codes IS INITIAL.
       RETURN.
     ENDIF.
 
+    DATA(lt_local) = it_company_codes.
+    DELETE lt_local WHERE table_line IS INITIAL.
+
+    SORT lt_local.
+    DELETE ADJACENT DUPLICATES FROM lt_local.
+
+    IF lt_local IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    " Optimized: Fetching only key field into lightweight key table
     DATA lt_existing_db TYPE tt_company_codes.
 
-    SELECT CompanyCode
-      FROM zmerp_r_company_code
-      FOR ALL ENTRIES IN @it_company_codes
-      WHERE CompanyCode = @it_company_codes-table_line
+    SELECT company_code
+      FROM zmerp_comp_code
+      WHERE company_code IN ( SELECT table_line FROM @lt_local AS input )
       INTO TABLE @lt_existing_db.
 
-    LOOP AT it_company_codes INTO DATA(lv_code).
+    LOOP AT lt_local INTO DATA(lv_code).
       IF NOT line_exists( lt_existing_db[ table_line = lv_code ] ).
         INSERT lv_code INTO TABLE rt_invalid_codes.
       ENDIF.
@@ -134,10 +202,12 @@ CLASS ZCL_MERP_MD_UTIL IMPLEMENTATION.
 
     TYPES tt_string_range TYPE RANGE OF string.
 
-    DATA lt_keys         TYPE SORTED TABLE OF string WITH UNIQUE KEY table_line.
+    " Safe key table with non-unique key to avoid dump on assignment
+    DATA lt_keys         TYPE SORTED TABLE OF string WITH NON-UNIQUE KEY table_line.
     DATA lt_dependencies TYPE STANDARD TABLE OF ty_dep WITH EMPTY KEY.
 
     lt_keys = it_keys.
+    DELETE ADJACENT DUPLICATES FROM lt_keys.
 
     DATA(lv_select_clause) = |{ iv_key_field_name } AS key_field, UsedInEntity|.
     DATA(lv_total_lines)   = lines( lt_keys ).
@@ -146,7 +216,6 @@ CLASS ZCL_MERP_MD_UTIL IMPLEMENTATION.
     CONSTANTS lc_batch_size TYPE i VALUE 500.
 
     TRY.
-        " Batch processing (500 items max) to avoid HANA SQL statement buffer limits
         WHILE lv_offset <= lv_total_lines.
 
           DATA(lt_batch_range) = VALUE tt_string_range(
@@ -182,7 +251,6 @@ CLASS ZCL_MERP_MD_UTIL IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Instantiate error message object for every found dependency
     LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep).
       INSERT VALUE #(
         key_value = lr_dep->key_field
@@ -194,4 +262,5 @@ CLASS ZCL_MERP_MD_UTIL IMPLEMENTATION.
       ) INTO TABLE rt_blocked_keys.
     ENDLOOP.
   ENDMETHOD.
+
 ENDCLASS.

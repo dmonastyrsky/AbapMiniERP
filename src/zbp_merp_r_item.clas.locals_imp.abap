@@ -288,7 +288,6 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Filter out initial values on-the-fly to save memory and CPU cycles
     DATA(lt_group_codes) = VALUE zcl_merp_md_util=>tt_item_group_codes(
       FOR lr_item IN lt_items WHERE ( ItemGroupCode IS NOT INITIAL )
       ( lr_item-ItemGroupCode )
@@ -302,9 +301,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
     DATA lt_update TYPE TABLE FOR UPDATE zmerp_r_item.
 
     LOOP AT lt_items ASSIGNING FIELD-SYMBOL(<ls_item>) WHERE ItemGroupCode IS NOT INITIAL.
-      " Binary search on sorted table prevents CPU bottleneck and avoids dumps
-      READ TABLE lt_vat_mapping ASSIGNING FIELD-SYMBOL(<ls_vat>)
-        WITH TABLE KEY item_group_code = <ls_item>-ItemGroupCode.
+      ASSIGN lt_vat_mapping[ item_group_code = <ls_item>-ItemGroupCode ] TO FIELD-SYMBOL(<ls_vat>).
 
       IF sy-subrc = 0.
         APPEND VALUE #(

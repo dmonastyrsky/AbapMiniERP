@@ -86,6 +86,18 @@ INTERFACE zif_merp_constants
       table_draft   TYPE string VALUE 'ZMERP_WHSE_D',
       field_draft   TYPE string VALUE 'WAREHOUSECODE',
       cds_view      TYPE string VALUE 'ZMERP_R_WAREHOUSE',
-    END OF c_wh.
+    END OF c_wh,
+
+    " Purchase Orders Metadata
+    BEGIN OF c_po,
+      prefix        TYPE string VALUE '',
+      length        TYPE i VALUE 10,
+      number_object TYPE cl_numberrange_runtime=>nr_object VALUE 'ZNR_PURORD',
+      table_db      TYPE string VALUE 'ZMERP_PO_HDR',
+      field_db      TYPE string VALUE 'DOCUMENT_NUMBER',
+      table_draft   TYPE string VALUE 'ZMERP_PO_HDR_D',
+      field_draft   TYPE string VALUE 'DOCUMENTNUMBER',
+      cds_view      TYPE string VALUE 'ZMERP_R_PURCHASEORDER',
+    END OF c_po.
 
 ENDINTERFACE.

@@ -48,6 +48,17 @@ CLASS zcl_merp_num_range_util DEFINITION
       RAISING
         cx_number_ranges.
 
+    "! Generates the next sequential Purchase Order number by searching maximum existing value for specified company code.
+    "! @parameter iv_company_code | Company code context
+    "! @parameter rv_po_num       | Generated formatted Purchase Order number string
+    CLASS-METHODS get_next_po_number
+      IMPORTING
+        iv_company_code  TYPE zmerp_company_code
+      RETURNING
+        VALUE(rv_po_num) TYPE zmerp_po_hdr-document_number
+      RAISING
+        cx_number_ranges.
+
     " Standard NRO Generation
     "! Generates the next sequential Business Partner code using standard SAP Number Range Runtime API.
     "! @parameter rv_bp_code | Generated formatted Business Partner code string from NRO
@@ -86,6 +97,17 @@ CLASS zcl_merp_num_range_util DEFINITION
     CLASS-METHODS get_next_warehouse_code_nro
       RETURNING
         VALUE(rv_wh_id) TYPE zmerp_warehouse-warehouse_code
+      RAISING
+        cx_number_ranges.
+
+    "! Generates the next sequential Purchase Order number using NRO API with company subobject.
+    "! @parameter iv_company_code | Company code context
+    "! @parameter rv_po_num       | Generated formatted Purchase Order number string
+    CLASS-METHODS get_next_po_number_nro
+      IMPORTING
+        iv_company_code  TYPE zmerp_company_code
+      RETURNING
+        VALUE(rv_po_num) TYPE zmerp_po_hdr-document_number
       RAISING
         cx_number_ranges.
 
@@ -139,6 +161,19 @@ CLASS zcl_merp_num_range_util DEFINITION
     "! @parameter rt_codes | Table of generated formatted Warehouse codes
     CLASS-METHODS get_next_wh_codes_nro
       IMPORTING
+        iv_count        TYPE i
+      RETURNING
+        VALUE(rt_codes) TYPE string_table
+      RAISING
+        cx_number_ranges.
+
+    "! Generates multiple sequential Purchase Order numbers using NRO API with DB fallback.
+    "! @parameter iv_company_code | Company code context
+    "! @parameter iv_count        | Total count of sequential codes requested
+    "! @parameter rt_codes        | Table of generated formatted Purchase Order numbers
+    CLASS-METHODS get_next_po_codes_nro
+      IMPORTING
+        iv_company_code TYPE zmerp_company_code
         iv_count        TYPE i
       RETURNING
         VALUE(rt_codes) TYPE string_table
@@ -215,6 +250,17 @@ CLASS zcl_merp_num_range_util DEFINITION
       RETURNING
         VALUE(rv_code) TYPE string.
 
+    "! Convenience formatter for Purchase Order number using dynamic company prefix.
+    "! @parameter iv_number       | Raw numeric input
+    "! @parameter iv_company_code | Company code context
+    "! @parameter rv_code         | Formatted Purchase Order number
+    CLASS-METHODS format_po_code
+      IMPORTING
+        iv_number       TYPE simple
+        iv_company_code TYPE zmerp_company_code
+      RETURNING
+        VALUE(rv_code)  TYPE string.
+
     " NRO Setup & Administration
     "! BTP ABAP Cloud: Initializes number range interval '01' for all configured NRO objects.
     CLASS-METHODS setup_intervals.
@@ -240,26 +286,35 @@ CLASS zcl_merp_num_range_util DEFINITION
     "! Synchronizes Warehouse NRO interval level with actual active database record count.
     CLASS-METHODS sync_warehouse_interval.
 
+    "! Synchronizes Purchase Order NRO interval level for specified company code.
+    "! @parameter iv_company_code | Company code context
+    CLASS-METHODS sync_po_interval
+      IMPORTING
+        iv_company_code TYPE zmerp_company_code.
+
   PRIVATE SECTION.
 
     " Internal Helpers
-    "! Generic sequential number generator based on entity metadata.
+    "! Generic sequential number generator based on entity metadata and company context.
     CLASS-METHODS get_next_number
       IMPORTING
-        is_meta          TYPE zif_merp_constants=>ty_entity_metadata
+        is_meta            TYPE zif_merp_constants=>ty_entity_metadata
+        iv_company_code    TYPE zmerp_company_code OPTIONAL
+        iv_prefix_override TYPE string OPTIONAL
       RETURNING
-        VALUE(rv_number) TYPE string
+        VALUE(rv_number)   TYPE string
       RAISING
         cx_number_ranges.
 
-    "! Queries highest current key from specified database table matching prefix pattern.
+    "! Queries highest current key from specified database table matching prefix pattern and optional company code.
     CLASS-METHODS get_max_code_from_db
       IMPORTING
-        iv_table       TYPE string
-        iv_field       TYPE string
-        iv_prefix      TYPE string
+        iv_table        TYPE string
+        iv_field        TYPE string
+        iv_prefix       TYPE string
+        iv_company_code TYPE zmerp_company_code OPTIONAL
       RETURNING
-        VALUE(rv_code) TYPE string.
+        VALUE(rv_code)  TYPE string.
 
     "! Extracts and converts numeric suffix from string key after prefix offset.
     CLASS-METHODS extract_numeric_suffix
@@ -272,51 +327,54 @@ CLASS zcl_merp_num_range_util DEFINITION
     "! Generic number generator wrapping Standard SAP Number Range Runtime API based on entity metadata.
     CLASS-METHODS get_next_number_from_nro
       IMPORTING
-        is_meta        TYPE zif_merp_constants=>ty_entity_metadata
+        is_meta            TYPE zif_merp_constants=>ty_entity_metadata
+        iv_company_code    TYPE zmerp_company_code OPTIONAL
+        iv_prefix_override TYPE string OPTIONAL
       RETURNING
-        VALUE(rv_code) TYPE string.
+        VALUE(rv_code)     TYPE string.
 
     "! Generic bulk sequential number generator based on entity metadata.
-    "! @parameter is_meta  | Entity metadata configuration
-    "! @parameter iv_count | Total count of sequential codes requested
-    "! @parameter rt_codes | Table of generated formatted codes
     CLASS-METHODS get_next_numbers
       IMPORTING
-        is_meta         TYPE zif_merp_constants=>ty_entity_metadata
-        iv_count        TYPE i
+        is_meta            TYPE zif_merp_constants=>ty_entity_metadata
+        iv_count           TYPE i
+        iv_company_code    TYPE zmerp_company_code OPTIONAL
+        iv_prefix_override TYPE string OPTIONAL
       RETURNING
-        VALUE(rt_codes) TYPE string_table
+        VALUE(rt_codes)    TYPE string_table
       RAISING
         cx_number_ranges.
 
     "! Generic bulk number generator wrapping Standard SAP NRO Runtime API based on entity metadata.
-    "! @parameter is_meta  | Entity metadata configuration
-    "! @parameter iv_count | Total count of sequential codes requested
-    "! @parameter rt_codes | Table of generated formatted codes
     CLASS-METHODS get_next_numbers_from_nro
       IMPORTING
-        is_meta         TYPE zif_merp_constants=>ty_entity_metadata
-        iv_count        TYPE i
+        is_meta            TYPE zif_merp_constants=>ty_entity_metadata
+        iv_count           TYPE i
+        iv_company_code    TYPE zmerp_company_code OPTIONAL
+        iv_prefix_override TYPE string OPTIONAL
       RETURNING
-        VALUE(rt_codes) TYPE string_table.
+        VALUE(rt_codes)    TYPE string_table.
 
     "! Returns list of all configured NRO object names for administration.
     CLASS-METHODS get_nro_objects
       RETURNING
         VALUE(rt_objects) TYPE string_table.
 
-    "! Saves or updates NRO interval '01' level for specified object.
+    "! Saves or updates NRO interval '01' level for specified object and subobject.
     CLASS-METHODS save_interval
       IMPORTING
-        iv_object TYPE cl_numberrange_intervals=>nr_object
-        iv_level  TYPE int8 DEFAULT 0.
+        iv_object    TYPE cl_numberrange_intervals=>nr_object
+        iv_subobject TYPE cl_numberrange_intervals=>nr_subobject OPTIONAL
+        iv_level     TYPE int8 DEFAULT 0.
 
     "! Reads maximum numeric suffix from database for specific entity metadata.
     CLASS-METHODS get_max_level_from_db
       IMPORTING
-        is_meta         TYPE zif_merp_constants=>ty_entity_metadata
+        is_meta            TYPE zif_merp_constants=>ty_entity_metadata
+        iv_company_code    TYPE zmerp_company_code OPTIONAL
+        iv_prefix_override TYPE string OPTIONAL
       RETURNING
-        VALUE(rv_level) TYPE int8.
+        VALUE(rv_level)    TYPE int8.
 
 ENDCLASS.
 
@@ -344,6 +402,16 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
   METHOD get_next_warehouse_code.
     rv_wh_id = get_next_number( zif_merp_constants=>c_wh ).
+  ENDMETHOD.
+
+
+  METHOD get_next_po_number.
+    DATA(lv_prefix) = zcl_merp_md_util=>get_company_prefix( iv_company_code ).
+
+    rv_po_num = get_next_number(
+      is_meta            = zif_merp_constants=>c_po
+      iv_company_code    = iv_company_code
+      iv_prefix_override = CONV #( lv_prefix ) ).
   ENDMETHOD.
 
 
@@ -388,6 +456,20 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
     IF rv_wh_id IS INITIAL.
       rv_wh_id = get_next_warehouse_code( ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD get_next_po_number_nro.
+    DATA(lv_prefix) = zcl_merp_md_util=>get_company_prefix( iv_company_code ).
+
+    rv_po_num = get_next_number_from_nro(
+      is_meta            = zif_merp_constants=>c_po
+      iv_company_code    = iv_company_code
+      iv_prefix_override = CONV #( lv_prefix ) ).
+
+    IF rv_po_num IS INITIAL.
+      rv_po_num = get_next_po_number( iv_company_code ).
     ENDIF.
   ENDMETHOD.
 
@@ -453,6 +535,25 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       rt_codes = get_next_numbers(
         is_meta  = zif_merp_constants=>c_wh
         iv_count = iv_count ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD get_next_po_codes_nro.
+    DATA(lv_prefix) = zcl_merp_md_util=>get_company_prefix( iv_company_code ).
+
+    rt_codes = get_next_numbers_from_nro(
+      is_meta            = zif_merp_constants=>c_po
+      iv_count           = iv_count
+      iv_company_code    = iv_company_code
+      iv_prefix_override = CONV #( lv_prefix ) ).
+
+    IF lines( rt_codes ) < iv_count.
+      rt_codes = get_next_numbers(
+        is_meta            = zif_merp_constants=>c_po
+        iv_count           = iv_count
+        iv_company_code    = iv_company_code
+        iv_prefix_override = CONV #( lv_prefix ) ).
     ENDIF.
   ENDMETHOD.
 
@@ -533,6 +634,16 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD format_po_code.
+    DATA(lv_prefix) = zcl_merp_md_util=>get_company_prefix( iv_company_code ).
+
+    rv_code = format_code(
+      iv_number       = iv_number
+      iv_prefix       = CONV #( lv_prefix )
+      iv_total_length = zif_merp_constants=>c_po-length ).
+  ENDMETHOD.
+
+
   METHOD setup_intervals.
     DATA(lt_objects) = get_nro_objects( ).
 
@@ -599,21 +710,40 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD sync_po_interval.
+    DATA(lv_prefix) = zcl_merp_md_util=>get_company_prefix( iv_company_code ).
+
+    save_interval(
+      iv_object    = zif_merp_constants=>c_po-number_object
+      iv_subobject = CONV #( iv_company_code )
+      iv_level     = get_max_level_from_db(
+                      is_meta            = zif_merp_constants=>c_po
+                      iv_company_code    = iv_company_code
+                      iv_prefix_override = CONV #( lv_prefix ) ) ).
+  ENDMETHOD.
+
   METHOD get_next_number.
-    DATA(lv_prefix_length) = strlen( is_meta-prefix ).
+    DATA(lv_prefix) = COND string(
+      WHEN iv_prefix_override IS SUPPLIED AND iv_prefix_override IS NOT INITIAL
+      THEN iv_prefix_override
+      ELSE is_meta-prefix ).
+
+    DATA(lv_prefix_length) = strlen( lv_prefix ).
 
     DATA(lv_max_active) = get_max_code_from_db(
-      iv_table  = is_meta-table_db
-      iv_field  = is_meta-field_db
-      iv_prefix = is_meta-prefix ).
+      iv_table        = is_meta-table_db
+      iv_field        = is_meta-field_db
+      iv_prefix       = lv_prefix
+      iv_company_code = iv_company_code ).
 
     DATA(lv_max_draft) = COND string(
       WHEN is_meta-table_draft IS NOT INITIAL
        AND is_meta-field_draft IS NOT INITIAL
       THEN get_max_code_from_db(
-             iv_table  = is_meta-table_draft
-             iv_field  = is_meta-field_draft
-             iv_prefix = is_meta-prefix ) ).
+             iv_table        = is_meta-table_draft
+             iv_field        = is_meta-field_draft
+             iv_prefix       = lv_prefix
+             iv_company_code = iv_company_code ) ).
 
     DATA(lv_max_numeric) = nmax(
       val1 = extract_numeric_suffix(
@@ -626,7 +756,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     lv_max_numeric += 1.
 
     rv_number = format_code(
-      iv_prefix       = is_meta-prefix
+      iv_prefix       = lv_prefix
       iv_number       = lv_max_numeric
       iv_total_length = is_meta-length ).
 
@@ -644,8 +774,13 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     DATA(lv_prefix_upper) = to_upper( iv_prefix ).
     DATA(lv_prefix_lower) = to_lower( iv_prefix ).
 
+    DATA(lv_company_filter) = COND string(
+      WHEN iv_company_code IS NOT INITIAL
+      THEN | AND ( company_code = '{ iv_company_code }' OR companycode = '{ iv_company_code }' )|
+      ELSE '' ).
+
     TRY.
-        DATA(lv_where) = |( { iv_field } LIKE '{ lv_prefix_upper }%' OR { iv_field } LIKE '{ lv_prefix_lower }%' )|.
+        DATA(lv_where) = |( { iv_field } LIKE '{ lv_prefix_upper }%' OR { iv_field } LIKE '{ lv_prefix_lower }%' ){ lv_company_filter }|.
         DATA(lv_order) = |{ iv_field } DESCENDING|.
 
         SELECT (iv_field)
@@ -687,18 +822,24 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
   METHOD get_next_number_from_nro.
     DATA: lv_raw_number TYPE cl_numberrange_runtime=>nr_number.
 
+    DATA(lv_prefix) = COND string(
+      WHEN iv_prefix_override IS SUPPLIED AND iv_prefix_override IS NOT INITIAL
+      THEN iv_prefix_override
+      ELSE is_meta-prefix ).
+
     TRY.
         cl_numberrange_runtime=>number_get(
           EXPORTING
             nr_range_nr = '01'
             object      = is_meta-number_object
+            subobject   = CONV #( iv_company_code )
           IMPORTING
             number      = lv_raw_number ).
 
         TRY.
             rv_code = format_code(
               iv_number       = CONV int8( lv_raw_number )
-              iv_prefix       = is_meta-prefix
+              iv_prefix       = lv_prefix
               iv_total_length = is_meta-length ).
           CATCH cx_sy_conversion_error cx_sy_arithmetic_overflow.
             CLEAR rv_code.
@@ -715,20 +856,27 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA(lv_prefix_length) = strlen( is_meta-prefix ).
+    DATA(lv_prefix) = COND string(
+      WHEN iv_prefix_override IS SUPPLIED AND iv_prefix_override IS NOT INITIAL
+      THEN iv_prefix_override
+      ELSE is_meta-prefix ).
+
+    DATA(lv_prefix_length) = strlen( lv_prefix ).
 
     DATA(lv_max_active) = get_max_code_from_db(
-      iv_table  = is_meta-table_db
-      iv_field  = is_meta-field_db
-      iv_prefix = is_meta-prefix ).
+      iv_table        = is_meta-table_db
+      iv_field        = is_meta-field_db
+      iv_prefix       = lv_prefix
+      iv_company_code = iv_company_code ).
 
     DATA(lv_max_draft) = COND string(
       WHEN is_meta-table_draft IS NOT INITIAL
        AND is_meta-field_draft IS NOT INITIAL
       THEN get_max_code_from_db(
-             iv_table  = is_meta-table_draft
-             iv_field  = is_meta-field_draft
-             iv_prefix = is_meta-prefix ) ).
+             iv_table        = is_meta-table_draft
+             iv_field        = is_meta-field_draft
+             iv_prefix       = lv_prefix
+             iv_company_code = iv_company_code ) ).
 
     DATA(lv_max_numeric) = nmax(
       val1 = extract_numeric_suffix(
@@ -741,7 +889,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     DO iv_count TIMES.
       lv_max_numeric += 1.
       DATA(lv_code) = format_code(
-        iv_prefix       = is_meta-prefix
+        iv_prefix       = lv_prefix
         iv_number       = lv_max_numeric
         iv_total_length = is_meta-length ).
 
@@ -762,11 +910,17 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    DATA(lv_prefix) = COND string(
+      WHEN iv_prefix_override IS SUPPLIED AND iv_prefix_override IS NOT INITIAL
+      THEN iv_prefix_override
+      ELSE is_meta-prefix ).
+
     TRY.
         cl_numberrange_runtime=>number_get(
           EXPORTING
             nr_range_nr = '01'
             object      = is_meta-number_object
+            subobject   = CONV #( iv_company_code )
             quantity    = CONV #( iv_count )
           IMPORTING
             number      = lv_raw_number ).
@@ -778,7 +932,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
           DATA(lv_curr_num) = lv_start_num + sy-index - 1.
           DATA(lv_code) = format_code(
             iv_number       = lv_curr_num
-            iv_prefix       = is_meta-prefix
+            iv_prefix       = lv_prefix
             iv_total_length = is_meta-length ).
 
           IF lv_code IS INITIAL.
@@ -802,6 +956,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       ( CONV string( zif_merp_constants=>c_ig-number_object ) )
       ( CONV string( zif_merp_constants=>c_vat-number_object ) )
       ( CONV string( zif_merp_constants=>c_wh-number_object ) )
+      ( CONV string( zif_merp_constants=>c_po-number_object ) )
     ).
   ENDMETHOD.
 
@@ -812,6 +967,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
           lv_error    TYPE cl_numberrange_intervals=>nr_error,
           ls_error    TYPE cl_numberrange_intervals=>nr_error_inf.
 
+    ls_interval-subobject  = iv_subobject.
     ls_interval-nrrangenr  = '01'.
     ls_interval-fromnumber = '0000000001'.
     ls_interval-tonumber   = '9999999999'.
@@ -822,6 +978,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
         cl_numberrange_intervals=>update(
           EXPORTING
             object    = iv_object
+            subobject = iv_subobject
             interval  = lt_interval
           IMPORTING
             error     = lv_error
@@ -832,6 +989,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
             cl_numberrange_intervals=>create(
               EXPORTING
                 object    = iv_object
+                subobject = iv_subobject
                 interval  = lt_interval
               IMPORTING
                 error     = lv_error
@@ -846,14 +1004,20 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
 
   METHOD get_max_level_from_db.
+    DATA(lv_prefix) = COND string(
+      WHEN iv_prefix_override IS SUPPLIED AND iv_prefix_override IS NOT INITIAL
+      THEN iv_prefix_override
+      ELSE is_meta-prefix ).
+
     DATA(lv_max_code) = get_max_code_from_db(
-      iv_table  = is_meta-table_db
-      iv_field  = is_meta-field_db
-      iv_prefix = is_meta-prefix ).
+      iv_table        = is_meta-table_db
+      iv_field        = is_meta-field_db
+      iv_prefix       = lv_prefix
+      iv_company_code = iv_company_code ).
 
     rv_level = extract_numeric_suffix(
       iv_code   = lv_max_code
-      iv_offset = strlen( is_meta-prefix ) ).
+      iv_offset = strlen( lv_prefix ) ).
   ENDMETHOD.
 
 ENDCLASS.
