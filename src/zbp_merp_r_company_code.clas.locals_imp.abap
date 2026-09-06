@@ -70,8 +70,8 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         APPEND VALUE #(
           %tky                 = lr_comp_code->%tky
           %state_area          = c_state_area_mandatory
-          %msg                 = NEW zcm_merp_messages(
-                                   textid   = zcm_merp_messages=>enter_company_name
+          %msg                 = NEW zcx_merp_comp_code(
+                                   textid   = zcx_merp_comp_code=>enter_company_name
                                    severity = if_abap_behv_message=>severity-error )
           %element-CompanyName = if_abap_behv=>mk-on
         ) TO reported-companycode.
@@ -82,8 +82,8 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         APPEND VALUE #(
           %tky                   = lr_comp_code->%tky
           %state_area            = c_state_area_mandatory
-          %msg                   = NEW zcm_merp_messages(
-                                     textid   = zcm_merp_messages=>enter_company_prefix
+          %msg                   = NEW zcx_merp_comp_code(
+                                     textid   = zcx_merp_comp_code=>enter_company_prefix
                                      severity = if_abap_behv_message=>severity-error )
           %element-CompanyPrefix = if_abap_behv=>mk-on
         ) TO reported-companycode.
@@ -94,8 +94,8 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         APPEND VALUE #(
           %tky                  = lr_comp_code->%tky
           %state_area           = c_state_area_mandatory
-          %msg                  = NEW zcm_merp_messages(
-                                    textid   = zcm_merp_messages=>enter_currency
+          %msg                  = NEW zcx_merp_comp_code(
+                                    textid   = zcx_merp_comp_code=>select_currency
                                     severity = if_abap_behv_message=>severity-error )
           %element-CurrencyCode = if_abap_behv=>mk-on
         ) TO reported-companycode.
@@ -106,8 +106,8 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         APPEND VALUE #(
           %tky              = lr_comp_code->%tky
           %state_area       = c_state_area_mandatory
-          %msg              = NEW zcm_merp_messages(
-                                textid   = zcm_merp_messages=>enter_country
+          %msg              = NEW zcx_merp_comp_code(
+                                textid   = zcx_merp_comp_code=>select_country
                                 severity = if_abap_behv_message=>severity-error )
           %element-Country  = if_abap_behv=>mk-on
         ) TO reported-companycode.
@@ -218,8 +218,8 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         APPEND VALUE #(
           %tky                 = lr_key->%tky
           %element-CompanyCode = if_abap_behv=>mk-on
-          %msg                  = NEW zcm_merp_messages(
-                                      textid   = zcm_merp_messages=>company_code_in_use
+          %msg                  = NEW zcx_merp_comp_code(
+                                      textid   = zcx_merp_comp_code=>company_code_in_use
                                       attr1    = CONV #( lr_dep->companycode )
                                       attr2    = CONV #( lr_dep->usedinentity )
                                       severity = if_abap_behv_message=>severity-error )
@@ -227,6 +227,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
       ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
+
 
 *  METHOD precheck_delete.
 *    IF keys IS INITIAL.

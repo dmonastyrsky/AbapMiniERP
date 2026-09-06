@@ -65,8 +65,8 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
         APPEND VALUE #(
           %tky                 = lr_bp->%tky
           %state_area          = c_state_area_mandatory
-          %msg                 = NEW zcm_merp_messages(
-                                   textid   = zcm_merp_messages=>enter_partner_name
+          %msg                 = NEW zcx_merp_bus_part(
+                                   textid   = zcx_merp_bus_part=>enter_partner_name
                                    severity = if_abap_behv_message=>severity-error )
           %element-PartnerName = if_abap_behv=>mk-on
         ) TO reported-businesspartner.
@@ -112,8 +112,8 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
         APPEND VALUE #(
           %tky                = lr_bp->%tky
           %state_area         = c_state_area_role
-          %msg                = NEW zcm_merp_messages(
-                                  textid   = zcm_merp_messages=>select_partner_role
+          %msg                = NEW zcx_merp_bus_part(
+                                  textid   = zcx_merp_bus_part=>select_partner_role
                                   severity = if_abap_behv_message=>severity-error )
           %element-IsCustomer = if_abap_behv=>mk-on
           %element-IsSupplier = if_abap_behv=>mk-on
@@ -182,8 +182,8 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
-            %msg      = NEW zcm_merp_messages(
-                          textid   = zcm_merp_messages=>bp_number_failed
+            %msg      = NEW zcx_merp_bus_part(
+                          textid   = zcx_merp_bus_part=>bus_part_generation_failed
                           previous = lx_nro_error
                           severity = if_abap_behv_message=>severity-error )
           ) TO reported-businesspartner.
@@ -257,8 +257,8 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
         APPEND VALUE #(
           %tky                 = lr_key->%tky
           %element-PartnerCode = if_abap_behv=>mk-on
-          %msg                 = NEW zcm_merp_messages(
-                                     textid   = zcm_merp_messages=>business_partner_in_use
+          %msg                 = NEW zcx_merp_bus_part(
+                                     textid   = zcx_merp_bus_part=>business_partner_in_use
                                      attr1    = CONV #( lr_dep->partnercode )
                                      attr2    = CONV #( lr_dep->usedinentity )
                                      severity = if_abap_behv_message=>severity-error )

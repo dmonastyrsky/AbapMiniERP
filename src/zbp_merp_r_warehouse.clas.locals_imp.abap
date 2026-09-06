@@ -74,8 +74,8 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
         APPEND VALUE #(
           %tky                   = lr_whse->%tky
           %state_area           = c_state_area_mandatory
-          %msg                  = NEW zcm_merp_messages(
-                                    textid   = zcm_merp_messages=>enter_warehouse_name
+          %msg                  = NEW zcx_merp_warehouse(
+                                    textid   = zcx_merp_warehouse=>enter_warehouse_name
                                     severity = if_abap_behv_message=>severity-error )
           %element-WarehouseName = if_abap_behv=>mk-on
         ) TO reported-warehouse.
@@ -86,8 +86,8 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
         APPEND VALUE #(
           %tky                  = lr_whse->%tky
           %state_area           = c_state_area_mandatory
-          %msg                  = NEW zcm_merp_messages(
-                                    textid   = zcm_merp_messages=>enter_company_code
+          %msg                  = NEW zcx_merp_warehouse(
+                                    textid   = zcx_merp_warehouse=>select_company
                                     severity = if_abap_behv_message=>severity-error )
           %element-CompanyCode  = if_abap_behv=>mk-on
         ) TO reported-warehouse.
@@ -157,8 +157,8 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
         APPEND VALUE #(
           %tky                 = lr_whse->%tky
           %state_area          = c_state_area_company
-          %msg                 = NEW zcm_merp_messages(
-                                   textid   = zcm_merp_messages=>company_code_not_found
+          %msg                 = NEW zcx_merp_warehouse(
+                                   textid   = zcx_merp_warehouse=>company_code_not_found
                                    attr1    = CONV #( lr_whse->CompanyCode )
                                    severity = if_abap_behv_message=>severity-error )
           %element-CompanyCode = if_abap_behv=>mk-on
@@ -219,8 +219,8 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
-            %msg      = NEW zcm_merp_messages(
-                          textid   = zcm_merp_messages=>warehouse_number_failed
+            %msg      = NEW zcx_merp_warehouse(
+                          textid   = zcx_merp_warehouse=>warehouse_generation_failed
                           previous = lx_nro_error
                           severity = if_abap_behv_message=>severity-error )
           ) TO reported-warehouse.
@@ -294,8 +294,8 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
         APPEND VALUE #(
           %tky                  = lr_key->%tky
           %element-WarehouseCode = if_abap_behv=>mk-on
-          %msg                  = NEW zcm_merp_messages(
-                                      textid   = zcm_merp_messages=>warehouse_in_use
+          %msg                  = NEW zcx_merp_warehouse(
+                                      textid   = zcx_merp_warehouse=>warehouse_in_use
                                       attr1    = CONV #( lr_dep->warehousecode )
                                       attr2    = CONV #( lr_dep->usedinentity )
                                       severity = if_abap_behv_message=>severity-error )

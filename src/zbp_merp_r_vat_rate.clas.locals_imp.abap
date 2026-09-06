@@ -74,8 +74,8 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
         APPEND VALUE #(
           %tky                 = lr_vat->%tky
           %state_area          = c_state_area_mandatory
-          %msg                 = NEW zcm_merp_messages(
-                                   textid   = zcm_merp_messages=>enter_vat_name
+          %msg                 = NEW zcx_merp_vat_rate(
+                                   textid   = zcx_merp_vat_rate=>enter_vat_description
                                    severity = if_abap_behv_message=>severity-error )
           %element-Description = if_abap_behv=>mk-on
         ) TO reported-vatrate.
@@ -121,8 +121,8 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
         APPEND VALUE #(
           %tky                = lr_vat->%tky
           %state_area         = c_state_area_percentage
-          %msg                = NEW zcm_merp_messages(
-                                  textid   = zcm_merp_messages=>invalid_vat_percentage
+          %msg                = NEW zcx_merp_vat_rate(
+                                  textid   = zcx_merp_vat_rate=>invalid_vat_percentage
                                   severity = if_abap_behv_message=>severity-error )
           %element-Percentage = if_abap_behv=>mk-on
         ) TO reported-vatrate.
@@ -190,8 +190,8 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
-            %msg      = NEW zcm_merp_messages(
-                          textid   = zcm_merp_messages=>vat_number_failed
+            %msg      = NEW zcx_merp_vat_rate(
+                          textid   = zcx_merp_vat_rate=>vat_rate_generation_failed
                           previous = lx_nro_error
                           severity = if_abap_behv_message=>severity-error )
           ) TO reported-vatrate.
@@ -265,8 +265,8 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
         APPEND VALUE #(
           %tky             = lr_key->%tky
           %element-VatCode = if_abap_behv=>mk-on
-          %msg             = NEW zcm_merp_messages(
-                                  textid   = zcm_merp_messages=>vat_rate_in_use
+          %msg             = NEW zcx_merp_vat_rate(
+                                  textid   = zcx_merp_vat_rate=>vat_rate_in_use
                                   attr1    = CONV #( lr_dep->vatcode )
                                   attr2    = CONV #( lr_dep->usedinentity )
                                   severity = if_abap_behv_message=>severity-error )
@@ -274,5 +274,6 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
+
 
 ENDCLASS.

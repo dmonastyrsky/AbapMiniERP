@@ -24,7 +24,7 @@ CLASS zcl_merp_md_util DEFINITION
 
     TYPES: BEGIN OF ty_dependency_result,
              key_value TYPE string,
-             msg       TYPE REF TO zcm_merp_messages,
+             msg       TYPE REF TO zcx_merp_base,
            END OF ty_dependency_result,
            tt_dependency_results TYPE STANDARD TABLE OF ty_dependency_result WITH EMPTY KEY.
 
@@ -67,7 +67,7 @@ CLASS zcl_merp_md_util DEFINITION
     "! @parameter it_keys | List of key values to validate
     "! @parameter iv_usage_cds | Name of the usage CDS View
     "! @parameter iv_key_field_name | Key field name in CDS View
-    "! @parameter is_textid | Message textid from zcm_merp_messages
+    "! @parameter is_textid | Message textid structure from exception classes
     "! @parameter rt_blocked_keys | Collection of blocked key strings with prepared error message objects
     CLASS-METHODS check_dependencies
       IMPORTING
@@ -237,7 +237,7 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
         LOOP AT lt_keys INTO DATA(lv_failed_key).
           INSERT VALUE #(
             key_value = lv_failed_key
-            msg       = NEW zcm_merp_messages(
+            msg       = NEW zcx_merp_master_data(
                           textid   = is_textid
                           attr1    = lv_failed_key
                           attr2    = CONV #( lx_err->get_text( ) )
@@ -254,7 +254,7 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
     LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep).
       INSERT VALUE #(
         key_value = lr_dep->key_field
-        msg       = NEW zcm_merp_messages(
+        msg       = NEW zcx_merp_master_data(
                       textid   = is_textid
                       attr1    = lr_dep->key_field
                       attr2    = CONV #( lr_dep->usedinentity )
