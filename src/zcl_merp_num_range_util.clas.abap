@@ -406,7 +406,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
 
   METHOD get_next_po_number.
-    DATA(lv_prefix) = zcl_merp_md_util=>get_company_prefix( iv_company_code ).
+    DATA(lv_prefix) = zcl_merp_md_util=>get_company_details( iv_company_code )-company_prefix.
 
     rv_po_num = get_next_number(
       is_meta            = zif_merp_constants=>c_po
@@ -461,7 +461,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
 
   METHOD get_next_po_number_nro.
-    DATA(lv_prefix) = zcl_merp_md_util=>get_company_prefix( iv_company_code ).
+    DATA(lv_prefix) = zcl_merp_md_util=>get_company_details( iv_company_code )-company_prefix.
 
     rv_po_num = get_next_number_from_nro(
       is_meta            = zif_merp_constants=>c_po
@@ -540,7 +540,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
 
   METHOD get_next_po_codes_nro.
-    DATA(lv_prefix) = zcl_merp_md_util=>get_company_prefix( iv_company_code ).
+    DATA(lv_prefix) = zcl_merp_md_util=>get_company_details( iv_company_code )-company_prefix.
 
     rt_codes = get_next_numbers_from_nro(
       is_meta            = zif_merp_constants=>c_po
@@ -635,7 +635,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
 
   METHOD format_po_code.
-    DATA(lv_prefix) = zcl_merp_md_util=>get_company_prefix( iv_company_code ).
+    DATA(lv_prefix) = zcl_merp_md_util=>get_company_details( iv_company_code )-company_prefix.
 
     rv_code = format_code(
       iv_number       = iv_number
@@ -711,7 +711,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
 
   METHOD sync_po_interval.
-    DATA(lv_prefix) = zcl_merp_md_util=>get_company_prefix( iv_company_code ).
+    DATA(lv_prefix) = zcl_merp_md_util=>get_company_details( iv_company_code )-company_prefix.
 
     save_interval(
       iv_object    = zif_merp_constants=>c_po-number_object

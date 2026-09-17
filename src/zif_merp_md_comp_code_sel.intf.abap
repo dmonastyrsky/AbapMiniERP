@@ -1,0 +1,28 @@
+INTERFACE zif_merp_md_comp_code_sel
+  PUBLIC.
+
+  TYPES ty_company TYPE zmerp_r_company_code.
+  TYPES tt_companies TYPE SORTED TABLE OF ty_company WITH UNIQUE KEY companycode.
+
+  TYPES: BEGIN OF ty_company_key,
+           companycode TYPE zmerp_r_company_code-companycode,
+         END OF ty_company_key,
+         tt_company_keys TYPE STANDARD TABLE OF ty_company_key WITH EMPTY KEY.
+
+  "! Reads master data for a single company code.
+  "! @raising zcx_merp_master_data | Raised if the requested company code does not exist.
+  METHODS read_company
+    IMPORTING iv_company_code TYPE zmerp_r_company_code-companycode
+    RETURNING VALUE(rs_company) TYPE ty_company
+    RAISING   zcx_merp_master_data.
+
+  METHODS read_companies
+    IMPORTING it_company_keys TYPE tt_company_keys
+    RETURNING VALUE(rt_companies) TYPE tt_companies.
+
+  "! Validates company codes and returns missing/invalid keys.
+  METHODS validate_companies
+    IMPORTING it_company_keys        TYPE tt_company_keys
+    RETURNING VALUE(rt_invalid_keys) TYPE tt_company_keys.
+
+ENDINTERFACE.

@@ -20,7 +20,11 @@ define root view entity ZMERP_C_PURCHASEORDER
       @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_COMPANY_CODE_VH', element: 'CompanyCode' }, useForValidation: true }]
       CompanyCode,
 
-      @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_WAREHOUSE_VH', element: 'WarehouseCode' }, useForValidation: true }]
+      @Consumption.valueHelpDefinition: [{
+      entity: { name: 'ZMERP_I_WAREHOUSE_VH', element: 'WarehouseCode' },
+      additionalBinding: [{ localElement: 'CompanyCode', element: 'CompanyCode', usage: #FILTER }],
+      useForValidation: true
+      }]
       WarehouseCode,
 
       @Consumption.valueHelpDefinition: [{ entity: { name: 'ZMERP_I_BUS_PARTNER_VH', element: 'PartnerCode' }, useForValidation: true }]
@@ -31,7 +35,7 @@ define root view entity ZMERP_C_PURCHASEORDER
 
       TotalNetAmount,
       TotalGrossAmount,
-      
+
       ResponsiblePerson,
 
       @Search.defaultSearchElement: true
@@ -60,8 +64,8 @@ define root view entity ZMERP_C_PURCHASEORDER
       _CompanyCode     : redirected to ZMERP_C_COMPANY_CODE,
       _Warehouse       : redirected to ZMERP_C_WAREHOUSE,
       _BusinessPartner : redirected to ZMERP_C_BUS_PARTNER,
-      
-      _Currency,     
+
+      _Currency,
 
       _Status
 }

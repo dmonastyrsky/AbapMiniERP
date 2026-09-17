@@ -28,7 +28,7 @@ authorization master ( global )
   action ( features : instance ) releaseDocument result [1] $self;
   action ( features : instance ) cancelDocument result [1] $self;
 
-  determination setHeaderDefaults on save { create; }
+  determination setHeaderDefaults on modify { create; }
 
   validation validateHeaderFields on save { create; update; field CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode, DocumentDate; }
   validation validateDates on save { create; update; field DocumentDate, DeliveryDate; }

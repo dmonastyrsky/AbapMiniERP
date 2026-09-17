@@ -16,11 +16,15 @@ CLASS zcl_merp_md_util DEFINITION
     " Fixed: Changed WITH EMPTY KEY to WITH NON-UNIQUE KEY table_line to allow standard SORT and DELETE ADJACENT DUPLICATES
     TYPES tt_company_codes TYPE STANDARD TABLE OF zmerp_company_code WITH NON-UNIQUE KEY table_line.
 
-    TYPES: BEGIN OF ty_company_prefix,
+    TYPES: BEGIN OF ty_company_details,
              company_code   TYPE zmerp_company_code,
+             company_name   TYPE zmerp_company_name,
              company_prefix TYPE zmerp_company_prefix,
-           END OF ty_company_prefix,
-           tt_company_prefixes TYPE SORTED TABLE OF ty_company_prefix WITH UNIQUE KEY company_code.
+             currency_code  TYPE waers,
+             country        TYPE land1,
+             is_blocked     TYPE zmerp_is_blocked,
+           END OF ty_company_details,
+           tt_company_details TYPE SORTED TABLE OF ty_company_details WITH UNIQUE KEY company_code.
 
     TYPES: BEGIN OF ty_dependency_result,
              key_value TYPE string,
@@ -28,35 +32,45 @@ CLASS zcl_merp_md_util DEFINITION
            END OF ty_dependency_result,
            tt_dependency_results TYPE STANDARD TABLE OF ty_dependency_result WITH EMPTY KEY.
 
-    "! Retrieves the default VAT code for a single Item Group
+    "! Retrieves the default VAT code for a single Item Group.
+    "! @parameter iv_item_group_code | Item Group code to search
+    "! @parameter rv_vat_code        | Default VAT code associated with the Item Group
     CLASS-METHODS get_item_group_default_vat
       IMPORTING
         iv_item_group_code TYPE zmerp_item_group_code
       RETURNING
         VALUE(rv_vat_code) TYPE zmerp_vat_code.
 
-    "! Retrieves default VAT codes for multiple Item Groups at once (Bulk Mode)
+    "! Retrieves default VAT codes for multiple Item Groups at once (Bulk Mode).
+    "! @parameter it_item_group_codes | Table of Item Group codes to retrieve
+    "! @parameter rt_vat_codes        | Table containing Item Group to default VAT code mappings
     CLASS-METHODS get_item_groups_default_vat
       IMPORTING
         it_item_group_codes TYPE tt_item_group_codes
       RETURNING
         VALUE(rt_vat_codes) TYPE tt_item_group_vats.
 
-    "! Retrieves company prefix for a single Company Code
-    CLASS-METHODS get_company_prefix
+    "! Retrieves full details for a single Company Code.
+    "! @parameter iv_company_code | Company code context
+    "! @parameter rs_details       | Structure containing complete company details
+    CLASS-METHODS get_company_details
       IMPORTING
-        iv_company_code  TYPE zmerp_company_code
+        iv_company_code   TYPE zmerp_company_code
       RETURNING
-        VALUE(rv_prefix) TYPE zmerp_company_prefix.
+        VALUE(rs_details) TYPE ty_company_details.
 
-    "! Retrieves company prefixes for multiple Company Codes at once (Bulk Mode)
-    CLASS-METHODS get_companies_prefixes
+    "! Retrieves full details for multiple Company Codes at once (Bulk Mode).
+    "! @parameter it_company_codes | Table of Company codes to query
+    "! @parameter rt_details       | Table containing full details for found companies
+    CLASS-METHODS get_companies_details
       IMPORTING
-        it_company_codes   TYPE tt_company_codes
+        it_company_codes  TYPE tt_company_codes
       RETURNING
-        VALUE(rt_prefixes) TYPE tt_company_prefixes.
+        VALUE(rt_details) TYPE tt_company_details.
 
-    "! Validates existence of company codes and returns invalid entries
+    "! Validates existence of company codes against the database and returns invalid entries.
+    "! @parameter it_company_codes  | Table of Company codes to validate
+    "! @parameter rt_invalid_codes | Collection of company codes that do not exist in database
     CLASS-METHODS validate_companies
       IMPORTING
         it_company_codes        TYPE tt_company_codes
@@ -64,11 +78,11 @@ CLASS zcl_merp_md_util DEFINITION
         VALUE(rt_invalid_codes) TYPE tt_company_codes.
 
     "! Checks dependencies for any BO entity against its usage CDS view.
-    "! @parameter it_keys | List of key values to validate
-    "! @parameter iv_usage_cds | Name of the usage CDS View
-    "! @parameter iv_key_field_name | Key field name in CDS View
-    "! @parameter is_textid | Message textid structure from exception classes
-    "! @parameter rt_blocked_keys | Collection of blocked key strings with prepared error message objects
+    "! @parameter it_keys          | List of key values to validate
+    "! @parameter iv_usage_cds     | Name of the usage CDS View
+    "! @parameter iv_key_field_name| Key field name in CDS View
+    "! @parameter is_textid        | Message textid structure from exception classes
+    "! @parameter rt_blocked_keys  | Collection of blocked key strings with prepared error message objects
     CLASS-METHODS check_dependencies
       IMPORTING
         it_keys                TYPE string_table
@@ -97,7 +111,6 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-
   METHOD get_item_groups_default_vat.
     IF it_item_group_codes IS INITIAL.
       RETURN.
@@ -119,21 +132,20 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
       INTO TABLE @rt_vat_codes.
   ENDMETHOD.
 
-  METHOD get_company_prefix.
+  METHOD get_company_details.
     IF iv_company_code IS INITIAL.
       RETURN.
     ENDIF.
 
-    DATA(lt_prefixes) = get_companies_prefixes( VALUE #( ( iv_company_code ) ) ).
+    DATA(lt_details) = get_companies_details( VALUE #( ( iv_company_code ) ) ).
 
-    ASSIGN lt_prefixes[ company_code = iv_company_code ] TO FIELD-SYMBOL(<ls_prefix>).
+    ASSIGN lt_details[ company_code = iv_company_code ] TO FIELD-SYMBOL(<ls_detail>).
     IF sy-subrc = 0.
-      rv_prefix = <ls_prefix>-company_prefix.
+      rs_details = <ls_detail>.
     ENDIF.
   ENDMETHOD.
 
-
-  METHOD get_companies_prefixes.
+  METHOD get_companies_details.
     IF it_company_codes IS INITIAL.
       RETURN.
     ENDIF.
@@ -149,13 +161,17 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
     ENDIF.
 
     SELECT company_code,
-           company_prefix
+           company_name,
+           company_prefix,
+           currency_code,
+           country,
+           is_blocked
       FROM zmerp_comp_code
       WHERE company_code IN ( SELECT table_line FROM @lt_local AS input )
-      INTO TABLE @rt_prefixes.
+      INTO TABLE @rt_details.
 
-    LOOP AT rt_prefixes ASSIGNING FIELD-SYMBOL(<ls_prefix>).
-      <ls_prefix>-company_prefix = condense( val = <ls_prefix>-company_prefix ).
+    LOOP AT rt_details ASSIGNING FIELD-SYMBOL(<ls_detail>).
+      <ls_detail>-company_prefix = condense( val = <ls_detail>-company_prefix ).
     ENDLOOP.
   ENDMETHOD.
 
@@ -188,7 +204,6 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
-
 
   METHOD check_dependencies.
     IF it_keys IS INITIAL OR iv_usage_cds IS INITIAL OR iv_key_field_name IS INITIAL.
