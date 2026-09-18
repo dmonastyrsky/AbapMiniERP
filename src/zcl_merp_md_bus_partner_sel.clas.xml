@@ -3,9 +3,9 @@
  <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
    <VSEOCLASS>
-    <CLSNAME>ZCL_MERP_MD_COMP_CODE_SEL</CLSNAME>
+    <CLSNAME>ZCL_MERP_MD_BUS_PARTNER_SEL</CLSNAME>
     <LANGU>E</LANGU>
-    <DESCRIPT>Master Data Selector Implementation for Company Code</DESCRIPT>
+    <DESCRIPT>Master Data Selector Implementation for Business Partners</DESCRIPT>
     <STATE>1</STATE>
     <CLSCCINCL>X</CLSCCINCL>
     <FIXPT>X</FIXPT>
