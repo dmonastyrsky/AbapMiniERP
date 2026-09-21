@@ -10,6 +10,26 @@
     <STATE>1</STATE>
     <UNICODE>X</UNICODE>
    </VSEOINTERF>
+   <DESCRIPTIONS>
+    <SEOCOMPOTX>
+     <CLSNAME>ZIF_MERP_MD_COMP_CODE_SEL</CLSNAME>
+     <CMPNAME>READ_COMPANIES</CMPNAME>
+     <LANGU>E</LANGU>
+     <DESCRIPT>Reads master data for a list of company codes</DESCRIPT>
+    </SEOCOMPOTX>
+    <SEOCOMPOTX>
+     <CLSNAME>ZIF_MERP_MD_COMP_CODE_SEL</CLSNAME>
+     <CMPNAME>READ_COMPANY</CMPNAME>
+     <LANGU>E</LANGU>
+     <DESCRIPT>Reads master data for a single company code</DESCRIPT>
+    </SEOCOMPOTX>
+    <SEOCOMPOTX>
+     <CLSNAME>ZIF_MERP_MD_COMP_CODE_SEL</CLSNAME>
+     <CMPNAME>VALIDATE_COMPANIES</CMPNAME>
+     <LANGU>E</LANGU>
+     <DESCRIPT>Validates company codes and returns missing/invalid keys</DESCRIPT>
+    </SEOCOMPOTX>
+   </DESCRIPTIONS>
   </asx:values>
  </asx:abap>
 </abapGit>

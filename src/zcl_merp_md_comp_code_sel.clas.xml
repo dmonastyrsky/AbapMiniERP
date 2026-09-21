@@ -11,6 +11,14 @@
     <FIXPT>X</FIXPT>
     <UNICODE>X</UNICODE>
    </VSEOCLASS>
+   <DESCRIPTIONS>
+    <SEOCOMPOTX>
+     <CLSNAME>ZCL_MERP_MD_COMP_CODE_SEL</CLSNAME>
+     <CMPNAME>PREPARE_KEYS</CMPNAME>
+     <LANGU>E</LANGU>
+     <DESCRIPT>Cleanses, sorts and removes duplicates from input keys</DESCRIPT>
+    </SEOCOMPOTX>
+   </DESCRIPTIONS>
   </asx:values>
  </asx:abap>
 </abapGit>

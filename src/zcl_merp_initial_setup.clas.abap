@@ -89,8 +89,6 @@ CLASS zcl_merp_initial_setup DEFINITION
 
 ENDCLASS.
 
-
-
 CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
 
 
@@ -113,7 +111,7 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
     " Dynamically sync NRO levels with real DB record counts
     zcl_merp_num_range_util=>sync_intervals_from_db( ).
 
-    write_log( iv_text = '=== Initial Data Setup Completed Successfully ===' out = out ).
+    write_log( iv_text = '==== Initial Data Setup Completed Successfully ====' out = out ).
   ENDMETHOD.
 
 
@@ -599,4 +597,5 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
       DELETE FROM (iv_draft_table).
     ENDIF.
   ENDMETHOD.
+
 ENDCLASS.

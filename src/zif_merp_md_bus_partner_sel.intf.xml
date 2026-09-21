@@ -10,6 +10,26 @@
     <STATE>1</STATE>
     <UNICODE>X</UNICODE>
    </VSEOINTERF>
+   <DESCRIPTIONS>
+    <SEOCOMPOTX>
+     <CLSNAME>ZIF_MERP_MD_BUS_PARTNER_SEL</CLSNAME>
+     <CMPNAME>READ_PARTNER</CMPNAME>
+     <LANGU>E</LANGU>
+     <DESCRIPT>Reads master data for a single business partner</DESCRIPT>
+    </SEOCOMPOTX>
+    <SEOCOMPOTX>
+     <CLSNAME>ZIF_MERP_MD_BUS_PARTNER_SEL</CLSNAME>
+     <CMPNAME>READ_PARTNERS</CMPNAME>
+     <LANGU>E</LANGU>
+     <DESCRIPT>Reads master data for a list of business partners</DESCRIPT>
+    </SEOCOMPOTX>
+    <SEOCOMPOTX>
+     <CLSNAME>ZIF_MERP_MD_BUS_PARTNER_SEL</CLSNAME>
+     <CMPNAME>VALIDATE_PARTNERS</CMPNAME>
+     <LANGU>E</LANGU>
+     <DESCRIPT>Validates business partner codes and returns missing/invalid</DESCRIPT>
+    </SEOCOMPOTX>
+   </DESCRIPTIONS>
   </asx:values>
  </asx:abap>
 </abapGit>
