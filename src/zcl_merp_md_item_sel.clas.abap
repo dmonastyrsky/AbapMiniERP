@@ -10,8 +10,8 @@ CLASS zcl_merp_md_item_sel DEFINITION
     TYPES tt_item_keys_unique TYPE HASHED TABLE OF zif_merp_md_item_sel=>ty_item_key
                                    WITH UNIQUE KEY ItemCode.
 
-    "! <p class="shorttext synchronized">Cleanses, sorts and removes duplicates from input keys</p>
-    "! @param it_keys | Raw table of keys
+    "! Cleanses, sorts and removes duplicates from input keys
+    "! @parameter it_keys | Raw table of keys
     "! @parameter rt_keys | Processed clean table of keys
     METHODS prepare_keys
       IMPORTING it_keys        TYPE zif_merp_md_item_sel=>tt_item_keys
@@ -70,6 +70,7 @@ CLASS zcl_merp_md_item_sel IMPLEMENTATION.
       INTO CORRESPONDING FIELDS OF TABLE @rt_items.
   ENDMETHOD.
 
+
   METHOD zif_merp_md_item_sel~validate_items.
     DATA lt_existing_keys TYPE tt_item_keys_unique.
 
@@ -83,12 +84,13 @@ CLASS zcl_merp_md_item_sel IMPLEMENTATION.
       INNER JOIN @lt_clean_keys AS keys ON item~ItemCode = keys~ItemCode
       INTO TABLE @lt_existing_keys.
 
-    LOOP AT lt_clean_keys INTO DATA(ls_key).
-      IF NOT line_exists( lt_existing_keys[ ItemCode = ls_key-ItemCode ] ).
-        INSERT ls_key INTO TABLE rt_invalid_keys.
+    LOOP AT lt_clean_keys ASSIGNING FIELD-SYMBOL(<ls_key>).
+      IF NOT line_exists( lt_existing_keys[ ItemCode = <ls_key>-ItemCode ] ).
+        INSERT <ls_key> INTO TABLE rt_invalid_keys.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
+
 
   METHOD prepare_keys.
     rt_keys = it_keys.
@@ -98,4 +100,3 @@ CLASS zcl_merp_md_item_sel IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-

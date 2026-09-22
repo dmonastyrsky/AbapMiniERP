@@ -4,78 +4,11 @@ CLASS zcl_merp_md_util DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
-    " Fixed: Changed WITH EMPTY KEY to WITH NON-UNIQUE KEY table_line to allow standard SORT and DELETE ADJACENT DUPLICATES
-    TYPES tt_item_group_codes TYPE STANDARD TABLE OF zmerp_item_group_code WITH NON-UNIQUE KEY table_line.
-
-    TYPES: BEGIN OF ty_item_group_vat,
-             item_group_code  TYPE zmerp_item_group_code,
-             default_vat_code TYPE zmerp_vat_code,
-           END OF ty_item_group_vat,
-           tt_item_group_vats TYPE SORTED TABLE OF ty_item_group_vat WITH UNIQUE KEY item_group_code.
-
-    " Fixed: Changed WITH EMPTY KEY to WITH NON-UNIQUE KEY table_line to allow standard SORT and DELETE ADJACENT DUPLICATES
-    TYPES tt_company_codes TYPE STANDARD TABLE OF zmerp_company_code WITH NON-UNIQUE KEY table_line.
-
-    TYPES: BEGIN OF ty_company_details,
-             company_code   TYPE zmerp_company_code,
-             company_name   TYPE zmerp_company_name,
-             company_prefix TYPE zmerp_company_prefix,
-             currency_code  TYPE waers,
-             country        TYPE land1,
-             is_blocked     TYPE zmerp_is_blocked,
-           END OF ty_company_details,
-           tt_company_details TYPE SORTED TABLE OF ty_company_details WITH UNIQUE KEY company_code.
-
     TYPES: BEGIN OF ty_dependency_result,
              key_value TYPE string,
              msg       TYPE REF TO zcx_merp_base,
            END OF ty_dependency_result,
            tt_dependency_results TYPE STANDARD TABLE OF ty_dependency_result WITH EMPTY KEY.
-
-    "! Retrieves the default VAT code for a single Item Group.
-    "! @parameter iv_item_group_code | Item Group code to search
-    "! @parameter rv_vat_code        | Default VAT code associated with the Item Group
-    CLASS-METHODS get_item_group_default_vat
-      IMPORTING
-        iv_item_group_code TYPE zmerp_item_group_code
-      RETURNING
-        VALUE(rv_vat_code) TYPE zmerp_vat_code.
-
-    "! Retrieves default VAT codes for multiple Item Groups at once (Bulk Mode).
-    "! @parameter it_item_group_codes | Table of Item Group codes to retrieve
-    "! @parameter rt_vat_codes        | Table containing Item Group to default VAT code mappings
-    CLASS-METHODS get_item_groups_default_vat
-      IMPORTING
-        it_item_group_codes TYPE tt_item_group_codes
-      RETURNING
-        VALUE(rt_vat_codes) TYPE tt_item_group_vats.
-
-    "! Retrieves full details for a single Company Code.
-    "! @parameter iv_company_code | Company code context
-    "! @parameter rs_details       | Structure containing complete company details
-    CLASS-METHODS get_company_details
-      IMPORTING
-        iv_company_code   TYPE zmerp_company_code
-      RETURNING
-        VALUE(rs_details) TYPE ty_company_details.
-
-    "! Retrieves full details for multiple Company Codes at once (Bulk Mode).
-    "! @parameter it_company_codes | Table of Company codes to query
-    "! @parameter rt_details       | Table containing full details for found companies
-    CLASS-METHODS get_companies_details
-      IMPORTING
-        it_company_codes  TYPE tt_company_codes
-      RETURNING
-        VALUE(rt_details) TYPE tt_company_details.
-
-    "! Validates existence of company codes against the database and returns invalid entries.
-    "! @parameter it_company_codes  | Table of Company codes to validate
-    "! @parameter rt_invalid_codes | Collection of company codes that do not exist in database
-    CLASS-METHODS validate_companies
-      IMPORTING
-        it_company_codes        TYPE tt_company_codes
-      RETURNING
-        VALUE(rt_invalid_codes) TYPE tt_company_codes.
 
     "! Checks dependencies for any BO entity against its usage CDS view.
     "! @parameter it_keys          | List of key values to validate
@@ -98,113 +31,6 @@ ENDCLASS.
 
 CLASS zcl_merp_md_util IMPLEMENTATION.
 
-  METHOD get_item_group_default_vat.
-    IF iv_item_group_code IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    DATA(lt_vats) = get_item_groups_default_vat( VALUE #( ( iv_item_group_code ) ) ).
-
-    ASSIGN lt_vats[ item_group_code = iv_item_group_code ] TO FIELD-SYMBOL(<ls_vat>).
-    IF sy-subrc = 0.
-      rv_vat_code = <ls_vat>-default_vat_code.
-    ENDIF.
-  ENDMETHOD.
-
-  METHOD get_item_groups_default_vat.
-    IF it_item_group_codes IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    DATA(lt_local) = it_item_group_codes.
-    DELETE lt_local WHERE table_line IS INITIAL.
-
-    SORT lt_local.
-    DELETE ADJACENT DUPLICATES FROM lt_local.
-
-    IF lt_local IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    SELECT item_group_code, default_vat_code
-      FROM zmerp_item_group
-      WHERE item_group_code IN ( SELECT table_line FROM @lt_local AS input )
-      INTO TABLE @rt_vat_codes.
-  ENDMETHOD.
-
-  METHOD get_company_details.
-    IF iv_company_code IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    DATA(lt_details) = get_companies_details( VALUE #( ( iv_company_code ) ) ).
-
-    ASSIGN lt_details[ company_code = iv_company_code ] TO FIELD-SYMBOL(<ls_detail>).
-    IF sy-subrc = 0.
-      rs_details = <ls_detail>.
-    ENDIF.
-  ENDMETHOD.
-
-  METHOD get_companies_details.
-    IF it_company_codes IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    DATA(lt_local) = it_company_codes.
-    DELETE lt_local WHERE table_line IS INITIAL.
-
-    SORT lt_local.
-    DELETE ADJACENT DUPLICATES FROM lt_local.
-
-    IF lt_local IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    SELECT company_code,
-           company_name,
-           company_prefix,
-           currency_code,
-           country,
-           is_blocked
-      FROM zmerp_comp_code
-      WHERE company_code IN ( SELECT table_line FROM @lt_local AS input )
-      INTO TABLE @rt_details.
-
-    LOOP AT rt_details ASSIGNING FIELD-SYMBOL(<ls_detail>).
-      <ls_detail>-company_prefix = condense( val = <ls_detail>-company_prefix ).
-    ENDLOOP.
-  ENDMETHOD.
-
-  METHOD validate_companies.
-    IF it_company_codes IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    DATA(lt_local) = it_company_codes.
-    DELETE lt_local WHERE table_line IS INITIAL.
-
-    SORT lt_local.
-    DELETE ADJACENT DUPLICATES FROM lt_local.
-
-    IF lt_local IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    " Optimized: Fetching only key field into lightweight key table
-    DATA lt_existing_db TYPE tt_company_codes.
-
-    SELECT company_code
-      FROM zmerp_comp_code
-      WHERE company_code IN ( SELECT table_line FROM @lt_local AS input )
-      INTO TABLE @lt_existing_db.
-
-    LOOP AT lt_local INTO DATA(lv_code).
-      IF NOT line_exists( lt_existing_db[ table_line = lv_code ] ).
-        INSERT lv_code INTO TABLE rt_invalid_codes.
-      ENDIF.
-    ENDLOOP.
-  ENDMETHOD.
-
   METHOD check_dependencies.
     IF it_keys IS INITIAL OR iv_usage_cds IS INITIAL OR iv_key_field_name IS INITIAL.
       RETURN.
@@ -217,7 +43,6 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
 
     TYPES tt_string_range TYPE RANGE OF string.
 
-    " Safe key table with non-unique key to avoid dump on assignment
     DATA lt_keys         TYPE SORTED TABLE OF string WITH NON-UNIQUE KEY table_line.
     DATA lt_dependencies TYPE STANDARD TABLE OF ty_dep WITH EMPTY KEY.
 

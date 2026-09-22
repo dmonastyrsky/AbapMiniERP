@@ -10,13 +10,14 @@ CLASS zcl_merp_md_comp_code_sel DEFINITION
     TYPES tt_company_keys_unique TYPE HASHED TABLE OF zif_merp_md_comp_code_sel=>ty_company_key
                                       WITH UNIQUE KEY CompanyCode.
 
-    "! <p class="shorttext synchronized">Cleanses, sorts and removes duplicates from input keys</p>
-    "! @param it_keys | Raw table of keys
+    "! Cleanses, sorts and removes duplicates from input keys
+    "! @parameter it_keys | Raw table of keys
     "! @parameter rt_keys | Processed clean table of keys
     METHODS prepare_keys
       IMPORTING it_keys        TYPE zif_merp_md_comp_code_sel=>tt_company_keys
       RETURNING VALUE(rt_keys) TYPE zif_merp_md_comp_code_sel=>tt_company_keys.
 ENDCLASS.
+
 
 CLASS zcl_merp_md_comp_code_sel IMPLEMENTATION.
 
@@ -80,9 +81,9 @@ CLASS zcl_merp_md_comp_code_sel IMPLEMENTATION.
       INNER JOIN @lt_clean_keys AS keys ON comp~CompanyCode = keys~CompanyCode
       INTO TABLE @lt_existing_keys.
 
-    LOOP AT lt_clean_keys INTO DATA(ls_key).
-      IF NOT line_exists( lt_existing_keys[ CompanyCode = ls_key-CompanyCode ] ).
-        INSERT ls_key INTO TABLE rt_invalid_keys.
+    LOOP AT lt_clean_keys ASSIGNING FIELD-SYMBOL(<ls_key>).
+      IF NOT line_exists( lt_existing_keys[ CompanyCode = <ls_key>-CompanyCode ] ).
+        INSERT <ls_key> INTO TABLE rt_invalid_keys.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.

@@ -89,13 +89,11 @@ CLASS zcl_merp_initial_setup DEFINITION
 
 ENDCLASS.
 
-CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
-
+CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
   METHOD if_oo_adt_classrun~main.
     execute( out ).
   ENDMETHOD.
-
 
   METHOD execute.
     write_log( iv_text = '=== Starting Initial Data Setup for Mini ERP ===' out = out ).
@@ -114,14 +112,12 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
     write_log( iv_text = '==== Initial Data Setup Completed Successfully ====' out = out ).
   ENDMETHOD.
 
-
   METHOD write_insert_log.
     write_log(
       iv_text = |[{ iv_entity_name }]: Successfully inserted { iv_count } rows.|
       out     = out
     ).
   ENDMETHOD.
-
 
   METHOD get_current_user.
     TRY.
@@ -131,18 +127,15 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
     ENDTRY.
   ENDMETHOD.
 
-
   METHOD get_current_timestamp.
     GET TIME STAMP FIELD rv_timestamp.
   ENDMETHOD.
-
 
   METHOD write_log.
     IF out IS BOUND.
       out->write( iv_text ).
     ENDIF.
   ENDMETHOD.
-
 
   METHOD fill_audit_fields.
     DATA(lv_user)      = get_current_user( ).
@@ -166,9 +159,7 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-
   METHOD setup_company_codes.
-
     clear_table_data(
       iv_active_table = CONV tabname( zif_merp_constants=>c_comp-table_db )
       iv_draft_table  = CONV tabname( zif_merp_constants=>c_comp-table_draft )
@@ -202,7 +193,6 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
     write_insert_log( iv_entity_name = 'Company Code' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
 
-
   METHOD setup_vat_rates.
     clear_table_data(
       iv_active_table = CONV tabname( zif_merp_constants=>c_vat-table_db )
@@ -230,7 +220,6 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
     INSERT zmerp_vat_rate FROM TABLE @lt_vat_rates.
     write_insert_log( iv_entity_name = 'VAT Rate' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
-
 
   METHOD setup_warehouses.
     clear_table_data(
@@ -276,7 +265,6 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
     write_insert_log( iv_entity_name = 'Warehouse' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
 
-
   METHOD setup_item_groups.
     clear_table_data(
       iv_active_table = CONV tabname( zif_merp_constants=>c_ig-table_db )
@@ -315,7 +303,6 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
     INSERT zmerp_item_group FROM TABLE @lt_item_groups.
     write_insert_log( iv_entity_name = 'Item Group' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
-
 
   METHOD setup_items.
     clear_table_data(
@@ -428,8 +415,18 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
         base_unit_of_measure = 'H' )
     ).
 
-    LOOP AT lt_items REFERENCE INTO DATA(lr_item).
-      lr_item->default_vat_code = zcl_merp_md_util=>get_item_group_default_vat( lr_item->item_group_code ).
+    " Bulk-mode item group fetching via interface implementation
+    DATA lt_grp_keys TYPE zif_merp_md_item_group_sel=>tt_item_group_keys.
+    lt_grp_keys = VALUE #( FOR GROUPS grp OF item IN lt_items GROUP BY item-item_group_code ( ItemGroupCode = grp ) ).
+
+    DATA(lo_item_grp_sel) = NEW zcl_merp_md_item_group_sel( ).
+    DATA(lt_item_groups)  = lo_item_grp_sel->zif_merp_md_item_group_sel~read_item_groups( lt_grp_keys ).
+
+    LOOP AT lt_items ASSIGNING FIELD-SYMBOL(<ls_item>).
+      ASSIGN lt_item_groups[ ItemGroupCode = <ls_item>-item_group_code ] TO FIELD-SYMBOL(<ls_grp>).
+      IF sy-subrc = 0.
+        <ls_item>-default_vat_code = <ls_grp>-DefaultVatCode.
+      ENDIF.
     ENDLOOP.
 
     fill_audit_fields( CHANGING ct_data = lt_items ).
@@ -437,7 +434,6 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
     INSERT zmerp_item FROM TABLE @lt_items.
     write_insert_log( iv_entity_name = 'Item' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
-
 
   METHOD setup_business_partners.
     clear_table_data(
@@ -589,7 +585,6 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
     INSERT zmerp_bus_part FROM TABLE @lt_bp.
     write_insert_log( iv_entity_name = 'Business Partner' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
-
 
   METHOD clear_table_data.
     DELETE FROM (iv_active_table).

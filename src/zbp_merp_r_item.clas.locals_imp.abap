@@ -276,47 +276,55 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setDefaultVatCode.
-
     " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_item IN LOCAL MODE
       ENTITY Item
       FIELDS ( ItemGroupCode )
       WITH CORRESPONDING #( keys )
-      RESULT DATA(lt_items).
+      RESULT DATA(items).
 
-    IF lt_items IS INITIAL.
+    IF items IS INITIAL.
       RETURN.
     ENDIF.
 
-    DATA(lt_group_codes) = VALUE zcl_merp_md_util=>tt_item_group_codes(
-      FOR lr_item IN lt_items WHERE ( ItemGroupCode IS NOT INITIAL )
-      ( lr_item-ItemGroupCode )
+    " Collect unique item group keys using the correct standard structure for the selector
+    DATA(item_group_keys) = VALUE zif_merp_md_item_group_sel=>tt_item_group_keys(
+      FOR item IN items WHERE ( ItemGroupCode IS NOT INITIAL )
+      ( ItemGroupCode = item-ItemGroupCode )
     ).
 
-    IF lt_group_codes IS INITIAL.
+    IF item_group_keys IS INITIAL.
       RETURN.
     ENDIF.
 
-    DATA(lt_vat_mapping) = zcl_merp_md_util=>get_item_groups_default_vat( lt_group_codes ).
-    DATA lt_update TYPE TABLE FOR UPDATE zmerp_r_item.
+    " Read item groups master data by calling the selector directly in one line
+    DATA(item_groups) = NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_item_groups( item_group_keys ).
 
-    LOOP AT lt_items ASSIGNING FIELD-SYMBOL(<ls_item>) WHERE ItemGroupCode IS NOT INITIAL.
-      ASSIGN lt_vat_mapping[ item_group_code = <ls_item>-ItemGroupCode ] TO FIELD-SYMBOL(<ls_vat>).
+    IF item_groups IS INITIAL.
+      RETURN.
+    ENDIF.
 
-      IF sy-subrc = 0.
+    DATA items_to_update TYPE TABLE FOR UPDATE zmerp_r_item.
+
+    " Map default VAT code from item groups back to items
+    LOOP AT items ASSIGNING FIELD-SYMBOL(<item>) WHERE ItemGroupCode IS NOT INITIAL.
+      ASSIGN item_groups[ ItemGroupCode = <item>-ItemGroupCode ] TO FIELD-SYMBOL(<item_group>).
+
+      IF sy-subrc = 0 AND <item_group>-DefaultVatCode IS NOT INITIAL.
         APPEND VALUE #(
-          %tky                    = <ls_item>-%tky
-          DefaultVatCode          = <ls_vat>-default_vat_code
+          %tky                    = <item>-%tky
+          DefaultVatCode          = <item_group>-DefaultVatCode
           %control-DefaultVatCode = if_abap_behv=>mk-on
-        ) TO lt_update.
+        ) TO items_to_update.
       ENDIF.
     ENDLOOP.
 
-    IF lt_update IS NOT INITIAL.
+    " Perform mass local update on RAP business object
+    IF items_to_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_item IN LOCAL MODE
         ENTITY Item
         UPDATE FIELDS ( DefaultVatCode )
-        WITH lt_update.
+        WITH items_to_update.
     ENDIF.
   ENDMETHOD.
 
