@@ -409,7 +409,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     TRY.
         DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
         DATA(lv_prefix)  = ls_company-CompanyPrefix.
-      CATCH zcx_merp_master_data.
+      CATCH zcx_merp_md.
         CLEAR lv_prefix.
     ENDTRY.
 
@@ -469,7 +469,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     TRY.
         DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
         DATA(lv_prefix)  = ls_company-CompanyPrefix.
-      CATCH zcx_merp_master_data.
+      CATCH zcx_merp_md.
         CLEAR lv_prefix.
     ENDTRY.
 
@@ -553,7 +553,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     TRY.
         DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
         DATA(lv_prefix)  = ls_company-CompanyPrefix.
-      CATCH zcx_merp_master_data.
+      CATCH zcx_merp_md.
         CLEAR lv_prefix.
     ENDTRY.
 
@@ -653,7 +653,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     TRY.
         DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
         DATA(lv_prefix)  = ls_company-CompanyPrefix.
-      CATCH zcx_merp_master_data.
+      CATCH zcx_merp_md.
         CLEAR lv_prefix.
     ENDTRY.
 
@@ -734,7 +734,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     TRY.
         DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
         DATA(lv_prefix)  = ls_company-CompanyPrefix.
-      CATCH zcx_merp_master_data.
+      CATCH zcx_merp_md.
         CLEAR lv_prefix.
     ENDTRY.
 

@@ -69,8 +69,8 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
         APPEND VALUE #(
           %tky                 = lr_group->%tky
           %state_area          = c_state_area_mandatory
-          %msg                 = NEW zcx_merp_item_group(
-                                   textid   = zcx_merp_item_group=>enter_item_group_description
+          %msg                 = NEW zcx_merp_md(
+                                   textid   = zcx_merp_md=>enter_item_group_description
                                    severity = if_abap_behv_message=>severity-error )
           %element-Description = if_abap_behv=>mk-on
         ) TO reported-itemgroup.
@@ -81,8 +81,8 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
         APPEND VALUE #(
           %tky                    = lr_group->%tky
           %state_area             = c_state_area_mandatory
-          %msg                    = NEW zcx_merp_item_group(
-                                      textid   = zcx_merp_item_group=>select_default_vat_code
+          %msg                    = NEW zcx_merp_md(
+                                      textid   = zcx_merp_md=>select_default_vat_code
                                       severity = if_abap_behv_message=>severity-error )
           %element-DefaultVatCode = if_abap_behv=>mk-on
         ) TO reported-itemgroup.
@@ -150,8 +150,8 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
-            %msg      = NEW zcx_merp_item_group(
-                          textid   = zcx_merp_item_group=>item_group_generation_failed
+            %msg      = NEW zcx_merp_md(
+                          textid   = zcx_merp_md=>item_group_generation_failed
                           previous = lx_nro_error
                           severity = if_abap_behv_message=>severity-error )
           ) TO reported-itemgroup.
@@ -225,14 +225,15 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
         APPEND VALUE #(
           %tky                   = lr_key->%tky
           %element-ItemGroupCode = if_abap_behv=>mk-on
-          %msg                   = NEW zcx_merp_item_group(
-                                      textid   = zcx_merp_item_group=>item_group_in_use
+          %msg                   = NEW zcx_merp_md(
+                                      textid   = zcx_merp_md=>item_group_in_use
                                       attr1    = CONV #( lr_dep->itemgroupcode )
                                       attr2    = CONV #( lr_dep->usedinentity )
                                       severity = if_abap_behv_message=>severity-error )
         ) TO reported-itemgroup.
       ENDLOOP.
     ENDLOOP.
+
   ENDMETHOD.
 
 ENDCLASS.

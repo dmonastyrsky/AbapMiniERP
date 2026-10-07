@@ -87,7 +87,7 @@ CLASS ltcl_md_comp_code_sel IMPLEMENTATION.
     TRY.
         mo_cut->read_company( '' ).
         cl_abap_unit_assert=>fail( msg = 'Exception zcx_merp_master_data expected for initial key.' ).
-      CATCH zcx_merp_master_data.
+      CATCH zcx_merp_md.
         " Exception successfully caught
     ENDTRY.
   ENDMETHOD.
@@ -96,7 +96,7 @@ CLASS ltcl_md_comp_code_sel IMPLEMENTATION.
     TRY.
         mo_cut->read_company( '9999' ).
         cl_abap_unit_assert=>fail( msg = 'Exception zcx_merp_master_data expected when key is not found.' ).
-      CATCH zcx_merp_master_data.
+      CATCH zcx_merp_md.
         " Exception successfully caught
     ENDTRY.
   ENDMETHOD.

@@ -24,9 +24,9 @@ CLASS zcl_merp_md_item_group_sel IMPLEMENTATION.
 
   METHOD zif_merp_md_item_group_sel~read_item_group.
     IF iv_item_group_code IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_merp_master_data
+      RAISE EXCEPTION TYPE zcx_merp_md
         EXPORTING
-          textid   = zcx_merp_master_data=>item_group_not_found
+          textid   = zcx_merp_md=>item_group_not_found
           attr1    = CONV string( iv_item_group_code )
           severity = if_abap_behv_message=>severity-error.
     ENDIF.
@@ -39,9 +39,9 @@ CLASS zcl_merp_md_item_group_sel IMPLEMENTATION.
     IF sy-subrc = 0.
       rs_item_group = <ls_detail>.
     ELSE.
-      RAISE EXCEPTION TYPE zcx_merp_master_data
+      RAISE EXCEPTION TYPE zcx_merp_md
         EXPORTING
-          textid   = zcx_merp_master_data=>item_group_not_found
+          textid   = zcx_merp_md=>item_group_not_found
           attr1    = CONV string( iv_item_group_code )
           severity = if_abap_behv_message=>severity-error.
     ENDIF.

@@ -12,11 +12,11 @@ INTERFACE zif_merp_md_item_group_sel
   "! Reads master data for a single item group
   "! @parameter iv_item_group_code | Requested item group key
   "! @parameter rs_item_group      | Returned item group data structure
-  "! @raising zcx_merp_master_data | Raised if the requested item group does not exist
+  "! @raising zcx_merp_md | Raised if the requested item group does not exist
   METHODS read_item_group
     IMPORTING iv_item_group_code TYPE zmerp_r_item_group-ItemGroupCode
     RETURNING VALUE(rs_item_group) TYPE ty_item_group
-    RAISING   zcx_merp_master_data.
+    RAISING   zcx_merp_md.
 
   "! Reads master data for a list of item groups
   "! @parameter it_item_group_keys | Table of item group keys

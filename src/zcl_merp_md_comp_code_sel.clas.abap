@@ -23,9 +23,9 @@ CLASS zcl_merp_md_comp_code_sel IMPLEMENTATION.
 
   METHOD zif_merp_md_comp_code_sel~read_company.
     IF iv_company_code IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_merp_master_data
+      RAISE EXCEPTION TYPE zcx_merp_md
         EXPORTING
-          textid   = zcx_merp_master_data=>company_code_not_found
+          textid   = zcx_merp_md=>company_code_not_found
           attr1    = CONV string( iv_company_code )
           severity = if_abap_behv_message=>severity-error.
     ENDIF.
@@ -38,9 +38,9 @@ CLASS zcl_merp_md_comp_code_sel IMPLEMENTATION.
     IF sy-subrc = 0.
       rs_company = <ls_detail>.
     ELSE.
-      RAISE EXCEPTION TYPE zcx_merp_master_data
+      RAISE EXCEPTION TYPE zcx_merp_md
         EXPORTING
-          textid   = zcx_merp_master_data=>company_code_not_found
+          textid   = zcx_merp_md=>company_code_not_found
           attr1    = CONV string( iv_company_code )
           severity = if_abap_behv_message=>severity-error.
     ENDIF.

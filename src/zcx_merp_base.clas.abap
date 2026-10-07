@@ -42,7 +42,9 @@ CLASS zcx_merp_base IMPLEMENTATION.
     if_t100_dyn_msg~msgv3 = attr3.
     if_t100_dyn_msg~msgv4 = attr4.
 
-    if_abap_behv_message~m_severity = severity.
+    if_abap_behv_message~m_severity = COND #( WHEN severity IS NOT INITIAL
+                                          THEN severity
+                                          ELSE if_abap_behv_message=>severity-error ).
 
     CLEAR me->textid.
     IF textid IS INITIAL.

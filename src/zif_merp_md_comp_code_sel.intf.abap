@@ -12,11 +12,11 @@ INTERFACE zif_merp_md_comp_code_sel
   "! Reads master data for a single company code
   "! @parameter iv_company_code    | Requested company code key
   "! @parameter rs_company         | Returned master data structure
-  "! @raising zcx_merp_master_data | Raised if the company code does not exist or input is initial
+  "! @raising zcx_merp_md | Raised if the company code does not exist or input is initial
   METHODS read_company
     IMPORTING iv_company_code TYPE zmerp_r_company_code-CompanyCode
     RETURNING VALUE(rs_company) TYPE ty_company
-    RAISING   zcx_merp_master_data.
+    RAISING   zcx_merp_md.
 
   "! Reads master data for a list of company codes
   "! @parameter it_company_keys | Table of company code keys
