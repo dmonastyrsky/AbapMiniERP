@@ -12,11 +12,11 @@ INTERFACE zif_merp_md_warehouse_sel
   "! Reads master data for a single warehouse
   "! @parameter iv_warehouse_code  | Requested warehouse key
   "! @parameter rs_warehouse       | Returned warehouse data structure
-  "! @raising zcx_merp_master_data | Raised if the warehouse does not exist
+  "! @raising zcx_merp_md | Raised if the warehouse does not exist
   METHODS read_warehouse
     IMPORTING iv_warehouse_code TYPE zmerp_r_warehouse-WarehouseCode
     RETURNING VALUE(rs_warehouse) TYPE ty_warehouse
-    RAISING   zcx_merp_master_data.
+    RAISING   zcx_merp_md.
 
   "! Reads master data for a list of warehouses
   "! @parameter it_warehouse_keys | Table of warehouse keys

@@ -12,11 +12,11 @@ INTERFACE zif_merp_md_bus_partner_sel
   "! Reads master data for a single business partner
   "! @parameter iv_partner_code    | Requested business partner key
   "! @parameter rs_partner         | Returned business partner data structure
-  "! @raising zcx_merp_master_data | Raised if the requested business partner does not exist
+  "! @raising zcx_merp_md | Raised if the requested business partner does not exist
   METHODS read_partner
     IMPORTING iv_partner_code TYPE zmerp_r_bus_partner-PartnerCode
     RETURNING VALUE(rs_partner) TYPE ty_partner
-    RAISING   zcx_merp_master_data.
+    RAISING   zcx_merp_md.
 
   "! Reads master data for a list of business partners
   "! @parameter it_partner_keys | Table of business partner keys

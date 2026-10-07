@@ -12,11 +12,11 @@ INTERFACE zif_merp_md_vat_rate_sel
   "! Reads master data for a single VAT rate
   "! @parameter iv_vat_code        | Requested VAT rate key
   "! @parameter rs_vat_rate        | Returned VAT rate data structure
-  "! @raising zcx_merp_master_data | Raised if the requested VAT code does not exist
+  "! @raising zcx_merp_md | Raised if the requested VAT code does not exist
   METHODS read_vat_rate
     IMPORTING iv_vat_code TYPE zmerp_r_vat_rate-VatCode
     RETURNING VALUE(rs_vat_rate) TYPE ty_vat_rate
-    RAISING   zcx_merp_master_data.
+    RAISING   zcx_merp_md.
 
   "! Reads master data for a list of VAT rates
   "! @parameter it_vat_rate_keys | Table of VAT rate keys

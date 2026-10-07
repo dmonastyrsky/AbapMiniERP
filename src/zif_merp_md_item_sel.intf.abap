@@ -12,11 +12,11 @@ INTERFACE zif_merp_md_item_sel
   "! Reads master data for a single item
   "! @parameter iv_item_code       | Requested item key
   "! @parameter rs_item            | Returned item data structure
-  "! @raising zcx_merp_master_data | Raised if the requested item code does not exist
+  "! @raising zcx_merp_md | Raised if the requested item code does not exist
   METHODS read_item
     IMPORTING iv_item_code TYPE zmerp_r_item-ItemCode
     RETURNING VALUE(rs_item) TYPE ty_item
-    RAISING   zcx_merp_master_data.
+    RAISING   zcx_merp_md.
 
   "! Reads master data for a list of items
   "! @parameter it_item_keys | Table of item keys
