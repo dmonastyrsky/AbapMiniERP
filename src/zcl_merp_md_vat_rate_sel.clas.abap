@@ -23,9 +23,9 @@ CLASS zcl_merp_md_vat_rate_sel IMPLEMENTATION.
 
   METHOD zif_merp_md_vat_rate_sel~read_vat_rate.
     IF iv_vat_code IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_merp_master_data
+      RAISE EXCEPTION TYPE zcx_merp_md
         EXPORTING
-          textid   = zcx_merp_master_data=>vat_code_not_found
+          textid   = zcx_merp_md=>vat_code_not_found
           attr1    = CONV string( iv_vat_code )
           severity = if_abap_behv_message=>severity-error.
     ENDIF.
@@ -38,9 +38,9 @@ CLASS zcl_merp_md_vat_rate_sel IMPLEMENTATION.
     IF sy-subrc = 0.
       rs_vat_rate = <ls_detail>.
     ELSE.
-      RAISE EXCEPTION TYPE zcx_merp_master_data
+      RAISE EXCEPTION TYPE zcx_merp_md
         EXPORTING
-          textid   = zcx_merp_master_data=>vat_code_not_found
+          textid   = zcx_merp_md=>vat_code_not_found
           attr1    = CONV string( iv_vat_code )
           severity = if_abap_behv_message=>severity-error.
     ENDIF.

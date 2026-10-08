@@ -22,9 +22,9 @@ CLASS zcl_merp_md_bus_partner_sel IMPLEMENTATION.
 
   METHOD zif_merp_md_bus_partner_sel~read_partner.
     IF iv_partner_code IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_merp_master_data
+      RAISE EXCEPTION TYPE zcx_merp_md
         EXPORTING
-          textid   = zcx_merp_master_data=>business_partner_not_found
+          textid   = zcx_merp_md=>business_partner_not_found
           attr1    = CONV string( iv_partner_code )
           severity = if_abap_behv_message=>severity-error.
     ENDIF.
@@ -37,9 +37,9 @@ CLASS zcl_merp_md_bus_partner_sel IMPLEMENTATION.
     IF sy-subrc = 0.
       rs_partner = <ls_detail>.
     ELSE.
-      RAISE EXCEPTION TYPE zcx_merp_master_data
+      RAISE EXCEPTION TYPE zcx_merp_md
         EXPORTING
-          textid   = zcx_merp_master_data=>business_partner_not_found
+          textid   = zcx_merp_md=>business_partner_not_found
           attr1    = CONV string( iv_partner_code )
           severity = if_abap_behv_message=>severity-error.
     ENDIF.

@@ -1,4 +1,4 @@
-class ZCL_MERP_MD_SEL definition
+class ZCX_MERP_PUR definition
   public
   final
   create public .
@@ -10,5 +10,5 @@ ENDCLASS.
 
 
 
-CLASS ZCL_MERP_MD_SEL IMPLEMENTATION.
+CLASS ZCX_MERP_PUR IMPLEMENTATION.
 ENDCLASS.

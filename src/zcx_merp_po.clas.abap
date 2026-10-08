@@ -1,6 +1,6 @@
 CLASS zcx_merp_po DEFINITION
   PUBLIC
-  INHERITING FROM zcx_merp_document
+  INHERITING FROM zcx_merp_doc
   FINAL
   CREATE PUBLIC .
 

@@ -77,7 +77,7 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
         LOOP AT lt_keys INTO DATA(lv_failed_key).
           INSERT VALUE #(
             key_value = lv_failed_key
-            msg       = NEW zcx_merp_master_data(
+            msg       = NEW zcx_merp_md(
                           textid   = is_textid
                           attr1    = lv_failed_key
                           attr2    = CONV #( lx_err->get_text( ) )
@@ -94,7 +94,7 @@ CLASS zcl_merp_md_util IMPLEMENTATION.
     LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep).
       INSERT VALUE #(
         key_value = lr_dep->key_field
-        msg       = NEW zcx_merp_master_data(
+        msg       = NEW zcx_merp_md(
                       textid   = is_textid
                       attr1    = lr_dep->key_field
                       attr2    = CONV #( lr_dep->usedinentity )
