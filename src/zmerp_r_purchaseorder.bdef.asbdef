@@ -20,6 +20,7 @@ authorization master ( global )
   field ( readonly, numbering : managed ) DocumentUUID;
 
   field ( readonly ) DocumentNumber;
+  field ( readonly ) Status;
   field ( readonly ) TotalNetAmount, TotalGrossAmount;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
 
@@ -28,12 +29,14 @@ authorization master ( global )
   action ( features : instance ) releaseDocument result [1] $self;
   action ( features : instance ) cancelDocument result [1] $self;
 
-  determination setHeaderDefaults on modify { create; }
+  determination setHeaderDefaults on modify { create; field CompanyCode; }
+  determination syncItemCurrency on modify { field CurrencyCode; }
+  determination assignDocumentNumber on save { create; }
 
   validation validateHeaderFields on save { create; update; field CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode, DocumentDate; }
   validation validateDates on save { create; update; field DocumentDate, DeliveryDate; }
 
-  draft action Edit;
+  draft action ( features : instance ) Edit;
   draft action Activate optimized;
   draft action Discard;
   draft action Resume;
@@ -85,15 +88,15 @@ authorization dependent by _PurchaseOrder
   field ( readonly, numbering : managed ) ItemUUID;
   field ( readonly ) HeaderUUID;
 
-  field ( readonly ) ItemNo;
+  field ( readonly ) ItemNo, Currency, DeliveryCompleted;
   field ( readonly ) NetAmount, VatAmount, GrossAmount;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
 
-  field ( mandatory ) ItemCode, Quantity, Price, UnitOfMeasure, Currency;
+  field ( mandatory ) ItemCode, Quantity, Price, UnitOfMeasure;
 
-  determination setItemDefaults on modify { field ItemCode; }
+  determination setItemDefaults on modify { create; field ItemCode; }
   determination calculateItemAmounts on modify { field Quantity, Price, VatCode; }
-  determination calculateHeaderTotals on modify { field NetAmount, GrossAmount; }
+  determination calculateHeaderTotals on modify { delete; field NetAmount, GrossAmount; }
 
   validation validateItemFields on save { create; update; field ItemCode, Quantity, Price; }
 

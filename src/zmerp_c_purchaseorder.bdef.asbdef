@@ -22,6 +22,12 @@ use etag
   use action Prepare;
 
   use association _Items { create; with draft; }
+
+  side effects {
+    field CompanyCode  affects field CurrencyCode, field WarehouseCode, entity _Items;
+    field CurrencyCode affects entity _Items;
+    entity _Items      affects field TotalNetAmount, field TotalGrossAmount;
+  }
 }
 
 define behavior for ZMERP_C_PURCHASEORDERITM alias PurchaseOrderItem
@@ -34,9 +40,9 @@ use etag
   use association _PurchaseOrder { with draft; }
 
   side effects {
-    field ItemCode affects field UnitOfMeasure, field VatCode;
+    field ItemCode affects field UnitOfMeasure, field VatCode, field VatAmount, field GrossAmount, field _PurchaseOrder.TotalGrossAmount;
     field Quantity affects field NetAmount, field VatAmount, field GrossAmount, field _PurchaseOrder.TotalNetAmount, field _PurchaseOrder.TotalGrossAmount;
-    field Price affects field NetAmount, field VatAmount, field GrossAmount, field _PurchaseOrder.TotalNetAmount, field _PurchaseOrder.TotalGrossAmount;
-    field VatCode affects field VatAmount, field GrossAmount, field _PurchaseOrder.TotalGrossAmount;
+    field Price    affects field NetAmount, field VatAmount, field GrossAmount, field _PurchaseOrder.TotalNetAmount, field _PurchaseOrder.TotalGrossAmount;
+    field VatCode  affects field VatAmount, field GrossAmount, field _PurchaseOrder.TotalGrossAmount;
   }
 }

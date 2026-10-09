@@ -1,14 +1,62 @@
-class ZCX_MERP_PUR definition
-  public
-  final
-  create public .
+CLASS zcx_merp_pur DEFINITION
+  PUBLIC
+  INHERITING FROM zcx_merp_doc
+  FINAL
+  CREATE PUBLIC .
 
-public section.
-protected section.
-private section.
+  PUBLIC SECTION.
+    CONSTANTS:
+      " --- Header Specifics ---
+      BEGIN OF enter_supplier_reference,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_PUR',
+        msgno TYPE symsgno VALUE '053',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF enter_supplier_reference,
+
+      BEGIN OF bp_is_not_supplier,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_PUR',
+        msgno TYPE symsgno VALUE '108',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF bp_is_not_supplier,
+
+      " --- Delivery & Items Specifics ---
+      BEGIN OF delivery_date_past_invalid,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_PUR',
+        msgno TYPE symsgno VALUE '104',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF delivery_date_past_invalid,
+
+      BEGIN OF delivery_date_before_doc_date,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_PUR',
+        msgno TYPE symsgno VALUE '109',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF delivery_date_before_doc_date,
+
+      " --- Status Specifics ---
+      BEGIN OF invalid_document_status,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_PUR',
+        msgno TYPE symsgno VALUE '150',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF invalid_document_status.
+
+  PROTECTED SECTION.
+  PRIVATE SECTION.
 ENDCLASS.
 
-
-
-CLASS ZCX_MERP_PUR IMPLEMENTATION.
+CLASS zcx_merp_pur IMPLEMENTATION.
 ENDCLASS.

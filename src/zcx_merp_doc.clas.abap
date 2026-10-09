@@ -6,6 +6,7 @@ CLASS zcx_merp_doc DEFINITION
 
   PUBLIC SECTION.
     CONSTANTS:
+      " --- Mandatory Selection & Basic Field Checks (001-021) ---
       BEGIN OF select_company,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '001',
@@ -78,6 +79,7 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF select_unit_of_measure,
 
+      " --- Header Mandatory Entry Checks (050-052) ---
       BEGIN OF enter_document_date,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '050',
@@ -105,6 +107,7 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF enter_responsible_person,
 
+      " --- Business Logic & Item Validations (100-107) ---
       BEGIN OF quantity_must_be_positive,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '100',
@@ -168,6 +171,7 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF item_duplicate_invalid,
 
+      " --- Document Actions & Lifecycle Restrictions (151-154) ---
       BEGIN OF doc_number_already_exists,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '151',
@@ -177,6 +181,34 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF doc_number_already_exists,
 
+      BEGIN OF delete_not_allowed,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '152',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF delete_not_allowed,
+
+      BEGIN OF release_not_allowed,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '153',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF release_not_allowed,
+
+      BEGIN OF cancel_not_allowed,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '154',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF cancel_not_allowed,
+
+      " --- Number Range & Document Generation (200) ---
       BEGIN OF doc_number_generation_failed,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '200',
@@ -192,4 +224,3 @@ ENDCLASS.
 
 CLASS zcx_merp_doc IMPLEMENTATION.
 ENDCLASS.
-
