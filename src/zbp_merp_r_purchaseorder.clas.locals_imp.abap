@@ -2,11 +2,13 @@
 CLASS lhc_zmerp_r_purchaseorder DEFINITION INHERITING FROM cl_abap_behavior_handler.
   PRIVATE SECTION.
     CONSTANTS:
-      c_state_area_header TYPE string VALUE 'VALIDATE_HEADER',
-      c_state_area_dates  TYPE string VALUE 'VALIDATE_DATES',
-      c_status_new        TYPE zmerp_po_status VALUE 'N',
-      c_status_approved   TYPE zmerp_po_status VALUE 'A',
-      c_status_cancelled  TYPE zmerp_po_status VALUE 'X'.
+      c_state_area_header  TYPE string VALUE 'VALIDATE_HEADER',
+      c_state_area_dates   TYPE string VALUE 'VALIDATE_DATES',
+      c_status_new         TYPE zmerp_po_status VALUE 'N',
+      c_status_approved    TYPE zmerp_po_status VALUE 'A',
+      c_status_in_delivery TYPE zmerp_po_status VALUE 'P',
+      c_status_completed   TYPE zmerp_po_status VALUE 'C',
+      c_status_cancelled   TYPE zmerp_po_status VALUE 'X'.
 
     "! Evaluates global authorizations for CUD operations.
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
@@ -80,11 +82,20 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_instance_features.
+
+    IF keys IS INITIAL.
+      RETURN.
+    ENDIF.
+
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       FIELDS ( Status )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_headers).
+
+    IF lt_headers IS INITIAL.
+      RETURN.
+    ENDIF.
 
     " Only saved (active) documents can be edited or processed; draft instances get no actions
     result = VALUE #(
@@ -106,33 +117,92 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD precheck_delete.
+    IF keys IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    TYPES: BEGIN OF ty_key,
+             documentuuid TYPE sysuuid_x16,
+           END OF ty_key.
+
+    TYPES: BEGIN OF ty_dependency,
+             documentuuid TYPE sysuuid_x16,
+             usedinentity TYPE zmerp_entity_name,
+           END OF ty_dependency.
+
+    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY documentuuid.
+    DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY documentuuid.
+    DATA lv_failed_added TYPE abap_bool.
+
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
-      FIELDS ( Status )
+      FIELDS ( status )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_headers).
 
-    " Only open documents may be deleted
-    LOOP AT lt_headers REFERENCE INTO DATA(lr_header)
-      WHERE Status <> c_status_new.
+    IF lt_headers IS INITIAL.
+      RETURN.
+    ENDIF.
 
-      APPEND VALUE #(
-        %tky        = lr_header->%tky
-        %fail-cause = if_abap_behv=>cause-conflict
-      ) TO failed-purchaseorder.
+    lt_keys = VALUE #( FOR hdr IN lt_headers WHERE ( documentuuid IS NOT INITIAL ) ( documentuuid = hdr-documentuuid ) ).
+    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING documentuuid.
 
-      APPEND VALUE #(
-        %tky = lr_header->%tky
-        %msg = NEW zcx_merp_po(
-                 textid   = zcx_merp_po=>delete_not_allowed
-                 severity = if_abap_behv_message=>severity-error )
-      ) TO reported-purchaseorder.
+    IF lt_keys IS NOT INITIAL.
+      SELECT DISTINCT
+             usage~DocumentUUID AS documentuuid,
+             usage~UsedInEntity AS usedinentity
+        FROM zmerp_i_purchaseorder_usage AS usage
+        INNER JOIN @lt_keys AS key ON usage~DocumentUUID = key~documentuuid
+        INTO TABLE @lt_dependencies.
+    ENDIF.
+
+    LOOP AT lt_headers REFERENCE INTO DATA(lr_hdr).
+      lv_failed_added = abap_false.
+
+      " Lifecycle status check: allow deletion only for new or cancelled documents
+      IF lr_hdr->status <> c_status_new AND lr_hdr->status <> c_status_cancelled.
+        APPEND VALUE #(
+          %tky        = lr_hdr->%tky
+          %fail-cause = if_abap_behv=>cause-conflict
+        ) TO failed-purchaseorder.
+
+        APPEND VALUE #(
+          %tky = lr_hdr->%tky
+          %msg = NEW zcx_merp_pur(
+                   textid   = zcx_merp_pur=>delete_not_allowed
+                   severity = if_abap_behv_message=>severity-error )
+        ) TO reported-purchaseorder.
+        CONTINUE.
+      ENDIF.
+
+      " Database dependency check
+      LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
+        WHERE documentuuid = lr_hdr->documentuuid.
+
+        IF lv_failed_added = abap_false.
+          APPEND VALUE #(
+            %tky        = lr_hdr->%tky
+            %fail-cause = if_abap_behv=>cause-dependency
+          ) TO failed-purchaseorder.
+          lv_failed_added = abap_true.
+        ENDIF.
+
+        APPEND VALUE #(
+          %tky            = lr_hdr->%tky
+          %element-status = if_abap_behv=>mk-on
+          %msg            = NEW zcx_merp_pur(
+                               textid   = zcx_merp_pur=>purchase_order_in_use
+                               attr1    = CONV #( lr_hdr->documentuuid )
+                               attr2    = CONV #( lr_dep->usedinentity )
+                               severity = if_abap_behv_message=>severity-error )
+        ) TO reported-purchaseorder.
+      ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
 
   METHOD releaseDocument.
     DATA lt_update  TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
-    DATA lo_message TYPE REF TO zcx_merp_po.
+    DATA lo_message TYPE REF TO zcx_merp_pur.
 
     " Bulk read: headers and links to their items (needed only to check that items exist)
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
@@ -149,10 +219,10 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       CLEAR lo_message.
 
       IF lr_header->Status <> c_status_new.
-        lo_message = NEW #( textid   = zcx_merp_po=>release_not_allowed
+        lo_message = NEW #( textid   = zcx_merp_pur=>release_not_allowed
                             severity = if_abap_behv_message=>severity-error ).
       ELSEIF NOT line_exists( lt_links[ source-%tky = lr_header->%tky ] ).
-        lo_message = NEW #( textid   = zcx_merp_po=>document_empty_items_invalid
+        lo_message = NEW #( textid   = zcx_merp_pur=>document_empty_items_invalid
                             severity = if_abap_behv_message=>severity-error ).
       ENDIF.
 
@@ -193,7 +263,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 
   METHOD cancelDocument.
     DATA lt_update  TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
-    DATA lo_message TYPE REF TO zcx_merp_po.
+    DATA lo_message TYPE REF TO zcx_merp_pur.
 
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
@@ -211,8 +281,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 
         APPEND VALUE #(
           %tky                   = lr_header->%tky
-          %msg                   = NEW zcx_merp_po(
-                                     textid   = zcx_merp_po=>cancel_not_allowed
+          %msg                   = NEW zcx_merp_pur(
+                                     textid   = zcx_merp_pur=>cancel_not_allowed
                                      severity = if_abap_behv_message=>severity-error )
           %action-cancelDocument = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
@@ -382,8 +452,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 *        BASE reported-purchaseorder
 *        FOR header IN lt_headers
 *        ( %tky = header-%tky
-*          %msg = NEW zcx_merp_po(
-*                   textid   = zcx_merp_po=>document_number_failed
+*          %msg = NEW zcx_merp_pur(
+*                   textid   = zcx_merp_pur=>document_number_failed
 *                   previous = lx_nro_error
 *                   severity = if_abap_behv_message=>severity-error ) )
 *      ).
@@ -430,8 +500,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         APPEND VALUE #(
           %tky                 = lr_header->%tky
           %state_area          = c_state_area_header
-          %msg                 = NEW zcx_merp_po(
-                                   textid   = zcx_merp_po=>select_company
+          %msg                 = NEW zcx_merp_pur(
+                                   textid   = zcx_merp_pur=>select_company
                                    severity = if_abap_behv_message=>severity-error )
           %element-CompanyCode = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
@@ -442,8 +512,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         APPEND VALUE #(
           %tky                         = lr_header->%tky
           %state_area                  = c_state_area_header
-          %msg                         = NEW zcx_merp_po(
-                                           textid   = zcx_merp_po=>select_business_partner
+          %msg                         = NEW zcx_merp_pur(
+                                           textid   = zcx_merp_pur=>select_business_partner
                                            severity = if_abap_behv_message=>severity-error )
           %element-BusinessPartnerCode = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
@@ -454,8 +524,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         APPEND VALUE #(
           %tky                   = lr_header->%tky
           %state_area            = c_state_area_header
-          %msg                   = NEW zcx_merp_po(
-                                     textid   = zcx_merp_po=>select_warehouse
+          %msg                   = NEW zcx_merp_pur(
+                                     textid   = zcx_merp_pur=>select_warehouse
                                      severity = if_abap_behv_message=>severity-error )
           %element-WarehouseCode = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
@@ -466,8 +536,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         APPEND VALUE #(
           %tky                  = lr_header->%tky
           %state_area           = c_state_area_header
-          %msg                  = NEW zcx_merp_po(
-                                    textid   = zcx_merp_po=>select_currency
+          %msg                  = NEW zcx_merp_pur(
+                                    textid   = zcx_merp_pur=>select_currency
                                     severity = if_abap_behv_message=>severity-error )
           %element-CurrencyCode = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
@@ -515,8 +585,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         APPEND VALUE #(
           %tky                  = lr_header->%tky
           %state_area           = c_state_area_dates
-          %msg                  = NEW zcx_merp_po(
-                                    textid   = zcx_merp_po=>enter_document_date
+          %msg                  = NEW zcx_merp_pur(
+                                    textid   = zcx_merp_pur=>enter_document_date
                                     severity = if_abap_behv_message=>severity-error )
           %element-DocumentDate = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
@@ -525,8 +595,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         APPEND VALUE #(
           %tky                  = lr_header->%tky
           %state_area           = c_state_area_dates
-          %msg                  = NEW zcx_merp_po(
-                                    textid   = zcx_merp_po=>document_date_future_invalid
+          %msg                  = NEW zcx_merp_pur(
+                                    textid   = zcx_merp_pur=>document_date_future_invalid
                                     severity = if_abap_behv_message=>severity-error )
           %element-DocumentDate = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
@@ -537,8 +607,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         APPEND VALUE #(
           %tky                 = lr_header->%tky
           %state_area          = c_state_area_dates
-          %msg                 = NEW zcx_merp_po(
-                                   textid   = zcx_merp_po=>enter_posting_date
+          %msg                 = NEW zcx_merp_pur(
+                                   textid   = zcx_merp_pur=>enter_posting_date
                                    severity = if_abap_behv_message=>severity-error )
           %element-PostingDate = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
@@ -547,8 +617,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         APPEND VALUE #(
           %tky                 = lr_header->%tky
           %state_area          = c_state_area_dates
-          %msg                 = NEW zcx_merp_po(
-                                   textid   = zcx_merp_po=>posting_date_sequence_invalid
+          %msg                 = NEW zcx_merp_pur(
+                                   textid   = zcx_merp_pur=>posting_date_sequence_invalid
                                    severity = if_abap_behv_message=>severity-error )
           %element-PostingDate = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
@@ -562,24 +632,24 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
           APPEND VALUE #(
             %tky                  = lr_header->%tky
             %state_area           = c_state_area_dates
-            %msg                  = NEW zcx_merp_po(
-                                      textid   = zcx_merp_po=>delivery_date_past_invalid
+            %msg                  = NEW zcx_merp_pur(
+                                      textid   = zcx_merp_pur=>delivery_date_past_invalid
                                       severity = if_abap_behv_message=>severity-error )
             %element-DeliveryDate = if_abap_behv=>mk-on
           ) TO reported-purchaseorder.
         ENDIF.
 
-        IF lr_header->DocumentDate IS NOT INITIAL AND lr_header->DeliveryDate < lr_header->DocumentDate.
-          lv_has_error = abap_true.
-          APPEND VALUE #(
-            %tky                  = lr_header->%tky
-            %state_area           = c_state_area_dates
-            %msg                  = NEW zcx_merp_po(
-                                      textid   = zcx_merp_po=>delivery_date_sequence_invalid
-                                      severity = if_abap_behv_message=>severity-error )
-            %element-DeliveryDate = if_abap_behv=>mk-on
-          ) TO reported-purchaseorder.
-        ENDIF.
+*        IF lr_header->DocumentDate IS NOT INITIAL AND lr_header->DeliveryDate < lr_header->DocumentDate.
+*          lv_has_error = abap_true.
+*          APPEND VALUE #(
+*            %tky                  = lr_header->%tky
+*            %state_area           = c_state_area_dates
+*            %msg                  = NEW zcx_merp_pur(
+*                                      textid   = zcx_merp_pur=>delivery_date_sequence_invalid
+*                                      severity = if_abap_behv_message=>severity-error )
+*            %element-DeliveryDate = if_abap_behv=>mk-on
+*          ) TO reported-purchaseorder.
+*        ENDIF.
       ENDIF.
 
       IF lv_has_error = abap_true.
@@ -833,8 +903,8 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         APPEND VALUE #(
           %tky              = lr_item->%tky
           %state_area       = c_state_area_item
-          %msg              = NEW zcx_merp_po(
-                                textid   = zcx_merp_po=>select_item
+          %msg              = NEW zcx_merp_pur(
+                                textid   = zcx_merp_pur=>select_item
                                 severity = if_abap_behv_message=>severity-error )
           %element-ItemCode = if_abap_behv=>mk-on
         ) TO reported-purchaseorderitem.
@@ -845,8 +915,8 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         APPEND VALUE #(
           %tky              = lr_item->%tky
           %state_area       = c_state_area_item
-          %msg              = NEW zcx_merp_po(
-                                textid   = zcx_merp_po=>quantity_must_be_positive
+          %msg              = NEW zcx_merp_pur(
+                                textid   = zcx_merp_pur=>quantity_must_be_positive
                                 severity = if_abap_behv_message=>severity-error )
           %element-Quantity = if_abap_behv=>mk-on
         ) TO reported-purchaseorderitem.
@@ -857,8 +927,8 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         APPEND VALUE #(
           %tky           = lr_item->%tky
           %state_area    = c_state_area_item
-          %msg           = NEW zcx_merp_po(
-                             textid   = zcx_merp_po=>price_must_be_positive
+          %msg           = NEW zcx_merp_pur(
+                             textid   = zcx_merp_pur=>price_must_be_positive
                              severity = if_abap_behv_message=>severity-error )
           %element-Price = if_abap_behv=>mk-on
         ) TO reported-purchaseorderitem.
@@ -869,8 +939,8 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         APPEND VALUE #(
           %tky                   = lr_item->%tky
           %state_area            = c_state_area_item
-          %msg                   = NEW zcx_merp_po(
-                                     textid   = zcx_merp_po=>select_unit_of_measure
+          %msg                   = NEW zcx_merp_pur(
+                                     textid   = zcx_merp_pur=>select_unit_of_measure
                                      severity = if_abap_behv_message=>severity-error )
           %element-UnitOfMeasure = if_abap_behv=>mk-on
         ) TO reported-purchaseorderitem.
@@ -881,8 +951,8 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         APPEND VALUE #(
           %tky             = lr_item->%tky
           %state_area      = c_state_area_item
-          %msg             = NEW zcx_merp_po(
-                               textid   = zcx_merp_po=>select_vat_code
+          %msg             = NEW zcx_merp_pur(
+                               textid   = zcx_merp_pur=>select_vat_code
                                severity = if_abap_behv_message=>severity-error )
           %element-VatCode = if_abap_behv=>mk-on
         ) TO reported-purchaseorderitem.

@@ -150,7 +150,7 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_MD</ARBGB>
      <MSGNR>103</MSGNR>
-     <TEXT> Item Group &amp;1 does not exist.</TEXT>
+     <TEXT>Item Group &amp;1 does not exist.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
@@ -162,7 +162,7 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_MD</ARBGB>
      <MSGNR>105</MSGNR>
-     <TEXT> Warehouse &amp;1 does not exist.</TEXT>
+     <TEXT>Warehouse &amp;1 does not exist.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>

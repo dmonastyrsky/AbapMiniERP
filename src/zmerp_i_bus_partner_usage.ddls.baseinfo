@@ -3,7 +3,7 @@
 {
 "FROM":
 [
-"ZMERP_BUS_PART"
+"ZMERP_R_PURCHASEORDER"
 ],
 "ASSOCIATED":
 [],

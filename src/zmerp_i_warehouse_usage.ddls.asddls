@@ -3,10 +3,11 @@
 @Metadata.ignorePropagatedAnnotations: true
 
 define view entity ZMERP_I_WAREHOUSE_USAGE
-  as select from zmerp_warehouse
+  as select from ZMERP_R_PURCHASEORDER
 {
-  key warehouse_code                           as WarehouseCode,
-  key cast( '' as abap.char(10) )              as RefEntityKey,
-  key cast( 'Warehouse' as zmerp_entity_name ) as UsedInEntity
+  key WarehouseCode                                    as WarehouseCode,
+  key DocumentUUID                                     as DocumentUUID,
+  key cast( bintohex( DocumentUUID ) as abap.char(40) ) as RefEntityKey,
+  key cast( 'Purchase Order' as zmerp_entity_name )    as UsedInEntity
 }
-where 1 = 0 //Dummy
+where WarehouseCode is not initial
