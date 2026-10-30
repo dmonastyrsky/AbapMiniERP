@@ -76,13 +76,15 @@ annotate view ZMERP_C_PURCHASEORDER with
   DocumentUUID;
 
   @UI.identification: [
-    { type: #FOR_ACTION, dataAction: 'releaseDocument', label: 'Release', position: 10 },
-    { type: #FOR_ACTION, dataAction: 'cancelDocument',  label: 'Cancel',  position: 20 }
+    { type: #FOR_ACTION, dataAction: 'releaseDocument',         label: 'Release',        position: 10 },
+    { type: #FOR_ACTION, dataAction: 'setInDeliveryDocument',   label: 'Delivery', position: 15 },
+    { type: #FOR_ACTION, dataAction: 'cancelDocument',          label: 'Cancel',         position: 20 }
   ]
   @UI.lineItem: [
     { position: 10, importance: #HIGH },
-    { type: #FOR_ACTION, dataAction: 'releaseDocument', label: 'Release' },
-    { type: #FOR_ACTION, dataAction: 'cancelDocument',  label: 'Cancel' }
+    { type: #FOR_ACTION, dataAction: 'releaseDocument',         label: 'Release' },
+    { type: #FOR_ACTION, dataAction: 'setInDeliveryDocument',   label: 'Delivery' },
+    { type: #FOR_ACTION, dataAction: 'cancelDocument',          label: 'Cancel' }
   ]
   @UI.selectionField: [{ position: 10 }]
   DocumentNumber;

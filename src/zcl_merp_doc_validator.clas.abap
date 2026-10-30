@@ -33,11 +33,11 @@ CLASS zcl_merp_doc_validator DEFINITION
 
     "! Validates if the logistical Delivery Date correctly follows the Document Date.
     "! @parameter iv_doc_date  | Document date anchor
-    "! @parameter iv_del_date  | Logistical delivery date to be validated
+    "! @parameter iv_deliv_date  | Logistical delivery date to be validated
     "! @parameter rv_is_valid  | Returns abap_true if valid, otherwise abap_false
     CLASS-METHODS is_delivery_date_valid
       IMPORTING iv_doc_date       TYPE zmerp_doc_date
-                iv_del_date       TYPE zmerp_delivery_date
+                iv_deliv_date       TYPE zmerp_delivery_date
       RETURNING VALUE(rv_is_valid) TYPE abap_bool.
 
     "! Validates if the specific business partner is flagged as a supplier.
@@ -94,7 +94,7 @@ CLASS zcl_merp_doc_validator IMPLEMENTATION.
 
   METHOD is_delivery_date_valid.
     " Supply Chain constraint: Goods cannot be requested for delivery before the order exists
-    rv_is_valid = xsdbool( iv_del_date >= iv_doc_date ).
+    rv_is_valid = xsdbool( iv_deliv_date >= iv_doc_date ).
   ENDMETHOD.
 
   METHOD is_pur_partner_supplier.

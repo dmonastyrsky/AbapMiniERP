@@ -9,14 +9,7 @@ CLASS lhc_zmerp_r_purchaseorder DEFINITION INHERITING FROM cl_abap_behavior_hand
       c_val_currency       TYPE string VALUE 'VALIDATE_CURRENCY',
       c_val_doc_date       TYPE string VALUE 'VALIDATE_DOC_DATE',
       c_val_post_date      TYPE string VALUE 'VALIDATE_POST_DATE',
-      c_val_deliv_date     TYPE string VALUE 'VALIDATE_DELIV_DATE',
-
-      " Purchase order lifecycle statuses
-      c_status_new         TYPE zmerp_po_status VALUE 'N',
-      c_status_approved    TYPE zmerp_po_status VALUE 'A',
-      c_status_in_delivery TYPE zmerp_po_status VALUE 'P',
-      c_status_completed   TYPE zmerp_po_status VALUE 'C',
-      c_status_cancelled   TYPE zmerp_po_status VALUE 'X'.
+      c_val_deliv_date     TYPE string VALUE 'VALIDATE_DELIV_DATE'.
 
     "! Evaluates global authorizations for CUD operations.
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
@@ -39,6 +32,12 @@ CLASS lhc_zmerp_r_purchaseorder DEFINITION INHERITING FROM cl_abap_behavior_hand
     METHODS releaseDocument FOR MODIFY
       IMPORTING
         keys   FOR ACTION PurchaseOrder~releaseDocument
+      RESULT   result.
+
+    "! Moves the Purchase Order to 'In Delivery' and stores the delivery date entered by the user.
+    METHODS setInDeliveryDocument FOR MODIFY
+      IMPORTING
+        keys   FOR ACTION PurchaseOrder~setInDeliveryDocument
       RESULT   result.
 
     "! Cancels the Purchase Order.
@@ -126,20 +125,29 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Only saved (active) documents can be edited or processed; draft instances get no actions
+        " Only saved (active) documents can be edited or processed; draft instances get no actions
     result = VALUE #(
       FOR header IN lt_headers
-      LET lv_active = xsdbool( header-%is_draft = if_abap_behv=>mk-off )
-          lv_new    = xsdbool( header-Status = c_status_new )
-          lv_open   = xsdbool( header-Status = c_status_new OR header-Status = c_status_approved ) IN
+      LET lv_active   = xsdbool( header-%is_draft = if_abap_behv=>mk-off )
+          lv_edit     = xsdbool( lv_active = abap_true
+                             AND zcl_merp_doc_po_lifecycle=>can_edit( header-Status ) = abap_true )
+          lv_release  = xsdbool( lv_active = abap_true
+                             AND zcl_merp_doc_po_lifecycle=>can_release( header-Status ) = abap_true )
+          lv_delivery = xsdbool( lv_active = abap_true
+                             AND zcl_merp_doc_po_lifecycle=>can_set_in_delivery( header-Status ) = abap_true )
+          lv_cancel   = xsdbool( lv_active = abap_true
+                             AND zcl_merp_doc_po_lifecycle=>can_cancel( header-Status ) = abap_true ) IN
       ( %tky                    = header-%tky
-        %action-Edit            = COND #( WHEN lv_active = abap_true AND lv_new = abap_true
+        %action-Edit            = COND #( WHEN lv_edit = abap_true
                                           THEN if_abap_behv=>fc-o-enabled
                                           ELSE if_abap_behv=>fc-o-disabled )
-        %action-releaseDocument = COND #( WHEN lv_active = abap_true AND lv_new = abap_true
+        %action-releaseDocument = COND #( WHEN lv_release = abap_true
                                           THEN if_abap_behv=>fc-o-enabled
                                           ELSE if_abap_behv=>fc-o-disabled )
-        %action-cancelDocument  = COND #( WHEN lv_active = abap_true AND lv_open = abap_true
+        %action-setInDeliveryDocument   = COND #( WHEN lv_delivery = abap_true
+                                          THEN if_abap_behv=>fc-o-enabled
+                                          ELSE if_abap_behv=>fc-o-disabled )
+        %action-cancelDocument  = COND #( WHEN lv_cancel = abap_true
                                           THEN if_abap_behv=>fc-o-enabled
                                           ELSE if_abap_behv=>fc-o-disabled ) )
     ).
@@ -403,7 +411,9 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       " 3. Delivery Date Validations
       IF lr_header->DeliveryDate IS NOT INITIAL.
         " Past delivery date check holds only for active validation during New status creation phase
-        IF lr_header->Status = c_status_new AND lr_header->DeliveryDate < lv_today.
+        IF zcl_merp_doc_po_lifecycle=>is_delivery_date_actual( iv_status    = lr_header->Status
+                                                           iv_delivery_date = lr_header->DeliveryDate
+                                                           iv_today         = lv_today ) = abap_false.
           lv_has_error = abap_true.
           APPEND VALUE #(
             %tky                  = lr_header->%tky
@@ -418,7 +428,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         " Validate chronology between core document date and logistical delivery date
         IF lr_header->DocumentDate IS NOT INITIAL
            AND zcl_merp_doc_validator=>is_delivery_date_valid( iv_doc_date = lr_header->DocumentDate
-                                                               iv_del_date = lr_header->DeliveryDate ) = abap_false.
+                                                               iv_deliv_date = lr_header->DeliveryDate ) = abap_false.
           lv_has_error = abap_true.
           APPEND VALUE #(
             %tky                  = lr_header->%tky
@@ -501,15 +511,15 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         APPEND VALUE #( %tky = lr_header->%tky %state_area = c_val_post_date ) TO reported-purchaseorder.
       ENDIF.
 
-      " 3. Clear Delivery Date message area
+            " 3. Clear Delivery Date message area
       IF lr_header->DeliveryDate IS NOT INITIAL AND lr_header->DocumentDate IS NOT INITIAL.
-        DATA(lv_del_valid) = zcl_merp_doc_validator=>is_delivery_date_valid( iv_doc_date = lr_header->DocumentDate
-                                                                             iv_del_date = lr_header->DeliveryDate ).
+        DATA(lv_del_valid) = zcl_merp_doc_validator=>is_delivery_date_valid( iv_doc_date   = lr_header->DocumentDate
+                                                                             iv_deliv_date = lr_header->DeliveryDate ).
 
         IF lv_del_valid = abap_true.
-          IF lr_header->Status = c_status_new AND lr_header->DeliveryDate < lv_today.
-            lv_del_valid = abap_false.
-          ENDIF.
+          lv_del_valid = zcl_merp_doc_po_lifecycle=>is_delivery_date_actual( iv_status        = lr_header->Status
+                                                                         iv_delivery_date = lr_header->DeliveryDate
+                                                                         iv_today         = lv_today ).
         ENDIF.
 
         IF lv_del_valid = abap_true.
@@ -539,7 +549,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       CLEAR lo_message.
 
       " Document must be in 'New' status to be released
-      IF lr_header->Status <> c_status_new.
+      IF zcl_merp_doc_po_lifecycle=>can_release( lr_header->Status ) = abap_false.
         lo_message = NEW #( textid   = zcx_merp_pur=>release_not_allowed
                             severity = if_abap_behv_message=>severity-error
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
@@ -560,7 +570,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
                         %action-releaseDocument = if_abap_behv=>mk-on ) TO reported-purchaseorder.
       ELSE.
         APPEND VALUE #( %tky   = lr_header->%tky
-                        Status = c_status_approved ) TO lt_update.
+                        Status = zcl_merp_doc_po_lifecycle=>c_status_approved ) TO lt_update.
       ENDIF.
     ENDLOOP.
 
@@ -569,6 +579,92 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrder
         UPDATE FIELDS ( Status )
+        WITH lt_update
+        FAILED DATA(lt_mod_failed)
+        REPORTED DATA(lt_mod_reported).
+
+      " Forward buffer failure exceptions directly to the UI layer
+      IF lt_mod_failed IS NOT INITIAL.
+        failed-purchaseorder   = CORRESPONDING #( BASE ( failed-purchaseorder ) lt_mod_failed-purchaseorder ).
+        reported-purchaseorder = CORRESPONDING #( BASE ( reported-purchaseorder ) lt_mod_reported-purchaseorder ).
+        RETURN.
+      ENDIF.
+    ENDIF.
+
+    " Read the latest state from buffer to return requested action parameters
+    READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
+      ENTITY PurchaseOrder
+      ALL FIELDS
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_result).
+
+    result = VALUE #( FOR header IN lt_result ( %tky = header-%tky %param = header ) ).
+  ENDMETHOD.
+
+  METHOD setInDeliveryDocument.
+    DATA lt_update        TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
+    DATA lo_message       TYPE REF TO zcx_merp_pur.
+    DATA lv_delivery_date TYPE zmerp_delivery_date.
+
+    " Bulk read headers to check current status and the baseline document date
+    READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
+      ENTITY PurchaseOrder
+      FIELDS ( Status DocumentNumber DocumentDate )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_headers).
+
+    LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
+      CLEAR: lo_message, lv_delivery_date.
+
+      " Delivery date entered by the user in the action dialog
+      ASSIGN keys[ %tky = lr_header->%tky ] TO FIELD-SYMBOL(<ls_key>).
+      IF sy-subrc = 0.
+        lv_delivery_date = <ls_key>-%param-DeliveryDate.
+      ENDIF.
+
+      " If the user left the date empty, the date already stored in the document is used
+      IF lv_delivery_date IS INITIAL.
+        lv_delivery_date = lr_header->DeliveryDate.
+      ENDIF.
+
+      " Only Approved documents can be moved to delivery
+      IF zcl_merp_doc_po_lifecycle=>can_set_in_delivery( lr_header->Status ) = abap_false.
+        lo_message = NEW #( textid   = zcx_merp_pur=>set_delivery_not_allowed
+                            severity = if_abap_behv_message=>severity-error
+                            attr1    = CONV #( lr_header->DocumentNumber ) ).
+
+      " Delivery date is mandatory
+      ELSEIF lv_delivery_date IS INITIAL.
+        lo_message = NEW #( textid   = zcx_merp_pur=>enter_delivery_date
+                            severity = if_abap_behv_message=>severity-error ).
+
+      " Delivery date must not precede the document date
+      ELSEIF zcl_merp_doc_validator=>is_delivery_date_valid( iv_doc_date   = lr_header->DocumentDate
+                                                             iv_deliv_date = lv_delivery_date ) = abap_false.
+        lo_message = NEW #( textid   = zcx_merp_pur=>delivery_date_before_doc_date
+                            severity = if_abap_behv_message=>severity-error ).
+      ENDIF.
+
+      " Handle validation results
+      IF lo_message IS BOUND.
+        APPEND VALUE #( %tky        = lr_header->%tky
+                        %fail-cause = if_abap_behv=>cause-conflict ) TO failed-purchaseorder.
+
+        APPEND VALUE #( %tky                  = lr_header->%tky
+                        %msg                  = lo_message
+                        %action-setInDeliveryDocument = if_abap_behv=>mk-on ) TO reported-purchaseorder.
+      ELSE.
+        APPEND VALUE #( %tky         = lr_header->%tky
+                        Status       = zcl_merp_doc_po_lifecycle=>c_status_in_delivery
+                        DeliveryDate = lv_delivery_date ) TO lt_update.
+      ENDIF.
+    ENDLOOP.
+
+    " Perform bulk update for successful documents in transactional buffer
+    IF lt_update IS NOT INITIAL.
+      MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
+        ENTITY PurchaseOrder
+        UPDATE FIELDS ( Status DeliveryDate )
         WITH lt_update
         FAILED DATA(lt_mod_failed)
         REPORTED DATA(lt_mod_reported).
@@ -606,7 +702,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       CLEAR lo_message.
 
       " Only New or Approved documents can be cancelled
-      IF lr_header->Status <> c_status_new AND lr_header->Status <> c_status_approved.
+      IF zcl_merp_doc_po_lifecycle=>can_cancel( lr_header->Status ) = abap_false.
         lo_message = NEW #( textid   = zcx_merp_pur=>cancel_not_allowed
                             severity = if_abap_behv_message=>severity-error
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
@@ -622,7 +718,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
                         %action-cancelDocument = if_abap_behv=>mk-on ) TO reported-purchaseorder.
       ELSE.
         APPEND VALUE #( %tky   = lr_header->%tky
-                        Status = c_status_cancelled ) TO lt_update.
+                        Status = zcl_merp_doc_po_lifecycle=>c_status_cancelled ) TO lt_update.
       ENDIF.
     ENDLOOP.
 
@@ -681,11 +777,11 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ENDIF.
 
       IF ls_header-Status IS INITIAL.
-        ls_header-Status = c_status_new.
+        ls_header-Status = zcl_merp_doc_po_lifecycle=>c_status_new.
       ENDIF.
 
       " Collect changes only if fields were actually initialized
-      If ls_header <> lr_header->*.
+      IF ls_header <> lr_header->*.
         APPEND CORRESPONDING #( ls_header ) TO lt_header_update.
       ENDIF.
     ENDLOOP.
@@ -794,7 +890,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         " Automatically align delivery date if it violates the chronological rules
         IF ls_header-DeliveryDate IS NOT INITIAL
            AND zcl_merp_doc_validator=>is_delivery_date_valid( iv_doc_date = ls_header-DocumentDate
-                                                               iv_del_date = ls_header-DeliveryDate ) = abap_false.
+                                                               iv_deliv_date = ls_header-DeliveryDate ) = abap_false.
           ls_header-DeliveryDate = ls_header-DocumentDate.
         ENDIF.
       ENDIF.
@@ -983,7 +1079,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       lv_failed_added = abap_false.
 
       " Lifecycle status check: allow deletion only for new or cancelled documents
-      IF lr_hdr->Status <> c_status_new AND lr_hdr->Status <> c_status_cancelled.
+      IF zcl_merp_doc_po_lifecycle=>can_delete( lr_hdr->Status ) = abap_false.
         APPEND VALUE #(
           %tky        = lr_hdr->%tky
           %fail-cause = if_abap_behv=>cause-conflict
@@ -1589,16 +1685,9 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Collect unique VAT codes to optimize cross-entity selection
-    DATA(lt_vat_keys) = VALUE zif_merp_md_vat_rate_sel=>tt_vat_rate_keys(
-      FOR item IN lt_items WHERE ( VatCode IS NOT INITIAL )
-      ( VatCode = item-VatCode )
-    ).
-
-    " Bulk select VAT percentages via the Master Data Selector interface
-    DATA(lt_vat_rates) = COND #(
-      WHEN lt_vat_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates( lt_vat_keys ) ).
+    " Bulk select VAT percentages
+    DATA(lt_vat_rates) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates(
+      VALUE #( FOR item IN lt_items ( VatCode = item-VatCode ) ) ).
 
     DATA lt_items_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder\\PurchaseOrderItem.
 
@@ -1652,16 +1741,9 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Collect unique VAT codes for optimized batch retrieval
-    DATA(lt_vat_keys) = VALUE zif_merp_md_vat_rate_sel=>tt_vat_rate_keys(
-      FOR item IN lt_items WHERE ( VatCode IS NOT INITIAL )
-      ( VatCode = item-VatCode )
-    ).
-
-    " Select updated rates from Master Data Selector
-    DATA(lt_vat_rates) = COND #(
-      WHEN lt_vat_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates( lt_vat_keys ) ).
+    " Bulk select VAT percentages
+    DATA(lt_vat_rates) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates(
+      VALUE #( FOR item IN lt_items ( VatCode = item-VatCode ) ) ).
 
     DATA lt_items_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder\\PurchaseOrderItem.
 

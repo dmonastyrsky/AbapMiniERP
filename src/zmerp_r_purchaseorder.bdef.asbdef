@@ -27,6 +27,7 @@ authorization master ( global )
   field ( mandatory ) CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode, DocumentDate;
 
   action ( features : instance ) releaseDocument result [1] $self;
+  action ( features : instance ) setInDeliveryDocument parameter ZMERP_A_DOC_PO_SET_IN_DELIVERY result [1] $self;
   action ( features : instance ) cancelDocument result [1] $self;
 
   determination setHeaderDefaults        on modify { create; }

@@ -44,6 +44,24 @@ CLASS zcx_merp_pur DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF delivery_date_before_doc_date,
 
+      BEGIN OF enter_delivery_date,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '055',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF enter_delivery_date,
+
+      BEGIN OF set_delivery_not_allowed,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '111',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF set_delivery_not_allowed,
+
       " --- Dependency Checks ---
       BEGIN OF purchase_order_in_use,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',

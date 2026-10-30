@@ -89,6 +89,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>055</MSGNR>
+     <TEXT>Enter a delivery date.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>100</MSGNR>
      <TEXT>Quantity must be greater than zero.</TEXT>
     </T100>
@@ -151,6 +157,12 @@
      <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>110</MSGNR>
      <TEXT>Warehouse &amp;1 does not belong to Company Code &amp;2.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>111</MSGNR>
+     <TEXT>Purchase order &amp;1 cannot be set to &apos;In Delivery&apos;: only approved documents</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>

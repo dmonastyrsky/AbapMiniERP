@@ -267,21 +267,30 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
         company_code   = '1000' )
 
       ( warehouse_code = zcl_merp_format_util=>format_warehouse_code( 5 )
-        warehouse_name = 'Hauptlager Hamburg'
-        company_code   = '2000' )
-
-      ( warehouse_code = zcl_merp_format_util=>format_warehouse_code( 6 )
-        warehouse_name = 'Lager München'
-        company_code   = '2000' )
-
-      ( warehouse_code = zcl_merp_format_util=>format_warehouse_code( 7 )
-        warehouse_name = 'Transitlager Hamburg'
-        company_code   = '2000' )
-
-      ( warehouse_code = zcl_merp_format_util=>format_warehouse_code( 8 )
         warehouse_name = 'Altlager Frankfurt'
         company_code   = '1000'
         is_blocked     = abap_true )
+
+      ( warehouse_code = zcl_merp_format_util=>format_warehouse_code( 6 )
+        warehouse_name = 'Hauptlager Hamburg'
+        company_code   = '2000' )
+
+      ( warehouse_code = zcl_merp_format_util=>format_warehouse_code( 7 )
+        warehouse_name = 'Lager München'
+        company_code   = '2000' )
+
+      ( warehouse_code = zcl_merp_format_util=>format_warehouse_code( 8 )
+        warehouse_name = 'Transitlager Hamburg'
+        company_code   = '2000' )
+
+      ( warehouse_code = zcl_merp_format_util=>format_warehouse_code( 9 )
+        warehouse_name = 'Hauptlager Kusel'
+        company_code   = '3000' )
+
+      ( warehouse_code = zcl_merp_format_util=>format_warehouse_code( 10 )
+        warehouse_name = 'Lager Kaiserslautern'
+        company_code   = '3000' )
+
     ).
 
     fill_audit_fields( CHANGING ct_data = lt_warehouses ).
@@ -863,7 +872,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       document_date         = lv_today
       posting_date          = lv_today
       company_code          = '2000'
-      warehouse_code        = zcl_merp_format_util=>format_warehouse_code( 5 )
+      warehouse_code        = zcl_merp_format_util=>format_warehouse_code( 6 )
       business_partner_code = zcl_merp_format_util=>format_bp_code( 2 )
       currency_code         = 'EUR'
       total_net_amount      = ls_tot3-total_net_amount
@@ -910,8 +919,8 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     document_date         = lv_today
     posting_date          = lv_today
     company_code          = '3000'
-    warehouse_code        = zcl_merp_format_util=>format_warehouse_code( 1 )
-    business_partner_code = zcl_merp_format_util=>format_bp_code( 4 )
+    warehouse_code        = zcl_merp_format_util=>format_warehouse_code( 4 )
+    business_partner_code = zcl_merp_format_util=>format_bp_code( 9 )
     currency_code         = 'EUR'
     total_net_amount      = ls_tot4-total_net_amount
     total_gross_amount    = ls_tot4-total_gross_amount

@@ -13,6 +13,7 @@ use etag
   use delete;
 
   use action releaseDocument;
+  use action setInDeliveryDocument;
   use action cancelDocument;
 
   use action Edit;
