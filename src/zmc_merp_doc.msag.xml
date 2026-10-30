@@ -95,6 +95,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>056</MSGNR>
+     <TEXT>Select Purchase Order reference.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>100</MSGNR>
      <TEXT>Quantity must be greater than zero.</TEXT>
     </T100>
@@ -197,6 +203,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>135</MSGNR>
+     <TEXT>Posting of document &amp;1 is not allowed.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>150</MSGNR>
      <TEXT>Purchase Order &amp;1 is used in &amp;2.</TEXT>
     </T100>
@@ -217,6 +229,30 @@
      <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>153</MSGNR>
      <TEXT>Goods Issue &amp;1 is used in &amp;2.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>170</MSGNR>
+     <TEXT>Purchase Order &amp;1 does not exist.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>171</MSGNR>
+     <TEXT>Sales Order &amp;1 does not exist.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>172</MSGNR>
+     <TEXT>Goods Receipt &amp;1 does not exist.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>173</MSGNR>
+     <TEXT>Goods Issue &amp;1 does not exist.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>

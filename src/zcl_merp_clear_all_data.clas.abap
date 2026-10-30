@@ -80,18 +80,32 @@ CLASS zcl_merp_clear_all_data IMPLEMENTATION.
       iv_draft_tab  = CONV tabname( zif_merp_constants=>c_comp-table_draft )
       out           = out ).
 
-    " Clear Transactional Document (Purchase Order) and its Draft table
+    " Clear Transactional Document (Purchase Order Items) and its Draft table
     clear_entity(
       iv_label      = 'Purchase Order Items'
       iv_active_tab = CONV tabname( zif_merp_constants=>c_po_itm-table_db )
       iv_draft_tab  = CONV tabname( zif_merp_constants=>c_po_itm-table_draft )
       out           = out ).
 
-    " Clear Transactional Document (Purchase Order) and its Draft table
+    " Clear Transactional Document (Purchase Order Header) and its Draft table
     clear_entity(
       iv_label      = 'Purchase Order Header'
       iv_active_tab = CONV tabname( zif_merp_constants=>c_po-table_db )
       iv_draft_tab  = CONV tabname( zif_merp_constants=>c_po-table_draft )
+      out           = out ).
+
+    " Clear Transactional Document (Goods Receipt Items) and its Draft table
+    clear_entity(
+      iv_label      = 'Goods Receipt Items'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_gr_itm-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_gr_itm-table_draft )
+      out           = out ).
+
+    " Clear Transactional Document (Goods Receipt Header) and its Draft table
+    clear_entity(
+      iv_label      = 'Goods Receipt Header'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_gr-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_gr-table_draft )
       out           = out ).
 
     " Resets all Master Data and Document NRO intervals back to level zero since all data is cleared
@@ -135,4 +149,3 @@ CLASS zcl_merp_clear_all_data IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 ENDCLASS.
-

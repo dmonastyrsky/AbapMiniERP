@@ -181,32 +181,18 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Bulk collect keys for cross-entity master data validation to eliminate DB roundtrips
-    DATA(lt_company_keys) = VALUE zif_merp_md_comp_code_sel=>tt_company_keys(
-      FOR header IN lt_headers WHERE ( CompanyCode IS NOT INITIAL )
-      ( CompanyCode = header-CompanyCode )
-    ).
-    DATA(lt_bp_keys) = VALUE zif_merp_md_bus_partner_sel=>tt_partner_keys(
-      FOR header IN lt_headers WHERE ( BusinessPartnerCode IS NOT INITIAL )
-      ( PartnerCode = header-BusinessPartnerCode )
-    ).
-    DATA(lt_warehouse_keys) = VALUE zif_merp_md_warehouse_sel=>tt_warehouse_keys(
-      FOR header IN lt_headers WHERE ( WarehouseCode IS NOT INITIAL )
-      ( WarehouseCode = header-WarehouseCode )
-    ).
-
     " Execute optimized bulk selection via Master Data Selector interface regardless of user restrictions
-    DATA(lt_companies) = COND #(
-      WHEN lt_company_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies( lt_company_keys ) ).
+    DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
+      VALUE #( FOR header IN lt_headers ( CompanyCode = header-CompanyCode ) )
+    ).
 
-    DATA(lt_partners) = COND #(
-      WHEN lt_bp_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_bus_partner_sel( )->zif_merp_md_bus_partner_sel~read_partners( lt_bp_keys ) ).
+    DATA(lt_partners) = NEW zcl_merp_md_bus_partner_sel( )->zif_merp_md_bus_partner_sel~read_partners(
+      VALUE #( FOR header IN lt_headers ( PartnerCode = header-BusinessPartnerCode ) )
+    ).
 
-    DATA(lt_warehouses) = COND #(
-      WHEN lt_warehouse_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_warehouse_sel( )->zif_merp_md_warehouse_sel~read_warehouses( lt_warehouse_keys ) ).
+    DATA(lt_warehouses) = NEW zcl_merp_md_warehouse_sel( )->zif_merp_md_warehouse_sel~read_warehouses(
+      VALUE #( FOR header IN lt_headers ( WarehouseCode = header-WarehouseCode ) )
+    ).
 
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       lv_has_error = abap_false.
@@ -809,24 +795,14 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Collect master data keys for bulk read optimization
-    DATA(lt_company_keys) = VALUE zif_merp_md_comp_code_sel=>tt_company_keys(
-      FOR header IN lt_headers WHERE ( CompanyCode IS NOT INITIAL )
-      ( CompanyCode = header-CompanyCode )
-    ).
-    DATA(lt_warehouse_keys) = VALUE zif_merp_md_warehouse_sel=>tt_warehouse_keys(
-      FOR header IN lt_headers WHERE ( WarehouseCode IS NOT INITIAL )
-      ( WarehouseCode = header-WarehouseCode )
+    " Perform independent bulk master data selections directly via inline value generation
+    DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
+      VALUE #( FOR header IN lt_headers ( CompanyCode = header-CompanyCode ) )
     ).
 
-    " Perform independent bulk master data selections
-    DATA(lt_companies) = COND #(
-      WHEN lt_company_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies( lt_company_keys ) ).
-
-    DATA(lt_warehouses) = COND #(
-      WHEN lt_warehouse_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_warehouse_sel( )->zif_merp_md_warehouse_sel~read_warehouses( lt_warehouse_keys ) ).
+    DATA(lt_warehouses) = NEW zcl_merp_md_warehouse_sel( )->zif_merp_md_warehouse_sel~read_warehouses(
+      VALUE #( FOR header IN lt_headers ( WarehouseCode = header-WarehouseCode ) )
+    ).
 
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       DATA(ls_header) = lr_header->*.
@@ -991,7 +967,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       " Bulk allocation via NRO utility with company subobject context and exception capture
       CLEAR lt_codes.
       TRY.
-          lt_codes = zcl_merp_num_range_util=>get_next_po_codes_nro(
+          lt_codes = zcl_merp_num_range_util=>get_next_po_numbers_nro(
             iv_company_code = lr_company->CompanyCode
             iv_count        = lv_needed_count ).
         CATCH cx_number_ranges INTO lx_nro_error.
@@ -1123,6 +1099,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 "! Local behavior handler for Purchase Order Item child entity.
 CLASS lhc_zmerp_r_purchaseorderitm DEFINITION INHERITING FROM cl_abap_behavior_handler.
   PRIVATE SECTION.
@@ -1131,28 +1108,28 @@ CLASS lhc_zmerp_r_purchaseorderitm DEFINITION INHERITING FROM cl_abap_behavior_h
       c_val_quantity  TYPE string VALUE 'VALIDATE_QUANTITY',
       c_val_price     TYPE string VALUE 'VALIDATE_PRICE',
       c_val_uom       TYPE string VALUE 'VALIDATE_UOM',
-      c_val_vat_code  TYPE string VALUE 'VALIDATE_VAT_CODE',
-
-      c_item_no_step  TYPE i VALUE 10.
+      c_val_vat_code  TYPE string VALUE 'VALIDATE_VAT_CODE'.
 
     TYPES: BEGIN OF ty_header_key,
              document_uuid TYPE sysuuid_x16,
              is_draft      TYPE abp_behv_flag,
            END OF ty_header_key.
 
+    " Static buffer: filled in precheck_delete with the parents of the items being deleted
+    " and consumed (and cleared) by calcHeaderTotals within the same request
     CLASS-DATA gt_deleted_headers TYPE STANDARD TABLE OF ty_header_key WITH EMPTY KEY.
 
-    "! Recalculates total header net and gross amounts using ZCL_MERP_DOC_CALC.
+    "! Recalculates total header net and gross amounts (via ZCL_MERP_DOC_CALC) when items are created, changed or deleted.
     METHODS calcHeaderTotals FOR DETERMINE ON MODIFY
       IMPORTING
         keys FOR PurchaseOrderItem~calcHeaderTotals.
 
-    "! Calculates net, VAT, and gross amounts for the item using ZCL_MERP_DOC_CALC.
+    "! Recalculates net, VAT and gross amounts of the item when quantity or price changes (via ZCL_MERP_DOC_CALC).
     METHODS calcAmountsOnQtyPrice FOR DETERMINE ON MODIFY
       IMPORTING
         keys FOR PurchaseOrderItem~calcAmountsOnQtyPrice.
 
-    "! Calculates net, VAT, and gross amounts for the item using ZCL_MERP_DOC_CALC.
+    "! Recalculates VAT and gross amounts of the item when the VAT code changes; the net amount stays (via ZCL_MERP_DOC_CALC).
     METHODS calcAmountsOnVatCode FOR DETERMINE ON MODIFY
       IMPORTING
         keys FOR PurchaseOrderItem~calcAmountsOnVatCode.
@@ -1162,22 +1139,24 @@ CLASS lhc_zmerp_r_purchaseorderitm DEFINITION INHERITING FROM cl_abap_behavior_h
       IMPORTING
         keys FOR PurchaseOrderItem~setItemDefaults.
 
-    "! Validates mandatory item fields, prices, and quantities before saving.
+    "! Validates item fields before saving: mandatory values, existence of item and VAT code in master data,
+    "! duplicate item codes, positive quantity and price.
     METHODS validateItemFields FOR VALIDATE ON SAVE
       IMPORTING
         keys FOR PurchaseOrderItem~validateItemFields.
 
-    "! Handles validation messages for item fields that have been filled/corrected on the fly.
+    "! Re-evaluates duplicate item code messages for ALL items of the document when an item code changes.
     METHODS handleMessagesOnItemModify FOR DETERMINE ON MODIFY
       IMPORTING
         keys FOR PurchaseOrderItem~handleMessagesOnItemModify.
 
-    "! Clears validation messages for item fields that have been filled/corrected on the fly.
+    "! Clears validation messages of quantity, price, unit of measure and VAT code once the values are valid/filled.
     METHODS clearMessagesForItemFields FOR DETERMINE ON MODIFY
       IMPORTING
         keys FOR PurchaseOrderItem~clearMessagesForItemFields.
 
-    "! Pre-checks for dependencies and lifecycle status before allowing deletion of a Purchase Order Item.
+    "! Remembers the parent documents of the items being deleted, so that calcHeaderTotals
+    "! can still recalculate their totals after the deletion.
     METHODS precheck_delete FOR PRECHECK
       keys FOR DELETE PurchaseOrderItem.
 
@@ -1200,7 +1179,6 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
     ENDIF.
 
     " Clear previous validation messages for individual field state areas to prevent duplicate errors in UI
-    " (done after the READ, because %path requires HeaderUUID which is not part of the keys)
     DATA(lt_state_areas) = VALUE string_table(
       ( c_val_item_code )
       ( c_val_quantity )
@@ -1239,27 +1217,14 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       CORRESPONDING zcl_merp_doc_validator=>tt_item_fields( lt_all_document_items )
     ).
 
-    " Bulk collect item master data keys for cross-entity business validation
-    DATA(lt_item_keys) = VALUE zif_merp_md_item_sel=>tt_item_keys(
-      FOR item IN lt_items WHERE ( ItemCode IS NOT INITIAL )
-      ( ItemCode = item-ItemCode )
+    " Execute optimized bulk selections via Master Data Selector interfaces directly inline
+    DATA(lt_items_master) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items(
+      VALUE #( FOR item IN lt_items ( ItemCode = item-ItemCode ) )
     ).
 
-    " Bulk collect VAT rate master data keys for cross-entity business validation
-    DATA(lt_vat_keys) = VALUE zif_merp_md_vat_rate_sel=>tt_vat_rate_keys(
-      FOR item IN lt_items WHERE ( VatCode IS NOT INITIAL )
-      ( VatCode = item-VatCode )
+    DATA(lt_vat_rates) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates(
+      VALUE #( FOR item IN lt_items ( VatCode = item-VatCode ) )
     ).
-
-    " Execute optimized bulk selections via Master Data Selector interfaces
-    DATA(lt_items_master) = COND #(
-      WHEN lt_item_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items( lt_item_keys ) ).
-
-    " Execute optimized bulk selections via VAT Rate Master Data Selector interface
-    DATA(lt_vat_rates) = COND #(
-      WHEN lt_vat_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates( lt_vat_keys ) ).
 
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       lv_has_error = abap_false.
@@ -1292,7 +1257,6 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         ) TO reported-purchaseorderitem.
       ELSEIF line_exists( lt_duplicates[ HeaderUUID = lr_item->HeaderUUID
                                          ItemCode   = lr_item->ItemCode ] ).
-        " High-performance business validation: Catch duplicates under the same field state area
         lv_has_error = abap_true.
         APPEND VALUE #(
           %tky              = lr_item->%tky
@@ -1514,14 +1478,15 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD calcHeaderTotals.
-    " Read parent headers of the changed (or deleted) items
+    METHOD calcHeaderTotals.
+    " Read parent headers of the created/changed items (deleted items can no longer be read)
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrderItem BY \_PurchaseOrder
       FIELDS ( DocumentUUID )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_headers).
 
+    " Add parents of the items deleted in this request (collected in precheck_delete)
     LOOP AT gt_deleted_headers REFERENCE INTO DATA(lr_deleted).
       APPEND VALUE #( DocumentUUID = lr_deleted->document_uuid
                       %is_draft    = lr_deleted->is_draft ) TO lt_headers.
@@ -1536,36 +1501,36 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
     SORT lt_headers BY DocumentUUID %is_draft.
     DELETE ADJACENT DUPLICATES FROM lt_headers COMPARING DocumentUUID %is_draft.
 
-    " Read all items of those headers in one call to pass into the calculation class
+    " Read all items of those headers in one call to pass into the shared item logic
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder BY \_Items
       FIELDS ( HeaderUUID NetAmount VatAmount GrossAmount ) " Fetch all calculated financial components
       WITH CORRESPONDING #( lt_headers )
       RESULT DATA(lt_items).
 
+    " Delegate the summation to the shared item logic (same for all documents)
+    DATA(lt_totals) = NEW zcl_merp_doc_item_logic( )->calc_header_totals(
+      it_header_keys = VALUE #( FOR header IN lt_headers
+                                ( HeaderUUID = header-DocumentUUID
+                                  IsDraft    = header-%is_draft ) )
+      it_items       = CORRESPONDING #( lt_items MAPPING IsDraft = %is_draft ) ).
+
     DATA lt_po_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
 
-    LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
-      " Extract the exact item amount structures belonging to the current header document context (UUID + Draft status)
-      DATA(lt_target_amounts) = VALUE zcl_merp_doc_calc=>tt_item_amounts(
-        FOR item IN lt_items WHERE ( HeaderUUID = lr_header->DocumentUUID
-                                     AND %is_draft  = lr_header->%is_draft )
-        ( net_amount   = item-NetAmount
-          vat_amount   = item-VatAmount
-          gross_amount = item-GrossAmount )
-      ).
+    " Pack the calculated totals directly into the transactional modification buffer
+    LOOP AT lt_totals REFERENCE INTO DATA(lr_total).
+      ASSIGN lt_headers[ DocumentUUID = lr_total->HeaderUUID
+                         %is_draft    = lr_total->IsDraft ] TO FIELD-SYMBOL(<ls_header>).
 
-      " Delegate execution to the pure business logic class that knows the calculation sequence
-      DATA(ls_totals) = zcl_merp_doc_calc=>calculate_header_totals( lt_target_amounts ).
-
-      " Pack the calculated totals directly into the transactional modification buffer
-      APPEND VALUE #(
-        %tky                      = lr_header->%tky
-        TotalNetAmount            = ls_totals-total_net_amount
-        TotalGrossAmount          = ls_totals-total_gross_amount
-        %control-TotalNetAmount   = if_abap_behv=>mk-on
-        %control-TotalGrossAmount = if_abap_behv=>mk-on
-      ) TO lt_po_update.
+      IF sy-subrc = 0.
+        APPEND VALUE #(
+          %tky                      = <ls_header>-%tky
+          TotalNetAmount            = lr_total->TotalNetAmount
+          TotalGrossAmount          = lr_total->TotalGrossAmount
+          %control-TotalNetAmount   = if_abap_behv=>mk-on
+          %control-TotalGrossAmount = if_abap_behv=>mk-on
+        ) TO lt_po_update.
+      ENDIF.
     ENDLOOP.
 
     " Update header totals in the transactional buffer
@@ -1578,13 +1543,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setItemDefaults.
-    TYPES: BEGIN OF ty_counter,
-             header_uuid TYPE sysuuid_x16,
-             last_no     TYPE i,
-           END OF ty_counter.
-
-    DATA lt_counters TYPE HASHED TABLE OF ty_counter WITH UNIQUE KEY header_uuid.
-    DATA lt_update   TYPE TABLE FOR UPDATE zmerp_r_purchaseorder\\PurchaseOrderItem.
+    DATA lt_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder\\PurchaseOrderItem.
 
     " Items and their parent headers (document currency)
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
@@ -1608,60 +1567,26 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       WITH CORRESPONDING #( lt_headers )
       RESULT DATA(lt_siblings).
 
-    LOOP AT lt_siblings REFERENCE INTO DATA(lr_sibling).
-      ASSIGN lt_counters[ header_uuid = lr_sibling->HeaderUUID ] TO FIELD-SYMBOL(<counter>).
-      IF sy-subrc <> 0.
-        INSERT VALUE #( header_uuid = lr_sibling->HeaderUUID )
-          INTO TABLE lt_counters ASSIGNING <counter>.
-      ENDIF.
+    " Delegate the defaulting to the shared item logic (same for all documents), only changed items are returned
+    DATA(lt_changed) = NEW zcl_merp_doc_item_logic( )->set_defaults(
+      it_items             = CORRESPONDING #( lt_items MAPPING IsDraft = %is_draft )
+      it_siblings          = CORRESPONDING #( lt_siblings MAPPING IsDraft = %is_draft )
+      it_header_currencies = CORRESPONDING #( lt_headers MAPPING HeaderUUID = DocumentUUID
+                                                                 IsDraft    = %is_draft ) ).
 
-      IF lr_sibling->ItemNo > <counter>-last_no.
-        <counter>-last_no = lr_sibling->ItemNo.
-      ENDIF.
-    ENDLOOP.
+    " Map defaults back to the instances (UUID + draft state) of the transactional buffer
+    LOOP AT lt_changed REFERENCE INTO DATA(lr_changed).
+      ASSIGN lt_items[ ItemUUID  = lr_changed->ItemUUID
+                       %is_draft = lr_changed->IsDraft ] TO FIELD-SYMBOL(<ls_item>).
 
-    " Item master data for all selected item codes in one selector call
-    DATA(lt_item_keys) = VALUE zif_merp_md_item_sel=>tt_item_keys(
-      FOR item IN lt_items WHERE ( ItemCode IS NOT INITIAL )
-      ( ItemCode = item-ItemCode )
-    ).
-    DATA(lt_items_master) = COND #(
-      WHEN lt_item_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items( lt_item_keys ) ).
-
-    LOOP AT lt_items ASSIGNING FIELD-SYMBOL(<item>).
-      DATA(ls_item) = <item>.
-
-      " Next free item number within the document
-      IF ls_item-ItemNo IS INITIAL.
-        ASSIGN lt_counters[ header_uuid = ls_item-HeaderUUID ] TO <counter>.
-        IF sy-subrc = 0.
-          <counter>-last_no += c_item_no_step.
-          ls_item-ItemNo     = <counter>-last_no.
-        ENDIF.
-      ENDIF.
-
-      " Item currency follows the document currency
-      IF ls_item-CurrencyCode IS INITIAL.
-        ASSIGN lt_headers[ DocumentUUID = ls_item-HeaderUUID
-                           %is_draft    = ls_item-%is_draft ] TO FIELD-SYMBOL(<header>).
-        IF sy-subrc = 0.
-          ls_item-CurrencyCode = <header>-CurrencyCode.
-        ENDIF.
-      ENDIF.
-
-      " UoM and VAT code are unconditionally inherited from the item master data
-      IF ls_item-ItemCode IS NOT INITIAL.
-        ASSIGN lt_items_master[ ItemCode = ls_item-ItemCode ] TO FIELD-SYMBOL(<master>).
-        IF sy-subrc = 0.
-          ls_item-UnitOfMeasure = <master>-BaseUnitOfMeasure.
-          ls_item-VatCode       = <master>-DefaultVatCode.
-        ENDIF.
-      ENDIF.
-
-      " Update only instances that really changed
-      IF ls_item <> <item>.
-        APPEND CORRESPONDING #( ls_item ) TO lt_update.
+      IF sy-subrc = 0.
+        APPEND VALUE #(
+          %tky          = <ls_item>-%tky
+          ItemNo        = lr_changed->ItemNo
+          CurrencyCode  = lr_changed->CurrencyCode
+          UnitOfMeasure = lr_changed->UnitOfMeasure
+          VatCode       = lr_changed->VatCode
+        ) TO lt_update.
       ENDIF.
     ENDLOOP.
 
@@ -1685,34 +1610,23 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Bulk select VAT percentages
-    DATA(lt_vat_rates) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates(
-      VALUE #( FOR item IN lt_items ( VatCode = item-VatCode ) ) ).
+    " Delegate the recalculation to the shared item logic (same for all documents), only changed items are returned
+    DATA(lt_changed) = NEW zcl_merp_doc_item_logic( )->recalc_on_qty_price(
+      CORRESPONDING #( lt_items MAPPING IsDraft = %is_draft ) ).
 
     DATA lt_items_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder\\PurchaseOrderItem.
 
-    " Recalculate item amounts using pure business logic core
-    LOOP AT lt_items REFERENCE INTO DATA(lr_item).
-      ASSIGN lt_vat_rates[ VatCode = lr_item->VatCode ] TO FIELD-SYMBOL(<ls_vat>).
-      DATA(lv_percentage) = COND decfloat34( WHEN sy-subrc = 0 THEN <ls_vat>-percentage ELSE 0 ).
+    " Map recalculated amounts back to the instances (UUID + draft state) of the transactional buffer
+    LOOP AT lt_changed REFERENCE INTO DATA(lr_changed).
+      ASSIGN lt_items[ ItemUUID  = lr_changed->ItemUUID
+                       %is_draft = lr_changed->IsDraft ] TO FIELD-SYMBOL(<ls_item>).
 
-      " Quantity or price changed trigger event -> net -> VAT -> gross recalculation sequence
-      DATA(ls_calculated_amounts) = zcl_merp_doc_calc=>calc_on_qty_price_change(
-        iv_quantity       = lr_item->Quantity
-        iv_price          = lr_item->Price
-        iv_vat_percentage = lv_percentage
-      ).
-
-      " Prevent unnecessary roundtrips by checking if buffer values actually mutated
-      IF lr_item->NetAmount   <> ls_calculated_amounts-net_amount   OR
-         lr_item->VatAmount   <> ls_calculated_amounts-vat_amount   OR
-         lr_item->GrossAmount <> ls_calculated_amounts-gross_amount.
-
+      IF sy-subrc = 0.
         APPEND VALUE #(
-          %tky                = lr_item->%tky
-          NetAmount           = ls_calculated_amounts-net_amount
-          VatAmount           = ls_calculated_amounts-vat_amount
-          GrossAmount         = ls_calculated_amounts-gross_amount
+          %tky                 = <ls_item>-%tky
+          NetAmount            = lr_changed->NetAmount
+          VatAmount            = lr_changed->VatAmount
+          GrossAmount          = lr_changed->GrossAmount
           %control-NetAmount   = if_abap_behv=>mk-on
           %control-VatAmount   = if_abap_behv=>mk-on
           %control-GrossAmount = if_abap_behv=>mk-on
@@ -1741,36 +1655,22 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Bulk select VAT percentages
-    DATA(lt_vat_rates) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates(
-      VALUE #( FOR item IN lt_items ( VatCode = item-VatCode ) ) ).
+    " Delegate the recalculation to the shared item logic (same for all documents), only changed items are returned
+    DATA(lt_changed) = NEW zcl_merp_doc_item_logic( )->recalc_on_vat_code(
+      CORRESPONDING #( lt_items MAPPING IsDraft = %is_draft ) ).
 
     DATA lt_items_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder\\PurchaseOrderItem.
 
-    " Recalculate VAT and gross fields while net amount remains persistent
-    LOOP AT lt_items REFERENCE INTO DATA(lr_item).
-      ASSIGN lt_vat_rates[ VatCode = lr_item->VatCode ] TO FIELD-SYMBOL(<ls_vat>).
-      DATA(lv_percentage) = COND decfloat34( WHEN sy-subrc = 0 THEN <ls_vat>-percentage ELSE 0 ).
+    " Map recalculated amounts back to the instances (UUID + draft state) of the transactional buffer
+    LOOP AT lt_changed REFERENCE INTO DATA(lr_changed).
+      ASSIGN lt_items[ ItemUUID  = lr_changed->ItemUUID
+                       %is_draft = lr_changed->IsDraft ] TO FIELD-SYMBOL(<ls_item>).
 
-      DATA(ls_current_amounts) = VALUE zcl_merp_doc_calc=>ty_item_amounts(
-        net_amount   = lr_item->NetAmount
-        vat_amount   = lr_item->VatAmount
-        gross_amount = lr_item->GrossAmount
-      ).
-
-      " VAT rate changed trigger event -> VAT and gross calculation sequence
-      DATA(ls_calculated_amounts) = zcl_merp_doc_calc=>calc_on_vat_rate_change(
-        is_amounts        = ls_current_amounts
-        iv_vat_percentage = lv_percentage
-      ).
-
-      IF lr_item->VatAmount <> ls_calculated_amounts-vat_amount OR
-         lr_item->GrossAmount <> ls_calculated_amounts-gross_amount.
-
+      IF sy-subrc = 0.
         APPEND VALUE #(
-          %tky                = lr_item->%tky
-          VatAmount           = ls_calculated_amounts-vat_amount
-          GrossAmount         = ls_calculated_amounts-gross_amount
+          %tky                 = <ls_item>-%tky
+          VatAmount            = lr_changed->VatAmount
+          GrossAmount          = lr_changed->GrossAmount
           %control-VatAmount   = if_abap_behv=>mk-on
           %control-GrossAmount = if_abap_behv=>mk-on
         ) TO lt_items_update.

@@ -59,6 +59,17 @@ CLASS zcl_merp_num_range_util DEFINITION
       RAISING
         cx_number_ranges.
 
+    "! Generates the next sequential Goods Receipt number by searching maximum existing value for specified company code.
+    "! @parameter iv_company_code | Company code context
+    "! @parameter rv_gr_num       | Generated formatted Goods Receipt number string
+    CLASS-METHODS get_next_gr_number
+      IMPORTING
+        iv_company_code  TYPE zmerp_company_code
+      RETURNING
+        VALUE(rv_gr_num) TYPE zmerp_gr_hdr-document_number
+      RAISING
+        cx_number_ranges.
+
     " Standard NRO Generation
     "! Generates the next sequential Business Partner code using standard SAP Number Range Runtime API.
     "! @parameter rv_bp_code | Generated formatted Business Partner code string from NRO
@@ -108,6 +119,17 @@ CLASS zcl_merp_num_range_util DEFINITION
         iv_company_code  TYPE zmerp_company_code
       RETURNING
         VALUE(rv_po_num) TYPE zmerp_po_hdr-document_number
+      RAISING
+        cx_number_ranges.
+
+    "! Generates the next sequential Goods Receipt number using NRO API with company subobject.
+    "! @parameter iv_company_code | Company code context
+    "! @parameter rv_gr_num       | Generated formatted Goods Receipt number string
+    CLASS-METHODS get_next_gr_number_nro
+      IMPORTING
+        iv_company_code  TYPE zmerp_company_code
+      RETURNING
+        VALUE(rv_gr_num) TYPE zmerp_gr_hdr-document_number
       RAISING
         cx_number_ranges.
 
@@ -169,14 +191,27 @@ CLASS zcl_merp_num_range_util DEFINITION
 
     "! Generates multiple sequential Purchase Order numbers using NRO API with DB fallback.
     "! @parameter iv_company_code | Company code context
-    "! @parameter iv_count        | Total count of sequential codes requested
-    "! @parameter rt_codes        | Table of generated formatted Purchase Order numbers
-    CLASS-METHODS get_next_po_codes_nro
+    "! @parameter iv_count        | Total count of sequential numbers requested
+    "! @parameter rt_numbers      | Table of generated formatted Purchase Order numbers
+    CLASS-METHODS get_next_po_numbers_nro
       IMPORTING
         iv_company_code TYPE zmerp_company_code
         iv_count        TYPE i
       RETURNING
-        VALUE(rt_codes) TYPE string_table
+        VALUE(rt_numbers) TYPE string_table
+      RAISING
+        cx_number_ranges.
+
+    "! Generates multiple sequential Goods Receipt numbers using NRO API with DB fallback.
+    "! @parameter iv_company_code | Company code context
+    "! @parameter iv_count        | Total count of sequential numbers requested
+    "! @parameter rt_numbers      | Table of generated formatted Goods Receipt numbers
+    CLASS-METHODS get_next_gr_numbers_nro
+      IMPORTING
+        iv_company_code TYPE zmerp_company_code
+        iv_count        TYPE i
+      RETURNING
+        VALUE(rt_numbers) TYPE string_table
       RAISING
         cx_number_ranges.
 
@@ -208,6 +243,12 @@ CLASS zcl_merp_num_range_util DEFINITION
     "! Synchronizes Purchase Order NRO interval level for specified company code.
     "! @parameter iv_company_code | Company code context
     CLASS-METHODS sync_po_interval_from_db
+      IMPORTING
+        iv_company_code TYPE zmerp_company_code.
+
+    "! Synchronizes Goods Receipt NRO interval level for specified company code.
+    "! @parameter iv_company_code | Company code context
+    CLASS-METHODS sync_gr_interval_from_db
       IMPORTING
         iv_company_code TYPE zmerp_company_code.
 
@@ -254,6 +295,7 @@ CLASS zcl_merp_num_range_util DEFINITION
         VALUE(rt_codes)    TYPE string_table
       RAISING
         cx_number_ranges.
+
     "! Reads maximum numeric suffix from database for specific entity metadata.
     CLASS-METHODS get_max_level_from_db
       IMPORTING
@@ -301,6 +343,21 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
     rv_po_num = get_next_number(
       is_meta            = zif_merp_constants=>c_po
+      iv_company_code    = iv_company_code
+      iv_prefix_override = CONV #( lv_prefix ) ).
+  ENDMETHOD.
+
+
+  METHOD get_next_gr_number.
+    TRY.
+        DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
+        DATA(lv_prefix)  = ls_company-CompanyPrefix.
+      CATCH zcx_merp_md.
+        CLEAR lv_prefix.
+    ENDTRY.
+
+    rv_gr_num = get_next_number(
+      is_meta            = zif_merp_constants=>c_gr
       iv_company_code    = iv_company_code
       iv_prefix_override = CONV #( lv_prefix ) ).
   ENDMETHOD.
@@ -369,7 +426,27 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-    METHOD get_next_bp_codes_nro.
+
+  METHOD get_next_gr_number_nro.
+    TRY.
+        DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
+        DATA(lv_prefix)  = ls_company-CompanyPrefix.
+      CATCH zcx_merp_md.
+        CLEAR lv_prefix.
+    ENDTRY.
+
+    rv_gr_num = zcl_merp_nro_admin_util=>get_next_number_from_nro(
+      is_meta            = zif_merp_constants=>c_gr
+      iv_company_code    = iv_company_code
+      iv_prefix_override = CONV #( lv_prefix ) ).
+
+    IF rv_gr_num IS INITIAL.
+      rv_gr_num = get_next_gr_number( iv_company_code ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD get_next_bp_codes_nro.
     rt_codes = zcl_merp_nro_admin_util=>get_next_numbers_from_nro(
       is_meta  = zif_merp_constants=>c_bp
       iv_count = iv_count ).
@@ -434,7 +511,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD get_next_po_codes_nro.
+  METHOD get_next_po_numbers_nro.
     TRY.
         DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
         DATA(lv_prefix)  = ls_company-CompanyPrefix.
@@ -442,20 +519,45 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
         CLEAR lv_prefix.
     ENDTRY.
 
-    rt_codes = zcl_merp_nro_admin_util=>get_next_numbers_from_nro(
+    rt_numbers = zcl_merp_nro_admin_util=>get_next_numbers_from_nro(
       is_meta            = zif_merp_constants=>c_po
       iv_count           = iv_count
       iv_company_code    = iv_company_code
       iv_prefix_override = CONV #( lv_prefix ) ).
 
-    IF lines( rt_codes ) < iv_count.
-      rt_codes = get_next_numbers(
+    IF lines( rt_numbers ) < iv_count.
+      rt_numbers = get_next_numbers(
         is_meta            = zif_merp_constants=>c_po
         iv_count           = iv_count
         iv_company_code    = iv_company_code
         iv_prefix_override = CONV #( lv_prefix ) ).
     ENDIF.
   ENDMETHOD.
+
+
+  METHOD get_next_gr_numbers_nro.
+    TRY.
+        DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
+        DATA(lv_prefix)  = ls_company-CompanyPrefix.
+      CATCH zcx_merp_md.
+        CLEAR lv_prefix.
+    ENDTRY.
+
+    rt_numbers = zcl_merp_nro_admin_util=>get_next_numbers_from_nro(
+      is_meta            = zif_merp_constants=>c_gr
+      iv_count           = iv_count
+      iv_company_code    = iv_company_code
+      iv_prefix_override = CONV #( lv_prefix ) ).
+
+    IF lines( rt_numbers ) < iv_count.
+      rt_numbers = get_next_numbers(
+        is_meta            = zif_merp_constants=>c_gr
+        iv_count           = iv_count
+        iv_company_code    = iv_company_code
+        iv_prefix_override = CONV #( lv_prefix ) ).
+    ENDIF.
+  ENDMETHOD.
+
 
   METHOD sync_intervals_from_db.
     sync_master_intervals_from_db( ).
@@ -473,7 +575,6 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
 
   METHOD sync_doc_intervals_from_db.
-
     SELECT company_code
       FROM zmerp_comp_code
       WHERE is_blocked = @abap_false
@@ -481,6 +582,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
 
     LOOP AT lt_companies ASSIGNING FIELD-SYMBOL(<ls_company>).
       sync_po_interval_from_db( iv_company_code = <ls_company>-company_code ).
+      sync_gr_interval_from_db( iv_company_code = <ls_company>-company_code ).
     ENDLOOP.
   ENDMETHOD.
 
@@ -533,6 +635,24 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       iv_subobject = CONV #( iv_company_code )
       iv_level     = get_max_level_from_db(
                       is_meta            = zif_merp_constants=>c_po
+                      iv_company_code    = iv_company_code
+                      iv_prefix_override = CONV #( lv_prefix ) ) ).
+  ENDMETHOD.
+
+
+  METHOD sync_gr_interval_from_db.
+    TRY.
+        DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
+        DATA(lv_prefix)  = ls_company-CompanyPrefix.
+      CATCH zcx_merp_md.
+        CLEAR lv_prefix.
+    ENDTRY.
+
+    zcl_merp_nro_admin_util=>save_interval(
+      iv_object    = zif_merp_constants=>c_gr-number_object
+      iv_subobject = CONV #( iv_company_code )
+      iv_level     = get_max_level_from_db(
+                      is_meta            = zif_merp_constants=>c_gr
                       iv_company_code    = iv_company_code
                       iv_prefix_override = CONV #( lv_prefix ) ) ).
   ENDMETHOD.

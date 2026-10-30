@@ -122,7 +122,7 @@ CLASS zcl_merp_nro_admin_util IMPLEMENTATION.
           IMPORTING
             number      = lv_raw_number ).
 
-        DATA(lv_last_num) = CONV int8( lv_raw_number ).
+        DATA(lv_last_num)  = CONV int8( lv_raw_number ).
         DATA(lv_start_num) = lv_last_num - iv_count + 1.
 
         DO iv_count TIMES.
@@ -273,6 +273,7 @@ CLASS zcl_merp_nro_admin_util IMPLEMENTATION.
   METHOD get_doc_nro_objects.
     rt_objects = VALUE #(
       ( CONV string( zif_merp_constants=>c_po-number_object ) )
+      ( CONV string( zif_merp_constants=>c_gr-number_object ) )
     ).
   ENDMETHOD.
 

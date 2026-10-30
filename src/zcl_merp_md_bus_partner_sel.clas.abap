@@ -21,29 +21,22 @@ ENDCLASS.
 CLASS zcl_merp_md_bus_partner_sel IMPLEMENTATION.
 
   METHOD zif_merp_md_bus_partner_sel~read_partner.
-    IF iv_partner_code IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_merp_md
-        EXPORTING
-          textid   = zcx_merp_md=>business_partner_not_found
-          attr1    = CONV string( iv_partner_code )
-          severity = if_abap_behv_message=>severity-error.
-    ENDIF.
-
     DATA(lt_partners) = zif_merp_md_bus_partner_sel~read_partners(
       VALUE #( ( PartnerCode = iv_partner_code ) )
     ).
 
-    ASSIGN lt_partners[ PartnerCode = iv_partner_code ] TO FIELD-SYMBOL(<ls_detail>).
-    IF sy-subrc = 0.
-      rs_partner = <ls_detail>.
-    ELSE.
-      RAISE EXCEPTION TYPE zcx_merp_md
-        EXPORTING
-          textid   = zcx_merp_md=>business_partner_not_found
-          attr1    = CONV string( iv_partner_code )
-          severity = if_abap_behv_message=>severity-error.
-    ENDIF.
+    " An initial code is dropped by prepare_keys, so this one check also covers empty input
+    TRY.
+        rs_partner = lt_partners[ PartnerCode = iv_partner_code ].
+      CATCH cx_sy_itab_line_not_found.
+        RAISE EXCEPTION TYPE zcx_merp_md
+          EXPORTING
+            textid   = zcx_merp_md=>business_partner_not_found
+            attr1    = CONV string( iv_partner_code )
+            severity = if_abap_behv_message=>severity-error.
+    ENDTRY.
   ENDMETHOD.
+
 
   METHOD zif_merp_md_bus_partner_sel~read_partners.
     DATA(lt_clean_keys) = prepare_keys( it_partner_keys ).
@@ -51,25 +44,10 @@ CLASS zcl_merp_md_bus_partner_sel IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SELECT bp~PartnerCode,
-           bp~PartnerName,
-           bp~IsCustomer,
-           bp~IsSupplier,
-           bp~TaxNumber,
-           bp~Address,
-           bp~City,
-           bp~Country,
-           bp~Phone,
-           bp~Email,
-           bp~IsBlocked,
-           bp~CreatedBy,
-           bp~CreatedAt,
-           bp~LocalLastChangedBy,
-           bp~LocalLastChangedAt,
-           bp~LastChangedAt
-      FROM zmerp_r_bus_partner AS bp
+    SELECT FROM zmerp_r_bus_partner AS bp
       INNER JOIN @lt_clean_keys AS keys ON bp~PartnerCode = keys~PartnerCode
-      INTO CORRESPONDING FIELDS OF TABLE @rt_partners.
+      FIELDS bp~*
+      INTO TABLE @rt_partners.
   ENDMETHOD.
 
   METHOD zif_merp_md_bus_partner_sel~validate_partners.

@@ -82,24 +82,15 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Bulk collect keys for cross-entity master data validation
-    DATA(lt_group_keys) = VALUE zif_merp_md_item_group_sel=>tt_item_group_keys(
-      FOR item IN lt_items WHERE ( ItemGroupCode IS NOT INITIAL )
-      ( ItemGroupCode = item-ItemGroupCode )
-    ).
-    DATA(lt_vat_keys) = VALUE zif_merp_md_vat_rate_sel=>tt_vat_rate_keys(
-      FOR item IN lt_items WHERE ( DefaultVatCode IS NOT INITIAL )
-      ( VatCode = item-DefaultVatCode )
-    ).
-
     " Execute optimized bulk selections via Master Data Selector interfaces
-    DATA(lt_item_groups) = COND #(
-      WHEN lt_group_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_item_groups( lt_group_keys ) ).
+    DATA(lt_item_groups) = NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_item_groups(
+      VALUE #( FOR item IN lt_items ( ItemGroupCode = item-ItemGroupCode ) )
+    ).
 
-    DATA(lt_vat_rates) = COND #(
-      WHEN lt_vat_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates( lt_vat_keys ) ).
+    DATA(lt_vat_rates) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates(
+      VALUE #( FOR item IN lt_items ( VatCode = item-DefaultVatCode ) )
+    ).
+
 
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       lv_has_error = abap_false.
@@ -381,18 +372,10 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Collect unique item group keys using the correct standard structure for the selector
-    DATA(item_group_keys) = VALUE zif_merp_md_item_group_sel=>tt_item_group_keys(
-      FOR item IN items WHERE ( ItemGroupCode IS NOT INITIAL )
-      ( ItemGroupCode = item-ItemGroupCode )
-    ).
-
-    IF item_group_keys IS INITIAL.
-      RETURN.
-    ENDIF.
-
     " Read item groups master data by calling the selector directly in one line
-    DATA(item_groups) = NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_item_groups( item_group_keys ).
+    DATA(item_groups) = NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_item_groups(
+      VALUE #( FOR item IN items ( ItemGroupCode = item-ItemGroupCode ) )
+    ).
 
     IF item_groups IS INITIAL.
       RETURN.

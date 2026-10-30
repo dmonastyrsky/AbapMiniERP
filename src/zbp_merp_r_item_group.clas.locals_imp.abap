@@ -69,16 +69,11 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Bulk collect VAT rate master data keys for cross-entity business validation
-    DATA(lt_vat_keys) = VALUE zif_merp_md_vat_rate_sel=>tt_vat_rate_keys(
-      FOR grp IN lt_groups WHERE ( DefaultVatCode IS NOT INITIAL )
-      ( VatCode = grp-DefaultVatCode )
+    " Execute optimized bulk selection via VAT Rate Master Data Selector interface
+    DATA(lt_vat_rates) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates(
+      VALUE #( FOR grp IN lt_groups ( VatCode = grp-DefaultVatCode ) )
     ).
 
-    " Execute optimized bulk selection via VAT Rate Master Data Selector interface
-    DATA(lt_vat_rates) = COND #(
-      WHEN lt_vat_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates( lt_vat_keys ) ).
 
     LOOP AT lt_groups REFERENCE INTO DATA(lr_group).
       lv_has_error = abap_false.

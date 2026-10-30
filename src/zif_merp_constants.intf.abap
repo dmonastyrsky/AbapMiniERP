@@ -100,7 +100,7 @@ INTERFACE zif_merp_constants
       cds_view      TYPE string VALUE 'ZMERP_R_PURCHASEORDER',
     END OF c_po,
 
-     " Purchase Order Items Metadata
+    " Purchase Order Items Metadata
     BEGIN OF c_po_itm,
       prefix        TYPE string VALUE '',
       length        TYPE i VALUE 0,
@@ -110,6 +110,30 @@ INTERFACE zif_merp_constants
       table_draft   TYPE string VALUE 'ZMERP_PO_ITM_D',
       field_draft   TYPE string VALUE 'ITEMUUID',
       cds_view      TYPE string VALUE 'ZMERP_R_PURCHASEORDERITM',
-    END OF c_po_itm.
+    END OF c_po_itm,
+
+    " Goods Receipts Metadata
+    BEGIN OF c_gr,
+      prefix        TYPE string VALUE '',
+      length        TYPE i VALUE 10,
+      number_object TYPE cl_numberrange_runtime=>nr_object VALUE 'ZNR_GDSREC',
+      table_db      TYPE string VALUE 'ZMERP_GR_HDR',
+      field_db      TYPE string VALUE 'DOCUMENT_NUMBER',
+      table_draft   TYPE string VALUE 'ZMERP_GR_HDR_D',
+      field_draft   TYPE string VALUE 'DOCUMENTNUMBER',
+      cds_view      TYPE string VALUE 'ZMERP_R_GOODSRECEIPT',
+    END OF c_gr,
+
+    " Goods Receipt Items Metadata
+    BEGIN OF c_gr_itm,
+      prefix        TYPE string VALUE '',
+      length        TYPE i VALUE 0,
+      number_object TYPE cl_numberrange_runtime=>nr_object VALUE '',
+      table_db      TYPE string VALUE 'ZMERP_GR_ITM',
+      field_db      TYPE string VALUE 'ITEM_UUID',
+      table_draft   TYPE string VALUE 'ZMERP_GR_ITM_D',
+      field_draft   TYPE string VALUE 'ITEMUUID',
+      cds_view      TYPE string VALUE 'ZMERP_R_GOODSRECEIPTITM',
+    END OF c_gr_itm.
 
 ENDINTERFACE.

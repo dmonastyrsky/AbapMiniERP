@@ -32,9 +32,9 @@ authorization master ( global )
 
   determination setHeaderDefaults        on modify { create; }
   determination deriveHeaderOnCompanyCode on modify { field CompanyCode; }
+  determination deriveDatesOnDocumentDate on modify { field DocumentDate; }
   determination syncItemCurrency on modify { field CurrencyCode; }
   determination assignDocumentNumber on save { create; }
-  determination deriveDatesOnDocumentDate on modify { field DocumentDate; }
 
   determination clearMessagesForDates    on modify { field DocumentDate, PostingDate, DeliveryDate; }
   determination clearMessagesForHeaderFields on modify { field CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode; }

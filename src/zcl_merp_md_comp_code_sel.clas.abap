@@ -18,32 +18,23 @@ CLASS zcl_merp_md_comp_code_sel DEFINITION
       RETURNING VALUE(rt_keys) TYPE zif_merp_md_comp_code_sel=>tt_company_keys.
 ENDCLASS.
 
-
 CLASS zcl_merp_md_comp_code_sel IMPLEMENTATION.
 
   METHOD zif_merp_md_comp_code_sel~read_company.
-    IF iv_company_code IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_merp_md
-        EXPORTING
-          textid   = zcx_merp_md=>company_code_not_found
-          attr1    = CONV string( iv_company_code )
-          severity = if_abap_behv_message=>severity-error.
-    ENDIF.
-
     DATA(lt_companies) = zif_merp_md_comp_code_sel~read_companies(
       VALUE #( ( CompanyCode = iv_company_code ) )
     ).
 
-    ASSIGN lt_companies[ CompanyCode = iv_company_code ] TO FIELD-SYMBOL(<ls_detail>).
-    IF sy-subrc = 0.
-      rs_company = <ls_detail>.
-    ELSE.
-      RAISE EXCEPTION TYPE zcx_merp_md
-        EXPORTING
-          textid   = zcx_merp_md=>company_code_not_found
-          attr1    = CONV string( iv_company_code )
-          severity = if_abap_behv_message=>severity-error.
-    ENDIF.
+    " An initial code is dropped by prepare_keys, so this one check also covers empty input
+    TRY.
+        rs_company = lt_companies[ CompanyCode = iv_company_code ].
+      CATCH cx_sy_itab_line_not_found.
+        RAISE EXCEPTION TYPE zcx_merp_md
+          EXPORTING
+            textid   = zcx_merp_md=>company_code_not_found
+            attr1    = CONV string( iv_company_code )
+            severity = if_abap_behv_message=>severity-error.
+    ENDTRY.
   ENDMETHOD.
 
   METHOD zif_merp_md_comp_code_sel~read_companies.
@@ -52,20 +43,10 @@ CLASS zcl_merp_md_comp_code_sel IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SELECT comp~CompanyCode,
-           comp~CompanyName,
-           comp~CompanyPrefix,
-           comp~CurrencyCode,
-           comp~Country,
-           comp~IsBlocked,
-           comp~CreatedBy,
-           comp~CreatedAt,
-           comp~LocalLastChangedBy,
-           comp~LocalLastChangedAt,
-           comp~LastChangedAt
-      FROM zmerp_r_company_code AS comp
+    SELECT FROM zmerp_r_company_code AS comp
       INNER JOIN @lt_clean_keys AS keys ON comp~CompanyCode = keys~CompanyCode
-      INTO CORRESPONDING FIELDS OF TABLE @rt_companies.
+      FIELDS comp~*
+      INTO TABLE @rt_companies.
   ENDMETHOD.
 
   METHOD zif_merp_md_comp_code_sel~validate_companies.
@@ -96,3 +77,4 @@ CLASS zcl_merp_md_comp_code_sel IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+

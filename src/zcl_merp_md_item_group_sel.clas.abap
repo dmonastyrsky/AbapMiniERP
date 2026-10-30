@@ -21,30 +21,21 @@ ENDCLASS.
 CLASS zcl_merp_md_item_group_sel IMPLEMENTATION.
 
   METHOD zif_merp_md_item_group_sel~read_item_group.
-    IF iv_item_group_code IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_merp_md
-        EXPORTING
-          textid   = zcx_merp_md=>item_group_not_found
-          attr1    = CONV string( iv_item_group_code )
-          severity = if_abap_behv_message=>severity-error.
-    ENDIF.
-
     DATA(lt_item_groups) = zif_merp_md_item_group_sel~read_item_groups(
       VALUE #( ( ItemGroupCode = iv_item_group_code ) )
     ).
 
-    ASSIGN lt_item_groups[ ItemGroupCode = iv_item_group_code ] TO FIELD-SYMBOL(<ls_detail>).
-    IF sy-subrc = 0.
-      rs_item_group = <ls_detail>.
-    ELSE.
-      RAISE EXCEPTION TYPE zcx_merp_md
-        EXPORTING
-          textid   = zcx_merp_md=>item_group_not_found
-          attr1    = CONV string( iv_item_group_code )
-          severity = if_abap_behv_message=>severity-error.
-    ENDIF.
+    " An initial code is dropped by prepare_keys, so this one check also covers empty input
+    TRY.
+        rs_item_group = lt_item_groups[ ItemGroupCode = iv_item_group_code ].
+      CATCH cx_sy_itab_line_not_found.
+        RAISE EXCEPTION TYPE zcx_merp_md
+          EXPORTING
+            textid   = zcx_merp_md=>item_group_not_found
+            attr1    = CONV string( iv_item_group_code )
+            severity = if_abap_behv_message=>severity-error.
+    ENDTRY.
   ENDMETHOD.
-
 
   METHOD zif_merp_md_item_group_sel~read_item_groups.
     DATA(lt_clean_keys) = prepare_keys( it_item_group_keys ).
@@ -52,20 +43,11 @@ CLASS zcl_merp_md_item_group_sel IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SELECT grp~ItemGroupCode,
-           grp~Description,
-           grp~DefaultVatCode,
-           grp~IsBlocked,
-           grp~CreatedBy,
-           grp~CreatedAt,
-           grp~LocalLastChangedBy,
-           grp~LocalLastChangedAt,
-           grp~LastChangedAt
-      FROM zmerp_r_item_group AS grp
+    SELECT FROM zmerp_r_item_group AS grp
       INNER JOIN @lt_clean_keys AS keys ON grp~ItemGroupCode = keys~ItemGroupCode
-      INTO CORRESPONDING FIELDS OF TABLE @rt_item_groups.
+      FIELDS grp~*
+      INTO TABLE @rt_item_groups.
   ENDMETHOD.
-
 
   METHOD zif_merp_md_item_group_sel~validate_item_groups.
     DATA lt_existing_keys TYPE tt_item_group_keys_unique.
@@ -87,7 +69,6 @@ CLASS zcl_merp_md_item_group_sel IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-
   METHOD prepare_keys.
     rt_keys = it_keys.
     DELETE rt_keys WHERE ItemGroupCode IS INITIAL.
@@ -96,3 +77,4 @@ CLASS zcl_merp_md_item_group_sel IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+

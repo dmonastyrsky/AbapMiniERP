@@ -68,16 +68,10 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Bulk collect keys for cross-entity master data validation to eliminate DB roundtrips
-    DATA(lt_company_keys) = VALUE zif_merp_md_comp_code_sel=>tt_company_keys(
-      FOR whse IN lt_warehouses WHERE ( CompanyCode IS NOT INITIAL )
-      ( CompanyCode = whse-CompanyCode )
-    ).
-
     " Execute optimized bulk selection via Master Data Selector interface regardless of user restrictions
-    DATA(lt_companies) = COND #(
-      WHEN lt_company_keys IS NOT INITIAL
-      THEN NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies( lt_company_keys ) ).
+    DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
+      VALUE #( FOR whse IN lt_warehouses ( CompanyCode = whse-CompanyCode ) )
+    ).
 
     LOOP AT lt_warehouses REFERENCE INTO DATA(lr_whse).
       lv_has_error = abap_false.

@@ -18,32 +18,23 @@ CLASS zcl_merp_md_item_sel DEFINITION
       RETURNING VALUE(rt_keys) TYPE zif_merp_md_item_sel=>tt_item_keys.
 ENDCLASS.
 
-
 CLASS zcl_merp_md_item_sel IMPLEMENTATION.
 
   METHOD zif_merp_md_item_sel~read_item.
-    IF iv_item_code IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_merp_md
-        EXPORTING
-          textid   = zcx_merp_md=>item_not_found
-          attr1    = CONV string( iv_item_code )
-          severity = if_abap_behv_message=>severity-error.
-    ENDIF.
-
     DATA(lt_items) = zif_merp_md_item_sel~read_items(
       VALUE #( ( ItemCode = iv_item_code ) )
     ).
 
-    ASSIGN lt_items[ ItemCode = iv_item_code ] TO FIELD-SYMBOL(<ls_detail>).
-    IF sy-subrc = 0.
-      rs_item = <ls_detail>.
-    ELSE.
-      RAISE EXCEPTION TYPE zcx_merp_md
-        EXPORTING
-          textid   = zcx_merp_md=>item_not_found
-          attr1    = CONV string( iv_item_code )
-          severity = if_abap_behv_message=>severity-error.
-    ENDIF.
+    " An initial code is dropped by prepare_keys, so this one check also covers empty input
+    TRY.
+        rs_item = lt_items[ ItemCode = iv_item_code ].
+      CATCH cx_sy_itab_line_not_found.
+        RAISE EXCEPTION TYPE zcx_merp_md
+          EXPORTING
+            textid   = zcx_merp_md=>item_not_found
+            attr1    = CONV string( iv_item_code )
+            severity = if_abap_behv_message=>severity-error.
+    ENDTRY.
   ENDMETHOD.
 
   METHOD zif_merp_md_item_sel~read_items.
@@ -52,24 +43,11 @@ CLASS zcl_merp_md_item_sel IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SELECT item~ItemCode,
-           item~Description,
-           item~Article,
-           item~ItemTypeCode,
-           item~ItemGroupCode,
-           item~DefaultVatCode,
-           item~BaseUnitOfMeasure,
-           item~IsBlocked,
-           item~CreatedBy,
-           item~CreatedAt,
-           item~LocalLastChangedBy,
-           item~LocalLastChangedAt,
-           item~LastChangedAt
-      FROM zmerp_r_item AS item
+    SELECT FROM zmerp_r_item AS item
       INNER JOIN @lt_clean_keys AS keys ON item~ItemCode = keys~ItemCode
-      INTO CORRESPONDING FIELDS OF TABLE @rt_items.
+      FIELDS item~*
+      INTO TABLE @rt_items.
   ENDMETHOD.
-
 
   METHOD zif_merp_md_item_sel~validate_items.
     DATA lt_existing_keys TYPE tt_item_keys_unique.
@@ -89,9 +67,7 @@ CLASS zcl_merp_md_item_sel IMPLEMENTATION.
         INSERT <ls_key> INTO TABLE rt_invalid_keys.
       ENDIF.
     ENDLOOP.
-
   ENDMETHOD.
-
 
   METHOD prepare_keys.
     rt_keys = it_keys.
@@ -101,3 +77,4 @@ CLASS zcl_merp_md_item_sel IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
