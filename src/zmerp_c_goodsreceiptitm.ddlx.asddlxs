@@ -76,6 +76,11 @@ annotate view ZMERP_C_GOODSRECEIPTITM with
   @UI.lineItem: [{ position: 30, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'ItemGeneralGroup', position: 30 }]
   Quantity;
+  
+  @EndUserText.label: 'Open in PO'      
+  @UI.lineItem: [{ position: 35, importance: #HIGH, label: 'Open in PO' }]
+  @UI.fieldGroup: [{ qualifier: 'ItemGeneralGroup', position: 35, label: 'Open in PO' }]
+  PoOpenQuantity;
 
   @UI.lineItem: [{ position: 40, importance: #MEDIUM }]
   @UI.fieldGroup: [{ qualifier: 'ItemGeneralGroup', position: 40 }]

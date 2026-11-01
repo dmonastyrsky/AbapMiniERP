@@ -36,6 +36,9 @@ define view entity ZMERP_C_GOODSRECEIPTITM
       /* zmerp_gr_itm */
       PoItemReferenceUUID,
 
+      @Semantics.quantity.unitOfMeasure: 'UnitOfMeasure'
+      _PoProgress.OpenQuantity as PoOpenQuantity,
+
       /* zmerp_s_admin */
       CreatedBy,
       CreatedAt,

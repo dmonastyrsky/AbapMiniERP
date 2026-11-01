@@ -11,6 +11,7 @@ define view entity ZMERP_R_GOODSRECEIPTITM
   association [0..1] to I_UnitOfMeasure       as _UnitOfMeasure on $projection.UnitOfMeasure = _UnitOfMeasure.UnitOfMeasure
   association [0..1] to I_Currency            as _Currency      on $projection.CurrencyCode = _Currency.Currency
   association [0..1] to ZMERP_R_PURCHASEORDERITM as _PurchaseOrderItem on $projection.PoItemReferenceUUID = _PurchaseOrderItem.ItemUUID
+  association [0..1] to ZMERP_I_PO_PROGRESS      as _PoProgress        on $projection.PoItemReferenceUUID = _PoProgress.PoItemUUID
 {
   key item_uuid             as ItemUUID,
       header_uuid           as HeaderUUID,
@@ -67,5 +68,6 @@ define view entity ZMERP_R_GOODSRECEIPTITM
       _VatRate,
       _UnitOfMeasure,
       _Currency,
-      _PurchaseOrderItem      
+      _PurchaseOrderItem,
+	  _PoProgress      
 }
