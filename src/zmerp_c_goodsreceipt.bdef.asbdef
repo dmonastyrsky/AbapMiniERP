@@ -31,14 +31,14 @@ use etag
     action cancelDocument affects entity _Items, messages;
     action unpostDocument affects entity _Items, messages;
 
-    field PoReferenceUUID affects field CompanyCode, field WarehouseCode, field BusinessPartnerCode, field CurrencyCode,
-        field SupplierReference, field TotalNetAmount, field TotalGrossAmount,
+       field PoReferenceUUID affects field CompanyCode, field WarehouseCode, field BusinessPartnerCode, field CurrencyCode,
+        field SupplierReference, field TotalNetAmount, field TotalGrossAmount, field PoDocumentNumber,
         entity _Items, messages;
 
-    field CompanyCode affects field CurrencyCode, field WarehouseCode, field PoReferenceUUID,
+    field CompanyCode affects field CurrencyCode, field WarehouseCode, field PoReferenceUUID, field PoDocumentNumber,
         field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
-    field BusinessPartnerCode affects field PoReferenceUUID, field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
-    field WarehouseCode affects field PoReferenceUUID, field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
+    field BusinessPartnerCode affects field PoReferenceUUID, field PoDocumentNumber, field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
+    field WarehouseCode affects field PoReferenceUUID, field PoDocumentNumber, field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
 
     field CurrencyCode affects entity _Items, messages;
     entity _Items affects field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;

@@ -48,6 +48,7 @@ define root view entity ZMERP_C_GOODSRECEIPT
       @Search.fuzzinessThreshold: 0.8
       Remarks,
 
+      @ObjectModel.text.element: [ 'PoDocumentNumber' ]
       @Consumption.valueHelpDefinition: [{
         entity: { name: 'ZMERP_I_PO_VH', element: 'DocumentUUID' },
         additionalBinding: [
@@ -59,6 +60,9 @@ define root view entity ZMERP_C_GOODSRECEIPT
         useForValidation: true
       }]
       PoReferenceUUID,
+
+      @EndUserText.label: 'Purchase Order Number'
+      _PurchaseOrder.DocumentNumber as PoDocumentNumber,
 
       @Search.defaultSearchElement: true
       SupplierReference,
