@@ -671,70 +671,131 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
   METHOD deriveDocFromPurchaseOrder.
     DATA lt_header_update TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt.
+    DATA lt_item_delete   TYPE TABLE FOR DELETE zmerp_r_goodsreceipt\\GoodsReceiptItem.
+    DATA lt_item_create   TYPE TABLE FOR CREATE zmerp_r_goodsreceipt\_Items.
+    DATA ls_item_create   LIKE LINE OF lt_item_create.
 
-    " Bulk read headers where the purchase order reference has been updated
+    " Headers with the changed purchase order reference and their current items
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt
-      FIELDS ( PoReferenceUUID CompanyCode WarehouseCode BusinessPartnerCode CurrencyCode SupplierReference )
-      WITH CORRESPONDING #( keys )
-      RESULT DATA(lt_headers).
+        FIELDS ( PoReferenceUUID CompanyCode WarehouseCode BusinessPartnerCode CurrencyCode
+                 SupplierReference TotalNetAmount TotalGrossAmount )
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(lt_headers)
+      ENTITY GoodsReceipt BY \_Items
+        FIELDS ( ItemUUID )
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(lt_items).
 
     IF lt_headers IS INITIAL.
       RETURN.
     ENDIF.
 
-    " Collect unique purchase order UUIDs for mass selection
-    DATA lt_po_uuids TYPE STANDARD TABLE OF sysuuid_x16 WITH EMPTY KEY.
-    lt_po_uuids = VALUE #( FOR hdr IN lt_headers WHERE ( PoReferenceUUID IS NOT INITIAL ) ( hdr-PoReferenceUUID ) ).
-    SORT lt_po_uuids.
-    DELETE ADJACENT DUPLICATES FROM lt_po_uuids.
+    " The item list always starts from scratch when the purchase order changes
+    lt_item_delete = VALUE #( FOR item IN lt_items ( %tky = item-%tky ) ).
 
-    IF lt_po_uuids IS INITIAL.
-      RETURN.
-    ENDIF.
+    " Purchase order headers and receipt progress (open quantities and amounts) in one selection each
+    DATA(lt_po_keys) = VALUE zif_merp_doc_po_sel=>tt_document_keys(
+      FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) ).
 
-    " Read referenced purchase orders directly from database table to bypass cross-entity local mode restrictions
-    SELECT document_uuid,
-           company_code,
-           warehouse_code,
-           business_partner_code,
-           currency_code,
-           supplier_reference
-      FROM zmerp_po_hdr
-      FOR ALL ENTRIES IN @lt_po_uuids
-      WHERE document_uuid = @lt_po_uuids-table_line
-      INTO TABLE @DATA(lt_po_headers).
+    DATA(lo_po_selector) = NEW zcl_merp_doc_po_sel( ).
+    DATA(lt_po_headers)  = lo_po_selector->zif_merp_doc_po_sel~read_headers( lt_po_keys ).
+    DATA(lt_progress)    = lo_po_selector->zif_merp_doc_po_sel~read_progress( lt_po_keys ).
 
-    IF lt_po_headers IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    " Derive header fields from the referenced purchase order context
+    " 1. Open (not yet received) quantities of a receivable purchase order become the new items.
+    "    Amounts are taken from the open amounts, so earlier rounding differences are closed to zero.
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
-      DATA(ls_header) = lr_header->*.
-
-      IF ls_header-PoReferenceUUID IS NOT INITIAL.
-        READ TABLE lt_po_headers INTO DATA(ls_po) WITH KEY document_uuid = ls_header-PoReferenceUUID.
-        IF sy-subrc = 0.
-          ls_header-CompanyCode         = ls_po-company_code.
-          ls_header-WarehouseCode       = ls_po-warehouse_code.
-          ls_header-BusinessPartnerCode = ls_po-business_partner_code.
-          ls_header-CurrencyCode        = ls_po-currency_code.
-          ls_header-SupplierReference   = ls_po-supplier_reference.
-        ENDIF.
+      ASSIGN lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ] TO FIELD-SYMBOL(<po>).
+      IF sy-subrc <> 0 OR zcl_merp_doc_po_lifecycle=>can_receive_goods( <po>-Status ) = abap_false.
+        CONTINUE.
       ENDIF.
 
-      " Collect updates if derived fields modified the header state
+      ls_item_create = VALUE #( %tky = lr_header->%tky ).
+
+      LOOP AT lt_progress REFERENCE INTO DATA(lr_open) USING KEY ByHeader
+           WHERE PoHeaderUUID = <po>-DocumentUUID
+             AND OpenQuantity > 0.
+        APPEND VALUE #(
+          %cid                = |{ lr_header->DocumentUUID }{ lines( ls_item_create-%target ) + 1 }|
+          %is_draft           = lr_header->%is_draft
+          ItemNo              = lr_open->PoItemNo
+          ItemCode            = lr_open->ItemCode
+          Quantity            = lr_open->OpenQuantity
+          UnitOfMeasure       = lr_open->UnitOfMeasure
+          CurrencyCode        = lr_open->CurrencyCode
+          Price               = lr_open->Price
+          VatCode             = lr_open->VatCode
+          NetAmount           = lr_open->OpenNetAmount
+          VatAmount           = lr_open->OpenVatAmount
+          GrossAmount         = lr_open->OpenGrossAmount
+          PoItemReferenceUUID = lr_open->PoItemUUID
+        ) TO ls_item_create-%target.
+      ENDLOOP.
+
+      IF ls_item_create-%target IS NOT INITIAL.
+        APPEND ls_item_create TO lt_item_create.
+      ENDIF.
+    ENDLOOP.
+
+    " 2. Header totals of the new items via the shared item logic (headers without new items get zero totals)
+    DATA(lt_totals) = NEW zcl_merp_doc_item_logic( )->calc_header_totals(
+      it_header_keys = VALUE #( FOR header IN lt_headers
+                                ( HeaderUUID = header-DocumentUUID
+                                  IsDraft    = header-%is_draft ) )
+      it_items       = VALUE #( FOR create IN lt_item_create
+                                FOR target IN create-%target
+                                ( HeaderUUID  = create-DocumentUUID
+                                  IsDraft     = create-%is_draft
+                                  NetAmount   = target-NetAmount
+                                  VatAmount   = target-VatAmount
+                                  GrossAmount = target-GrossAmount ) ) ).
+
+    " 3. Header context is taken over from the purchase order, totals follow the new items
+    LOOP AT lt_headers REFERENCE INTO lr_header.
+      DATA(ls_header) = lr_header->*.
+
+      ASSIGN lt_po_headers[ DocumentUUID = ls_header-PoReferenceUUID ] TO <po>.
+      IF sy-subrc = 0.
+        ls_header-CompanyCode         = <po>-CompanyCode.
+        ls_header-WarehouseCode       = <po>-WarehouseCode.
+        ls_header-BusinessPartnerCode = <po>-BusinessPartnerCode.
+        ls_header-CurrencyCode        = <po>-CurrencyCode.
+        ls_header-SupplierReference   = <po>-SupplierReference.
+      ENDIF.
+
+      ASSIGN lt_totals[ HeaderUUID = ls_header-DocumentUUID
+                        IsDraft    = ls_header-%is_draft ] TO FIELD-SYMBOL(<total>).
+      IF sy-subrc = 0.
+        ls_header-TotalNetAmount   = <total>-TotalNetAmount.
+        ls_header-TotalGrossAmount = <total>-TotalGrossAmount.
+      ENDIF.
+
       IF ls_header <> lr_header->*.
         APPEND CORRESPONDING #( ls_header ) TO lt_header_update.
       ENDIF.
     ENDLOOP.
 
-    " Apply derived values back to the transactional buffer
+    " Apply in a fixed order: remove old items, create new items, update the header
+    IF lt_item_delete IS NOT INITIAL.
+      MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+        ENTITY GoodsReceiptItem
+        DELETE FROM lt_item_delete.
+    ENDIF.
+
+    IF lt_item_create IS NOT INITIAL.
+      MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+        ENTITY GoodsReceipt
+        CREATE BY \_Items
+        FIELDS ( ItemNo ItemCode Quantity UnitOfMeasure CurrencyCode Price VatCode
+                 NetAmount VatAmount GrossAmount PoItemReferenceUUID )
+        WITH lt_item_create.
+    ENDIF.
+
     IF lt_header_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceipt
-        UPDATE FIELDS ( CompanyCode WarehouseCode BusinessPartnerCode CurrencyCode SupplierReference )
+        UPDATE FIELDS ( CompanyCode WarehouseCode BusinessPartnerCode CurrencyCode SupplierReference
+                        TotalNetAmount TotalGrossAmount )
         WITH lt_header_update.
     ENDIF.
   ENDMETHOD.
@@ -1423,7 +1484,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
     " Items and their parent headers (document currency)
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceiptItem
-        FIELDS ( HeaderUUID ItemNo ItemCode UnitOfMeasure VatCode CurrencyCode )
+        FIELDS ( HeaderUUID ItemNo ItemCode UnitOfMeasure VatCode CurrencyCode PoItemReferenceUUID )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_items)
       ENTITY GoodsReceiptItem BY \_GoodsReceipt
@@ -1476,22 +1537,54 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD calcAmountsOnQtyPrice.
-    " Bulk read modified items from the transactional buffer (Quantity and Price changes)
+    DATA lt_recalc       TYPE zcl_merp_doc_item_logic=>tt_items.
+    DATA lt_items_update TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt\\GoodsReceiptItem.
+
+    " Bulk read modified items (Quantity and Price changes) and their parent headers (purchase order reference)
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceiptItem
-      FIELDS ( HeaderUUID ItemCode Quantity Price VatCode NetAmount VatAmount GrossAmount )
-      WITH CORRESPONDING #( keys )
-      RESULT DATA(lt_items).
+        FIELDS ( HeaderUUID ItemCode Quantity Price VatCode NetAmount VatAmount GrossAmount PoItemReferenceUUID )
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(lt_items)
+      ENTITY GoodsReceiptItem BY \_GoodsReceipt
+        FIELDS ( PoReferenceUUID )
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(lt_headers).
 
     IF lt_items IS INITIAL.
       RETURN.
     ENDIF.
 
-    " Delegate the recalculation to the shared item logic (same for all documents), only changed items are returned
-    DATA(lt_changed) = NEW zcl_merp_doc_item_logic( )->recalc_on_qty_price(
-      CORRESPONDING #( lt_items MAPPING IsDraft = %is_draft ) ).
+    " Open quantities and amounts of the referenced purchase orders (posted receipts only)
+    DATA(lt_progress) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_progress(
+      VALUE #( FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) ) ).
 
-    DATA lt_items_update TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt\\GoodsReceiptItem.
+    LOOP AT lt_items REFERENCE INTO DATA(lr_item).
+      ASSIGN lt_progress[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO FIELD-SYMBOL(<open>).
+
+      " Receiving the whole open quantity takes the open amounts, so the order item is closed to zero
+      IF sy-subrc = 0 AND lr_item->Quantity = <open>-OpenQuantity.
+        IF lr_item->NetAmount   <> <open>-OpenNetAmount OR
+           lr_item->VatAmount   <> <open>-OpenVatAmount OR
+           lr_item->GrossAmount <> <open>-OpenGrossAmount.
+          APPEND VALUE #(
+            %tky                 = lr_item->%tky
+            NetAmount            = <open>-OpenNetAmount
+            VatAmount            = <open>-OpenVatAmount
+            GrossAmount          = <open>-OpenGrossAmount
+            %control-NetAmount   = if_abap_behv=>mk-on
+            %control-VatAmount   = if_abap_behv=>mk-on
+            %control-GrossAmount = if_abap_behv=>mk-on
+          ) TO lt_items_update.
+        ENDIF.
+      ELSE.
+        " Partial receipt and items without reference: standard calculation
+        APPEND CORRESPONDING #( lr_item->* MAPPING IsDraft = %is_draft ) TO lt_recalc.
+      ENDIF.
+    ENDLOOP.
+
+    " Delegate the recalculation to the shared item logic (same for all documents), only changed items are returned
+    DATA(lt_changed) = NEW zcl_merp_doc_item_logic( )->recalc_on_qty_price( lt_recalc ).
 
     " Map recalculated amounts back to the instances (UUID + draft state) of the transactional buffer
     LOOP AT lt_changed REFERENCE INTO DATA(lr_changed).
@@ -1524,9 +1617,12 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
     " Bulk read modified items upon VAT code change mutation
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceiptItem
-      FIELDS ( HeaderUUID VatCode NetAmount VatAmount GrossAmount )
+      FIELDS ( HeaderUUID VatCode NetAmount VatAmount GrossAmount PoItemReferenceUUID )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_items).
+
+    " Items copied from a purchase order keep the VAT code and amounts of the order (open amounts)
+    DELETE lt_items WHERE PoItemReferenceUUID IS NOT INITIAL.
 
     IF lt_items IS INITIAL.
       RETURN.

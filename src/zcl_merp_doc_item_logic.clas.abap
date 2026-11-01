@@ -63,7 +63,7 @@ CLASS zcl_merp_doc_item_logic DEFINITION
                 io_item_selector TYPE REF TO zif_merp_md_item_sel OPTIONAL.
 
     "! Quantity or price changed: net -> VAT -> gross are recalculated (prices are always without VAT)
-    "! @parameter it_items   | Items with Quantity, Price, VatCode, NetAmount, VatAmount and GrossAmount
+    "! @parameter it_items             | Items to be processed (HeaderUUID, ItemNo, ItemCode, UnitOfMeasure, VatCode, CurrencyCode, PoItemReferenceUUID)
     "! @parameter rt_changed | Only the items whose amounts really changed (with the new amounts)
     METHODS recalc_on_qty_price
       IMPORTING it_items          TYPE tt_items
@@ -253,8 +253,9 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
         ENDIF.
       ENDIF.
 
-      " UoM and VAT code are always taken from the item master data (overwriting current values) if the item exists
-      IF ls_item-ItemCode IS NOT INITIAL.
+      " UoM and VAT code are taken from the item master data (overwriting current values) if the item exists;
+      " items copied from a purchase order keep the UoM and VAT code of the order item
+      IF ls_item-ItemCode IS NOT INITIAL AND ls_item-PoItemReferenceUUID IS INITIAL.
         ASSIGN lt_items_master[ ItemCode = ls_item-ItemCode ] TO FIELD-SYMBOL(<master>).
         IF sy-subrc = 0.
           ls_item-UnitOfMeasure = <master>-BaseUnitOfMeasure.
