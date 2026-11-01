@@ -11,6 +11,12 @@ CLASS lhc_zmerp_r_warehouse DEFINITION INHERITING FROM cl_abap_behavior_handler.
       REQUEST requested_authorizations FOR Warehouse
       RESULT result.
 
+    "! Warehouses used in documents keep their company (documents and stock belong to it).
+    METHODS get_instance_features FOR INSTANCE FEATURES
+      IMPORTING
+        keys   REQUEST requested_features FOR Warehouse
+      RESULT   result.
+
     "! Validates mandatory fields before saving.
     METHODS validateMandatoryFields FOR VALIDATE ON SAVE
       IMPORTING keys FOR Warehouse~validateMandatoryFields.
@@ -42,6 +48,34 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
     IF requested_authorizations-%delete = if_abap_behv=>mk-on.
       result-%delete = if_abap_behv=>auth-allowed.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD get_instance_features.
+    TYPES: BEGIN OF ty_key,
+             warehousecode TYPE zmerp_warehouse_code,
+           END OF ty_key.
+
+    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY warehousecode.
+    DATA lt_used TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY warehousecode.
+
+    LOOP AT keys REFERENCE INTO DATA(lr_key) WHERE WarehouseCode IS NOT INITIAL.
+      INSERT VALUE #( warehousecode = lr_key->WarehouseCode ) INTO TABLE lt_keys.
+    ENDLOOP.
+
+    IF lt_keys IS NOT INITIAL.
+      SELECT DISTINCT usage~WarehouseCode AS warehousecode
+        FROM zmerp_i_warehouse_usage AS usage
+        INNER JOIN @lt_keys AS key ON usage~WarehouseCode = key~warehousecode
+        INTO TABLE @lt_used.
+    ENDIF.
+
+    result = VALUE #(
+      FOR key IN keys
+      ( %tky               = key-%tky
+        %field-CompanyCode = COND #( WHEN line_exists( lt_used[ warehousecode = key-WarehouseCode ] )
+                                     THEN if_abap_behv=>fc-f-read_only
+                                     ELSE if_abap_behv=>fc-f-mandatory ) )
+    ).
   ENDMETHOD.
 
   METHOD validateMandatoryFields.

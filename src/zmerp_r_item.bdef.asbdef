@@ -17,7 +17,8 @@ authorization master ( global )
   delete ( precheck );
 
   field ( readonly ) ItemCode;
-  field ( mandatory ) Description, ItemTypeCode, ItemGroupCode, DefaultVatCode, BaseUnitOfMeasure;
+  field ( mandatory ) Description, ItemGroupCode, DefaultVatCode;
+  field ( features : instance ) ItemTypeCode, BaseUnitOfMeasure;
 
   determination setDefaultVatCode on modify { field ItemGroupCode; }
   determination clearMessagesForFilledFields on modify

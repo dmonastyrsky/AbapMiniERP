@@ -18,3 +18,11 @@ union all select from ZMERP_R_PURCHASEORDER
   key cast( 'Purchase Order' as zmerp_entity_name )      as UsedInEntity
 }
 where CompanyCode is not initial
+
+union all select from ZMERP_R_GOODSRECEIPT
+{
+  key CompanyCode,
+  key cast( bintohex( DocumentUUID ) as abap.char(40) ) as RefEntityKey,
+  key cast( 'Goods Receipt' as zmerp_entity_name )      as UsedInEntity
+}
+where CompanyCode is not initial

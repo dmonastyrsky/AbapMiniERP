@@ -18,7 +18,8 @@ authorization master( global )
 
   field ( readonly ) WarehouseCode;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
-  field ( mandatory ) WarehouseName, CompanyCode;
+  field ( mandatory ) WarehouseName;
+  field ( features : instance ) CompanyCode;
 
   determination clearMessagesForFilledFields on modify { field WarehouseName, CompanyCode; }
 

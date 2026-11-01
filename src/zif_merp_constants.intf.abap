@@ -148,6 +148,25 @@ INTERFACE zif_merp_constants
       table_draft   TYPE string VALUE 'ZMERP_GR_ITM_D',
       field_draft   TYPE string VALUE 'ITEMUUID',
       cds_view      TYPE string VALUE 'ZMERP_R_GOODSRECEIPTITM',
-    END OF c_gr_itm.
+    END OF c_gr_itm,
+
+    " Stock Movements Metadata (journal: no draft, no number range)
+    BEGIN OF c_stock_mov,
+      prefix        TYPE string VALUE '',
+      length        TYPE i VALUE 0,
+      number_object TYPE cl_numberrange_runtime=>nr_object VALUE '',
+      table_db      TYPE string VALUE 'ZMERP_STOCK_MOV',
+      field_db      TYPE string VALUE 'MOVEMENT_UUID',
+      table_draft   TYPE string VALUE '',
+      field_draft   TYPE string VALUE '',
+      cds_view      TYPE string VALUE 'ZMERP_I_STOCK_BALANCE',
+    END OF c_stock_mov,
+
+    " Item types (domain ZMERP_ITEM_TYPE): only products are kept in stock
+    BEGIN OF c_item_type,
+      product TYPE zmerp_item_type VALUE 'P',
+      service TYPE zmerp_item_type VALUE 'S',
+    END OF c_item_type.
+
 
 ENDINTERFACE.

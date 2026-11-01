@@ -14,6 +14,12 @@ CLASS lhc_zmerp_r_company_code DEFINITION INHERITING FROM cl_abap_behavior_handl
         REQUEST requested_authorizations FOR CompanyCode
         RESULT result.
 
+    "! Companies in use keep their currency (stock valuation) and prefix (document numbers).
+    METHODS get_instance_features FOR INSTANCE FEATURES
+      IMPORTING
+        keys   REQUEST requested_features FOR CompanyCode
+      RESULT   result.
+
     "! Clears validation messages for fields that have been filled in.
     METHODS clearMessagesForFilledFields FOR DETERMINE ON MODIFY
       IMPORTING keys FOR CompanyCode~clearMessagesForFilledFields.
@@ -48,6 +54,36 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
     IF requested_authorizations-%delete = if_abap_behv=>mk-on.
       result-%delete = if_abap_behv=>auth-allowed.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD get_instance_features.
+    TYPES: BEGIN OF ty_key,
+             companycode TYPE zmerp_company_code,
+           END OF ty_key.
+
+    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY companycode.
+    DATA lt_used TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY companycode.
+
+    LOOP AT keys REFERENCE INTO DATA(lr_key) WHERE CompanyCode IS NOT INITIAL.
+      INSERT VALUE #( companycode = lr_key->CompanyCode ) INTO TABLE lt_keys.
+    ENDLOOP.
+
+    IF lt_keys IS NOT INITIAL.
+      SELECT DISTINCT usage~CompanyCode AS companycode
+        FROM zmerp_i_company_code_usage AS usage
+        INNER JOIN @lt_keys AS key ON usage~CompanyCode = key~companycode
+        INTO TABLE @lt_used.
+    ENDIF.
+
+    result = VALUE #(
+      FOR key IN keys
+      LET lv_control = COND #( WHEN line_exists( lt_used[ companycode = key-CompanyCode ] )
+                               THEN if_abap_behv=>fc-f-read_only
+                               ELSE if_abap_behv=>fc-f-mandatory ) IN
+      ( %tky                 = key-%tky
+        %field-CurrencyCode  = lv_control
+        %field-CompanyPrefix = lv_control )
+    ).
   ENDMETHOD.
 
   METHOD validateMandatoryFields.

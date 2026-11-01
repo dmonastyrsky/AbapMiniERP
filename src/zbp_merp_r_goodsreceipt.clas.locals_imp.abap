@@ -703,11 +703,11 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
              Quantity      TYPE zmerp_quantity,
            END OF ty_stock.
 
-    DATA lt_stock_keys   TYPE HASHED TABLE OF ty_stock WITH UNIQUE KEY CompanyCode WarehouseCode ItemCode UnitOfMeasure.
-    DATA lt_stock        TYPE HASHED TABLE OF ty_stock WITH UNIQUE KEY CompanyCode WarehouseCode ItemCode UnitOfMeasure.
-    DATA lt_update       TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt.
-    DATA lo_message      TYPE REF TO zcx_merp_pur.
-    DATA lv_items_valid  TYPE abap_bool.
+    DATA lt_stock_keys  TYPE HASHED TABLE OF ty_stock WITH UNIQUE KEY CompanyCode WarehouseCode ItemCode UnitOfMeasure.
+    DATA lt_stock       TYPE HASHED TABLE OF ty_stock WITH UNIQUE KEY CompanyCode WarehouseCode ItemCode UnitOfMeasure.
+    DATA lt_update      TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt.
+    DATA lo_message     TYPE REF TO zcx_merp_pur.
+    DATA lv_items_valid TYPE abap_bool.
 
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt
@@ -719,8 +719,20 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_items).
 
-    " Current stock of the affected items (including the movements of the documents to be unposted)
-    LOOP AT lt_items REFERENCE INTO DATA(lr_item).
+    " Services are not kept in stock: only products are checked against the stock
+    DATA(lt_items_master) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items(
+      VALUE #( FOR item IN lt_items ( ItemCode = item-ItemCode ) ) ).
+
+    DATA(lt_stock_items) = lt_items.
+    LOOP AT lt_stock_items REFERENCE INTO DATA(lr_stock_item).
+      IF VALUE #( lt_items_master[ ItemCode = lr_stock_item->ItemCode ]-ItemTypeCode OPTIONAL )
+         = zif_merp_constants=>c_item_type-service.
+        DELETE lt_stock_items.
+      ENDIF.
+    ENDLOOP.
+
+    " Current stock of the affected products (including the movements of the documents to be unposted)
+    LOOP AT lt_stock_items REFERENCE INTO DATA(lr_item).
       ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<header>).
       IF sy-subrc = 0.
         INSERT VALUE #( CompanyCode   = <header>-CompanyCode
@@ -757,9 +769,9 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
       ENDIF.
 
-      " 2. Removing the movements of the document must not make the stock negative
+      " 2. Removing the movements of the document must not make the stock negative (products only)
       IF lo_message IS NOT BOUND.
-        LOOP AT lt_items REFERENCE INTO lr_item WHERE HeaderUUID = lr_header->DocumentUUID.
+        LOOP AT lt_stock_items REFERENCE INTO lr_item WHERE HeaderUUID = lr_header->DocumentUUID.
           ASSIGN lt_stock[ CompanyCode   = lr_header->CompanyCode
                            WarehouseCode = lr_header->WarehouseCode
                            ItemCode      = lr_item->ItemCode
@@ -791,7 +803,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         ENDIF.
       ELSE.
         " Stock is reduced already here, so further documents of the same request are checked against it
-        LOOP AT lt_items REFERENCE INTO lr_item WHERE HeaderUUID = lr_header->DocumentUUID.
+        LOOP AT lt_stock_items REFERENCE INTO lr_item WHERE HeaderUUID = lr_header->DocumentUUID.
           ASSIGN lt_stock[ CompanyCode   = lr_header->CompanyCode
                            WarehouseCode = lr_header->WarehouseCode
                            ItemCode      = lr_item->ItemCode
@@ -808,6 +820,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
     IF lt_update IS NOT INITIAL.
       " 3. Purchase orders follow the receipt progress without the documents unposted now
+      "    (all items, services included: they close purchase order items as well)
       IF update_po_receipt_status(
            it_items    = VALUE #( FOR upd IN lt_update
                                   FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
@@ -2282,6 +2295,10 @@ CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
         WITH CORRESPONDING #( lt_posted )
         RESULT DATA(lt_items).
 
+    " Services are received (purchase order progress) but are not kept in stock
+    DATA(lt_items_master) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items(
+      VALUE #( FOR item IN lt_items ( ItemCode = item-ItemCode ) ) ).
+
     DATA(lv_user) = cl_abap_context_info=>get_user_technical_name( ).
     GET TIME STAMP FIELD DATA(lv_timestamp).
 
@@ -2290,6 +2307,11 @@ CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<header>).
       IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+
+      IF VALUE #( lt_items_master[ ItemCode = lr_item->ItemCode ]-ItemTypeCode OPTIONAL )
+         = zif_merp_constants=>c_item_type-service.
         CONTINUE.
       ENDIF.
 

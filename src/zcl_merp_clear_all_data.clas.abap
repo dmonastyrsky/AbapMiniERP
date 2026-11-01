@@ -43,7 +43,51 @@ CLASS zcl_merp_clear_all_data IMPLEMENTATION.
       out->write( '==================================================' ).
     ENDIF.
 
-    " Clear entities using structured metadata constants from zif_merp_constants
+    " ------------------------------------------------------------------
+    " 1. Documents (child tables first) and stock movements
+    " ------------------------------------------------------------------
+    clear_entity(
+      iv_label      = 'Goods Receipt Items'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_gr_itm-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_gr_itm-table_draft )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Goods Receipt Header'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_gr-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_gr-table_draft )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Stock Movements'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_stock_mov-table_db )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Purchase Order Items'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_po_itm-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_po_itm-table_draft )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Purchase Order Header'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_po-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_po-table_draft )
+      out           = out ).
+
+    " ------------------------------------------------------------------
+    " 2. Document number ranges: intervals exist per company code,
+    "    so they are reset while the company codes still exist
+    " ------------------------------------------------------------------
+    zcl_merp_nro_admin_util=>reset_doc_intervals( ).
+
+    IF out IS BOUND.
+      out->write( '[Number Ranges]: Document intervals reset.' ).
+    ENDIF.
+
+    " ------------------------------------------------------------------
+    " 3. Master data (company codes last: warehouses belong to them)
+    " ------------------------------------------------------------------
     clear_entity(
       iv_label      = 'Business Partner'
       iv_active_tab = CONV tabname( zif_merp_constants=>c_bp-table_db )
@@ -80,38 +124,13 @@ CLASS zcl_merp_clear_all_data IMPLEMENTATION.
       iv_draft_tab  = CONV tabname( zif_merp_constants=>c_comp-table_draft )
       out           = out ).
 
-    " Clear Transactional Document (Purchase Order Items) and its Draft table
-    clear_entity(
-      iv_label      = 'Purchase Order Items'
-      iv_active_tab = CONV tabname( zif_merp_constants=>c_po_itm-table_db )
-      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_po_itm-table_draft )
-      out           = out ).
-
-    " Clear Transactional Document (Purchase Order Header) and its Draft table
-    clear_entity(
-      iv_label      = 'Purchase Order Header'
-      iv_active_tab = CONV tabname( zif_merp_constants=>c_po-table_db )
-      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_po-table_draft )
-      out           = out ).
-
-    " Clear Transactional Document (Goods Receipt Items) and its Draft table
-    clear_entity(
-      iv_label      = 'Goods Receipt Items'
-      iv_active_tab = CONV tabname( zif_merp_constants=>c_gr_itm-table_db )
-      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_gr_itm-table_draft )
-      out           = out ).
-
-    " Clear Transactional Document (Goods Receipt Header) and its Draft table
-    clear_entity(
-      iv_label      = 'Goods Receipt Header'
-      iv_active_tab = CONV tabname( zif_merp_constants=>c_gr-table_db )
-      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_gr-table_draft )
-      out           = out ).
-
-    " Resets all Master Data and Document NRO intervals back to level zero since all data is cleared
-    zcl_merp_nro_admin_util=>reset_intervals( ).
+    " ------------------------------------------------------------------
+    " 4. Master data number ranges (not company dependent)
+    " ------------------------------------------------------------------
+    zcl_merp_nro_admin_util=>reset_master_intervals( ).
 
     IF out IS BOUND.
+      out->write( '[Number Ranges]: Master data intervals reset.' ).
       out->write( '==================================================' ).
       out->write( '  Full Data Cleanup Completed Successfully!       ' ).
       out->write( '==================================================' ).

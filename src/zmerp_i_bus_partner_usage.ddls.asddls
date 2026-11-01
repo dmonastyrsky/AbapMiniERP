@@ -11,3 +11,12 @@ define view entity ZMERP_I_BUS_PARTNER_USAGE
   key cast( 'Purchase Order' as zmerp_entity_name )     as UsedInEntity
 }
 where BusinessPartnerCode is not initial
+
+union all select from ZMERP_R_GOODSRECEIPT
+{
+  key BusinessPartnerCode                               as PartnerCode,
+  key DocumentUUID                                      as DocumentUUID,
+  key cast( bintohex( DocumentUUID ) as abap.char(40) ) as RefEntityKey,
+  key cast( 'Goods Receipt' as zmerp_entity_name )      as UsedInEntity
+}
+where BusinessPartnerCode is not initial

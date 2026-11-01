@@ -26,3 +26,11 @@ union all select from ZMERP_R_PURCHASEORDERITM
   key cast( 'Purchase Order Item' as zmerp_entity_name ) as UsedInEntity
 }
 where VatCode is not initial
+
+union all select from ZMERP_R_GOODSRECEIPTITM
+{
+  key VatCode                                           as VatCode,
+  key cast( bintohex( ItemUUID ) as abap.char(40) )     as RefEntityKey,
+  key cast( 'Goods Receipt Item' as zmerp_entity_name ) as UsedInEntity
+}
+where VatCode is not initial

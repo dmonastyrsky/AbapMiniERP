@@ -15,9 +15,10 @@ authorization master( global )
   update;
   delete ( precheck );
 
-  field ( mandatory : create, readonly : update ) CompanyCode;
-  field ( mandatory ) CompanyName, CompanyPrefix, CurrencyCode, Country;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
+  field ( mandatory : create, readonly : update ) CompanyCode;
+  field ( mandatory ) CompanyName, Country;
+  field ( features : instance ) CompanyPrefix, CurrencyCode;
 
   determination handlePrefixChange on modify { field CompanyPrefix; }
   determination clearMessagesForFilledFields on modify

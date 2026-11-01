@@ -14,6 +14,12 @@ CLASS lhc_zmerp_r_item DEFINITION INHERITING FROM cl_abap_behavior_handler.
       REQUEST requested_authorizations FOR Item
       RESULT result.
 
+    "! Items used in documents keep their type and base unit (stock is kept per item and unit).
+    METHODS get_instance_features FOR INSTANCE FEATURES
+      IMPORTING
+        keys   REQUEST requested_features FOR Item
+      RESULT   result.
+
     "! Validates mandatory fields before saving.
     METHODS validateMandatoryFields FOR VALIDATE ON SAVE
       IMPORTING keys FOR Item~validateMandatoryFields.
@@ -50,6 +56,36 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
     IF requested_authorizations-%delete = if_abap_behv=>mk-on.
       result-%delete = if_abap_behv=>auth-allowed.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD get_instance_features.
+    TYPES: BEGIN OF ty_key,
+             itemcode TYPE zmerp_item_code,
+           END OF ty_key.
+
+    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY itemcode.
+    DATA lt_used TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY itemcode.
+
+    LOOP AT keys REFERENCE INTO DATA(lr_key) WHERE ItemCode IS NOT INITIAL.
+      INSERT VALUE #( itemcode = lr_key->ItemCode ) INTO TABLE lt_keys.
+    ENDLOOP.
+
+    IF lt_keys IS NOT INITIAL.
+      SELECT DISTINCT usage~ItemCode AS itemcode
+        FROM zmerp_i_item_usage AS usage
+        INNER JOIN @lt_keys AS key ON usage~ItemCode = key~itemcode
+        INTO TABLE @lt_used.
+    ENDIF.
+
+    result = VALUE #(
+      FOR key IN keys
+      LET lv_control = COND #( WHEN line_exists( lt_used[ itemcode = key-ItemCode ] )
+                               THEN if_abap_behv=>fc-f-read_only
+                               ELSE if_abap_behv=>fc-f-mandatory ) IN
+      ( %tky                     = key-%tky
+        %field-ItemTypeCode      = lv_control
+        %field-BaseUnitOfMeasure = lv_control )
+    ).
   ENDMETHOD.
 
   METHOD validateMandatoryFields.

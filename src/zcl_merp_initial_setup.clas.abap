@@ -1,4 +1,7 @@
-"! Initial seed data population runner for Mini ERP application.
+"! Initial seed data for Mini ERP.
+"! All data is reset first (ZCL_MERP_CLEAR_ALL_DATA). Master data is inserted directly;
+"! documents are created via EML, so all business logic applies (number ranges, defaults,
+"! amounts, validations, stock movements, purchase order status).
 CLASS zcl_merp_initial_setup DEFINITION
   PUBLIC
   FINAL
@@ -7,7 +10,7 @@ CLASS zcl_merp_initial_setup DEFINITION
   PUBLIC SECTION.
     INTERFACES if_oo_adt_classrun .
 
-    "! Executes complete initial seed data setup for all master data entities and syncs NRO levels.
+    "! Resets all data and creates master data and documents.
     "! @parameter out | Console output object for logging setup progress
     CLASS-METHODS execute
       IMPORTING
@@ -15,6 +18,44 @@ CLASS zcl_merp_initial_setup DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    "! Document line: item number (formatted to the item code), quantity, price (purchase orders only)
+    TYPES: BEGIN OF ty_line,
+             item_no  TYPE i,
+             quantity TYPE zmerp_quantity,
+             price    TYPE zmerp_price,
+           END OF ty_line,
+           tt_lines TYPE STANDARD TABLE OF ty_line WITH EMPTY KEY.
+
+    "! Purchase order definition (dates relative to today)
+    TYPES: BEGIN OF ty_po,
+             company_code TYPE zmerp_company_code,
+             warehouse_no TYPE i,
+             partner_no   TYPE i,
+             days_ago     TYPE i,
+             delivery_in  TYPE i,
+             responsible  TYPE zmerp_resp_person,
+             remarks      TYPE zmerp_remarks,
+             release      TYPE abap_bool,
+             lines        TYPE tt_lines,
+           END OF ty_po.
+
+    "! Goods receipt definition: lines contain only quantities differing from the open quantity
+    TYPES: BEGIN OF ty_gr,
+             po_uuid     TYPE sysuuid_x16,
+             days_ago    TYPE i,
+             responsible TYPE zmerp_resp_person,
+             remarks     TYPE zmerp_remarks,
+             post        TYPE abap_bool,
+             lines       TYPE tt_lines,
+           END OF ty_gr.
+
+    TYPES: BEGIN OF ty_quantity,
+             item_code TYPE zmerp_item_code,
+             quantity  TYPE zmerp_quantity,
+           END OF ty_quantity,
+           tt_quantities TYPE STANDARD TABLE OF ty_quantity WITH EMPTY KEY.
+
+    TYPES tt_messages TYPE STANDARD TABLE OF REF TO if_abap_behv_message WITH EMPTY KEY.
 
     "! Retrieves the current technical user name or falls back to default.
     CLASS-METHODS get_current_user
@@ -45,59 +86,65 @@ CLASS zcl_merp_initial_setup DEFINITION
         iv_count       TYPE i
         out            TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
-    "! Clears active and draft database tables for a setup domain.
-    CLASS-METHODS clear_table_data
+    "! Logs a failed EML step together with its RAP messages.
+    CLASS-METHODS write_failure
       IMPORTING
-        iv_active_table TYPE tabname
-        iv_draft_table  TYPE tabname OPTIONAL .
+        iv_text     TYPE string
+        it_messages TYPE tt_messages
+        out         TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
-    "! Populates initial company codes seed data into ZMERP_COMP_CODE table.
-    "! @parameter out | Console output object for logging setup progress
+    "! Populates company codes.
     CLASS-METHODS setup_company_codes
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
-    "! Populates initial warehouses seed data into ZMERP_WAREHOUSE table.
-    "! @parameter out | Console output object for logging setup progress
+    "! Populates warehouses.
     CLASS-METHODS setup_warehouses
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
-    "! Populates initial VAT rates seed data into ZMERP_VAT_RATE table.
-    "! @parameter out | Console output object for logging setup progress
+    "! Populates VAT rates.
     CLASS-METHODS setup_vat_rates
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
-    "! Populates initial item groups seed data into ZMERP_ITEM_GROUP table.
-    "! @parameter out | Console output object for logging setup progress
+    "! Populates item groups.
     CLASS-METHODS setup_item_groups
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
-    "! Populates initial master items/products seed data into ZMERP_ITEM table.
-    "! @parameter out | Console output object for logging setup progress
+    "! Populates items (products and services).
     CLASS-METHODS setup_items
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
-    "! Populates initial business partners seed data into ZMERP_BUS_PART table.
-    "! @parameter out | Console output object for logging setup progress
+    "! Populates business partners.
     CLASS-METHODS setup_business_partners
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
-    "! Generates initial business transactional documents (Purchase Orders).
-    "! @parameter out | Console output object for logging setup progress
-    CLASS-METHODS setup_purchase_orders
+    "! Creates purchase orders and goods receipts covering the main lifecycle states.
+    CLASS-METHODS setup_documents
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
-    "! Generates initial business transactional documents (Goods Receipt).
-    "! @parameter out | Console output object for logging setup progress
-    CLASS-METHODS setup_goods_receipts
+    "! Creates a purchase order via EML and optionally releases it.
+    "! @parameter is_po      | Purchase order definition
+    "! @parameter rv_po_uuid | Key of the created purchase order (initial if it failed)
+    CLASS-METHODS create_purchase_order
       IMPORTING
-        out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+        is_po             TYPE ty_po
+        out               TYPE REF TO if_oo_adt_classrun_out OPTIONAL
+      RETURNING
+        VALUE(rv_po_uuid) TYPE sysuuid_x16 .
+
+    "! Creates a goods receipt for a purchase order via EML and optionally posts it.
+    "! Items are filled from the open quantities of the purchase order by the goods receipt logic.
+    "! @parameter is_gr | Goods receipt definition
+    CLASS-METHODS create_goods_receipt
+      IMPORTING
+        is_gr TYPE ty_gr
+        out   TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
 ENDCLASS.
 
@@ -110,7 +157,10 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   METHOD execute.
     write_log( iv_text = '=== Starting Initial Data Setup for Mini ERP ===' out = out ).
 
-    " Insert seed data using formatted keys and interface constants
+    " 1. Reset: all tables (master data, documents, stock movements) and number range levels
+    zcl_merp_clear_all_data=>execute( out ).
+
+    " 2. Master data
     setup_company_codes( out ).
     setup_vat_rates( out ).
     setup_warehouses( out ).
@@ -118,20 +168,28 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     setup_items( out ).
     setup_business_partners( out ).
 
-    setup_purchase_orders( out ).
-    setup_goods_receipts( out ).
-
-    " Dynamically sync NRO levels with real DB record counts
+    " 3. Number range levels follow the inserted master data; document numbers start from the beginning
     zcl_merp_num_range_util=>sync_intervals_from_db( ).
 
-    write_log( iv_text = '==== Initial Data Setup Completed Successfully ====' out = out ).
+    " Cleanup, master data and number range intervals are saved before documents are created:
+    " number assignment (number_get) must not wait for our own uncommitted interval changes
+    COMMIT WORK.
+
+    " 4. Documents via EML (the business logic assigns numbers, amounts, stock and statuses)
+    setup_documents( out ).
+
+    write_log( iv_text = '==== Initial Data Setup Completed ====' out = out ).
   ENDMETHOD.
 
   METHOD write_insert_log.
-    write_log(
-      iv_text = |[{ iv_entity_name }]: Successfully inserted { iv_count } rows.|
-      out     = out
-    ).
+    write_log( iv_text = |[{ iv_entity_name }]: Successfully inserted { iv_count } rows.| out = out ).
+  ENDMETHOD.
+
+  METHOD write_failure.
+    write_log( iv_text = iv_text out = out ).
+    LOOP AT it_messages INTO DATA(lo_message) WHERE table_line IS BOUND.
+      write_log( iv_text = |    - { lo_message->if_message~get_text( ) }| out = out ).
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD get_current_user.
@@ -175,12 +233,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setup_company_codes.
-    clear_table_data(
-      iv_active_table = CONV tabname( zif_merp_constants=>c_comp-table_db )
-      iv_draft_table  = CONV tabname( zif_merp_constants=>c_comp-table_draft )
-    ).
-
-   DATA lt_comp_code TYPE zif_merp_constants=>ty_md_comp_tt.
+    DATA lt_comp_code TYPE zif_merp_constants=>ty_md_comp_tt.
 
     lt_comp_code = VALUE #(
       ( company_code   = '1000'
@@ -216,11 +269,6 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setup_vat_rates.
-    clear_table_data(
-      iv_active_table = CONV tabname( zif_merp_constants=>c_vat-table_db )
-      iv_draft_table  = CONV tabname( zif_merp_constants=>c_vat-table_draft )
-    ).
-
     DATA lt_vat_rates TYPE zif_merp_constants=>ty_md_vat_tt.
 
     lt_vat_rates = VALUE #(
@@ -249,11 +297,6 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setup_warehouses.
-    clear_table_data(
-      iv_active_table = CONV tabname( zif_merp_constants=>c_wh-table_db )
-      iv_draft_table  = CONV tabname( zif_merp_constants=>c_wh-table_draft )
-    ).
-
     DATA lt_warehouses TYPE zif_merp_constants=>ty_md_wh_tt.
 
     lt_warehouses = VALUE #(
@@ -297,7 +340,6 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       ( warehouse_code = zcl_merp_format_util=>format_warehouse_code( 10 )
         warehouse_name = 'Lager Kaiserslautern'
         company_code   = '3000' )
-
     ).
 
     fill_audit_fields( CHANGING ct_data = lt_warehouses ).
@@ -307,11 +349,6 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setup_item_groups.
-    clear_table_data(
-      iv_active_table = CONV tabname( zif_merp_constants=>c_ig-table_db )
-      iv_draft_table  = CONV tabname( zif_merp_constants=>c_ig-table_draft )
-    ).
-
     DATA(lv_vat19) = zcl_merp_format_util=>format_vat_code( 3 ).
     DATA(lv_vat7)  = zcl_merp_format_util=>format_vat_code( 2 ).
 
@@ -351,12 +388,6 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setup_items.
-    clear_table_data(
-      iv_active_table = CONV tabname( zif_merp_constants=>c_item-table_db )
-      iv_draft_table  = CONV tabname( zif_merp_constants=>c_item-table_draft )
-    ).
-
-    " Formatted Group Codes
     DATA(lv_grp1) = zcl_merp_format_util=>format_item_grp_code( 1 ).
     DATA(lv_grp2) = zcl_merp_format_util=>format_item_grp_code( 2 ).
     DATA(lv_grp3) = zcl_merp_format_util=>format_item_grp_code( 3 ).
@@ -371,19 +402,19 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       ( item_code            = zcl_merp_format_util=>format_item_code( 1 )
         description          = 'Washing Machine Bosch Series 6'
         article              = 'BSH-WM-600'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp1
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_format_util=>format_item_code( 2 )
         description          = 'Refrigerator Siemens iQ500'
         article              = 'SIE-RF-500'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp1
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_format_util=>format_item_code( 3 )
         description          = 'Dishwasher Miele G7000'
         article              = 'MIE-DW-700'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp1
         base_unit_of_measure = 'EA' )
 
@@ -391,19 +422,19 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       ( item_code            = zcl_merp_format_util=>format_item_code( 4 )
         description          = 'Espresso Machine DeLonghi Magnifica'
         article              = 'DLG-EM-100'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp2
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_format_util=>format_item_code( 5 )
         description          = 'Electric Kettle Philips Daily Collection'
         article              = 'PHL-EK-200'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp2
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_format_util=>format_item_code( 6 )
         description          = 'Toaster Tefal Express 2-Slot'
         article              = 'TEF-TS-300'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp2
         base_unit_of_measure = 'EA' )
 
@@ -411,19 +442,19 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       ( item_code            = zcl_merp_format_util=>format_item_code( 7 )
         description          = 'Smart TV Samsung 55 Inch OLED'
         article              = 'SAM-TV-55O'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp3
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_format_util=>format_item_code( 8 )
         description          = 'Soundbar Sony HT-S400 2.1ch'
         article              = 'SNE-SB-400'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp3
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_format_util=>format_item_code( 9 )
         description          = 'Wireless Headphones Bose QuietComfort 45'
         article              = 'BOS-HP-QC45'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp3
         base_unit_of_measure = 'EA' )
 
@@ -431,19 +462,19 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       ( item_code            = zcl_merp_format_util=>format_item_code( 10 )
         description          = 'HDMI Cable 2.0 High Speed (2m)'
         article              = 'ACC-HDMI-02'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp4
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_format_util=>format_item_code( 11 )
         description          = 'Washing Machine Water Inlet Hose (1.5m)'
         article              = 'ACC-HOSE-15'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp4
         base_unit_of_measure = 'EA' )
       ( item_code            = zcl_merp_format_util=>format_item_code( 12 )
         description          = 'Descaling Solution for Coffee Machines 500ml'
         article              = 'ACC-DESC-50'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp4
         base_unit_of_measure = 'BOT' )
 
@@ -451,39 +482,38 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       ( item_code            = zcl_merp_format_util=>format_item_code( 13 )
         description          = 'Home Appliance Installation Service'
         article              = 'SRV-INST-01'
-        item_type            = 'S'
+        item_type            = zif_merp_constants=>c_item_type-service
         item_group_code      = lv_grp5
         base_unit_of_measure = 'H' )
       ( item_code            = zcl_merp_format_util=>format_item_code( 14 )
         description          = 'Extended Warranty & On-site Repair Service'
         article              = 'SRV-REPR-02'
-        item_type            = 'S'
+        item_type            = zif_merp_constants=>c_item_type-service
         item_group_code      = lv_grp5
         base_unit_of_measure = 'H' )
 
-       " Group 6: Legacy Office Equipment (Blocked)
-       ( item_code            = zcl_merp_format_util=>format_item_code( 15 )
+      " Group 6: Legacy Office Equipment (Blocked)
+      ( item_code            = zcl_merp_format_util=>format_item_code( 15 )
         description          = 'Siemens Optipoint 500 Entry'
         article              = 'SIE-TEL-500'
-        item_type            = 'P'
+        item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp6
         base_unit_of_measure = 'EA'
         is_blocked           = abap_true )
 
-       ( item_code            = zcl_merp_format_util=>format_item_code( 16 )
+      ( item_code            = zcl_merp_format_util=>format_item_code( 16 )
         description          = 'Express Delivery and Connection Service'
         article              = 'SRV-DELIV-03'
-        item_type            = 'S'
+        item_type            = zif_merp_constants=>c_item_type-service
         item_group_code      = lv_grp5
         base_unit_of_measure = 'EA' )
     ).
 
-    " Bulk-mode item group fetching via interface implementation
+    " Default VAT code of each item comes from its item group
     DATA lt_grp_keys TYPE zif_merp_md_item_group_sel=>tt_item_group_keys.
     lt_grp_keys = VALUE #( FOR GROUPS grp OF item IN lt_items GROUP BY item-item_group_code ( ItemGroupCode = grp ) ).
 
-    DATA(lo_item_grp_sel) = NEW zcl_merp_md_item_group_sel( ).
-    DATA(lt_item_groups)  = lo_item_grp_sel->zif_merp_md_item_group_sel~read_item_groups( lt_grp_keys ).
+    DATA(lt_item_groups) = NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_item_groups( lt_grp_keys ).
 
     LOOP AT lt_items ASSIGNING FIELD-SYMBOL(<ls_item>).
       ASSIGN lt_item_groups[ ItemGroupCode = <ls_item>-item_group_code ] TO FIELD-SYMBOL(<ls_grp>).
@@ -499,11 +529,6 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setup_business_partners.
-    clear_table_data(
-      iv_active_table = CONV tabname( zif_merp_constants=>c_bp-table_db )
-      iv_draft_table  = CONV tabname( zif_merp_constants=>c_bp-table_draft )
-    ).
-
     DATA lt_bp TYPE zif_merp_constants=>ty_md_bp_tt.
 
     lt_bp = VALUE #(
@@ -653,7 +678,6 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
         phone        = '+49 69 450012'
         email        = 'info@radioshack.de'
         is_blocked   = abap_true )
-
     ).
 
     fill_audit_fields( CHANGING ct_data = lt_bp ).
@@ -662,220 +686,279 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     write_insert_log( iv_entity_name = 'Business Partner' iv_count = sy-dbcnt out = out ).
   ENDMETHOD.
 
-  METHOD setup_purchase_orders.
-    clear_table_data(
-      iv_active_table = CONV tabname( zif_merp_constants=>c_po_itm-table_db )
-      iv_draft_table  = CONV tabname( zif_merp_constants=>c_po_itm-table_draft )
-    ).
+  METHOD setup_documents.
+    " PO 1 (1000): received completely by two goods receipts -> 'Completed'.
+    "   Rounding check, descaling solution 3 x 4.20 at 19% VAT:
+    "   3 units = 2.39 VAT, 2 units = 1.60 VAT, 1 unit = 0.80 VAT -> the last receipt takes the open 0.79
+    DATA(lv_po1) = create_purchase_order(
+      is_po = VALUE #( company_code = '1000' warehouse_no = 1 partner_no = 3
+                       days_ago     = 3      delivery_in  = 2
+                       responsible  = 'MUELLER_M'
+                       remarks      = 'Coffee machines and supplies'
+                       release      = abap_true
+                       lines        = VALUE #( ( item_no = 4  quantity = 4 price = '399.00' )
+                                               ( item_no = 12 quantity = 3 price = '4.20' )
+                                               ( item_no = 5  quantity = 6 price = '29.90' )
+                                               ( item_no = 16 quantity = 1 price = '49.00' ) ) )
+      out   = out ).
 
-    clear_table_data(
-      iv_active_table = CONV tabname( zif_merp_constants=>c_po-table_db )
-      iv_draft_table  = CONV tabname( zif_merp_constants=>c_po-table_draft )
-    ).
+    create_goods_receipt(
+      is_gr = VALUE #( po_uuid     = lv_po1
+                       days_ago    = 1
+                       responsible = 'MUELLER_M'
+                       remarks     = 'Delivery 1 of 2: 1 descaling solution follows'
+                       post        = abap_true
+                       lines       = VALUE #( ( item_no = 12 quantity = 2 ) ) )
+      out   = out ).
 
-    DATA lt_headers       TYPE zif_merp_constants=>ty_doc_po_hdr_tt.
-    DATA lt_items         TYPE zif_merp_constants=>ty_doc_po_itm_tt.
+    create_goods_receipt(
+      is_gr = VALUE #( po_uuid     = lv_po1
+                       days_ago    = 0
+                       responsible = 'MUELLER_M'
+                       remarks     = 'Delivery 2 of 2: remaining descaling solution'
+                       post        = abap_true )
+      out   = out ).
 
-    " Target structures for business logic orchestration
-    DATA lt_logic_items   TYPE zcl_merp_doc_item_logic=>tt_items.
-    DATA lt_header_keys   TYPE zcl_merp_doc_item_logic=>tt_header_keys.
-    DATA lt_currencies    TYPE zcl_merp_doc_item_logic=>tt_header_currencies.
+    " PO 2 (1000): partially received -> 'In Delivery' (2 washing machines and 3 h installation open)
+    DATA(lv_po2) = create_purchase_order(
+      is_po = VALUE #( company_code = '1000' warehouse_no = 2 partner_no = 1
+                       days_ago     = 2      delivery_in  = 5
+                       responsible  = 'SCHMIDT_A'
+                       remarks      = 'Large appliances with installation'
+                       release      = abap_true
+                       lines        = VALUE #( ( item_no = 1  quantity = 5  price = '550.00' )
+                                               ( item_no = 2  quantity = 2  price = '850.00' )
+                                               ( item_no = 11 quantity = 10 price = '12.50' )
+                                               ( item_no = 13 quantity = 5  price = '65.00' ) ) )
+      out   = out ).
 
-    DATA(lv_today)        = cl_abap_context_info=>get_system_date( ).
-    DATA(lo_item_logic)   = NEW zcl_merp_doc_item_logic( ).
+    create_goods_receipt(
+      is_gr = VALUE #( po_uuid     = lv_po2
+                       days_ago    = 0
+                       responsible = 'SCHMIDT_A'
+                       remarks     = 'Partial delivery: 2 washing machines and 3 h installation open'
+                       post        = abap_true
+                       lines       = VALUE #( ( item_no = 1  quantity = 3 )
+                                              ( item_no = 13 quantity = 2 ) ) )
+      out   = out ).
 
-    " Dynamic UUID generation for document routing keys
-    TRY.
-        DATA(lv_hd_uuid1) = cl_system_uuid=>create_uuid_x16_static( ).
-        DATA(lv_hd_uuid2) = cl_system_uuid=>create_uuid_x16_static( ).
-        DATA(lv_hd_uuid3) = cl_system_uuid=>create_uuid_x16_static( ).
-        DATA(lv_hd_uuid4) = cl_system_uuid=>create_uuid_x16_static( ).
+    " PO 3 (1000): released, nothing received -> 'Approved'
+    create_purchase_order(
+      is_po = VALUE #( company_code = '1000' warehouse_no = 1 partner_no = 4
+                       days_ago     = 1      delivery_in  = 4
+                       responsible  = 'SCHMIDT_A'
+                       remarks      = 'TV season stock'
+                       release      = abap_true
+                       lines        = VALUE #( ( item_no = 7  quantity = 4  price = '1200.00' )
+                                               ( item_no = 10 quantity = 20 price = '15.00' )
+                                               ( item_no = 14 quantity = 4  price = '80.00' ) ) )
+      out   = out ).
 
-        DATA(lv_it_uuid1) = cl_system_uuid=>create_uuid_x16_static( ).
-        DATA(lv_it_uuid2) = cl_system_uuid=>create_uuid_x16_static( ).
-        DATA(lv_it_uuid3) = cl_system_uuid=>create_uuid_x16_static( ).
-        DATA(lv_it_uuid4) = cl_system_uuid=>create_uuid_x16_static( ).
-        DATA(lv_it_uuid5) = cl_system_uuid=>create_uuid_x16_static( ).
-        DATA(lv_it_uuid6) = cl_system_uuid=>create_uuid_x16_static( ).
-        DATA(lv_it_uuid7) = cl_system_uuid=>create_uuid_x16_static( ).
-        DATA(lv_it_uuid8) = cl_system_uuid=>create_uuid_x16_static( ).
-        DATA(lv_it_uuid9) = cl_system_uuid=>create_uuid_x16_static( ).
-      CATCH cx_uuid_error.
-    ENDTRY.
+    " PO 4 (2000): released, nothing received -> 'Approved'
+    create_purchase_order(
+      is_po = VALUE #( company_code = '2000' warehouse_no = 6 partner_no = 12
+                       days_ago     = 2      delivery_in  = 6
+                       responsible  = 'FISCHER_K'
+                       remarks      = 'Audio assortment for Hamburg'
+                       release      = abap_true
+                       lines        = VALUE #( ( item_no = 9  quantity = 10 price = '279.00' )
+                                               ( item_no = 8  quantity = 5  price = '249.00' )
+                                               ( item_no = 10 quantity = 15 price = '15.00' )
+                                               ( item_no = 16 quantity = 1  price = '49.00' ) ) )
+      out   = out ).
 
-    " 1. Prepare header currencies required for default data derivation sequence
-    lt_currencies = VALUE #(
-      ( HeaderUUID = lv_hd_uuid1 IsDraft = abap_false CurrencyCode = 'EUR' )
-      ( HeaderUUID = lv_hd_uuid2 IsDraft = abap_false CurrencyCode = 'EUR' )
-      ( HeaderUUID = lv_hd_uuid3 IsDraft = abap_false CurrencyCode = 'EUR' )
-      ( HeaderUUID = lv_hd_uuid4 IsDraft = abap_false CurrencyCode = 'EUR' )
-    ).
+    " PO 5 (3000): not released -> 'New'
+    create_purchase_order(
+      is_po = VALUE #( company_code = '3000' warehouse_no = 9 partner_no = 11
+                       days_ago     = 1      delivery_in  = 7
+                       responsible  = 'WEBER_J'
+                       remarks      = 'Modevi starter set, waiting for approval'
+                       release      = abap_false
+                       lines        = VALUE #( ( item_no = 6 quantity = 8 price = '39.90' )
+                                               ( item_no = 5 quantity = 8 price = '29.90' ) ) )
+      out   = out ).
 
-    " 2. Inject initial item definitions (only code, quantity and price parameters)
-    lt_logic_items = VALUE #(
-      " Purchase Order 1
-      ( ItemUUID = lv_it_uuid1 HeaderUUID = lv_hd_uuid1 IsDraft = abap_false
-        ItemCode = zcl_merp_format_util=>format_item_code( 1 )  Quantity = 2 Price = '550.00' )
-      ( ItemUUID = lv_it_uuid2 HeaderUUID = lv_hd_uuid1 IsDraft = abap_false
-        ItemCode = zcl_merp_format_util=>format_item_code( 2 )  Quantity = 1 Price = '850.00' )
-      ( ItemUUID = lv_it_uuid7 HeaderUUID = lv_hd_uuid1 IsDraft = abap_false
-        ItemCode = zcl_merp_format_util=>format_item_code( 13 ) Quantity = 2 Price = '100.00' )
+    " Summary: resulting purchase order statuses
+    SELECT document_number, status
+      FROM zmerp_po_hdr
+      ORDER BY document_number
+      INTO TABLE @DATA(lt_po_status).
 
-      " Purchase Order 2
-      ( ItemUUID = lv_it_uuid3 HeaderUUID = lv_hd_uuid2 IsDraft = abap_false
-        ItemCode = zcl_merp_format_util=>format_item_code( 7 )  Quantity = 3 Price = '1200.00' )
-      ( ItemUUID = lv_it_uuid4 HeaderUUID = lv_hd_uuid2 IsDraft = abap_false
-        ItemCode = zcl_merp_format_util=>format_item_code( 10 ) Quantity = 5 Price = '15.00' )
-      ( ItemUUID = lv_it_uuid8 HeaderUUID = lv_hd_uuid2 IsDraft = abap_false
-        ItemCode = zcl_merp_format_util=>format_item_code( 13 ) Quantity = 2 Price = '100.00' )
-
-      " Purchase Order 3 (Company 2000)
-      ( ItemUUID = lv_it_uuid5 HeaderUUID = lv_hd_uuid3 IsDraft = abap_false
-        ItemCode = zcl_merp_format_util=>format_item_code( 1 )  Quantity = 4 Price = '550.00' )
-      ( ItemUUID = lv_it_uuid9 HeaderUUID = lv_hd_uuid3 IsDraft = abap_false
-        ItemCode = zcl_merp_format_util=>format_item_code( 13 ) Quantity = 1 Price = '100.00' )
-
-      " Purchase Order 4 (Company 3000)
-      ( ItemUUID = lv_it_uuid6 HeaderUUID = lv_hd_uuid4 IsDraft = abap_false
-        ItemCode = zcl_merp_format_util=>format_item_code( 7 )  Quantity = 2 Price = '1200.00' )
-    ).
-
-    " 3. Invoke shared logic core to determine defaults (ItemNo, UoM, VatCode, Currency)
-    DATA(lt_defaults) = lo_item_logic->set_defaults(
-      it_items             = lt_logic_items
-      it_siblings          = VALUE #( )
-      it_header_currencies = lt_currencies
-    ).
-
-    " 4. Execute calculations for financial amounts (Net, Vat, Gross fields)
-    DATA(lt_final_items) = lo_item_logic->recalc_on_qty_price( it_items = lt_defaults ).
-
-    " 5. Determine context keys and execute aggregation for document total values
-    lt_header_keys = VALUE #( FOR key IN lt_currencies ( CORRESPONDING #( key ) ) ).
-    DATA(lt_totals) = lo_item_logic->calc_header_totals( it_header_keys = lt_header_keys
-                                                         it_items       = lt_final_items ).
-
-    " 6. Construct structural mapping back into target zmerp_po_itm active database records
-    lt_items = VALUE #( FOR item IN lt_final_items (
-      item_uuid          = item-ItemUUID
-      header_uuid        = item-HeaderUUID
-      item_no            = item-ItemNo
-      item_code          = item-ItemCode
-      quantity           = item-Quantity
-      unit_of_measure    = item-UnitOfMeasure
-      currency_code      = item-CurrencyCode
-      price              = item-Price
-      net_amount         = item-NetAmount
-      vat_code           = item-VatCode
-      vat_amount         = item-VatAmount
-      gross_amount       = item-GrossAmount
-    ) ).
-
-    " 7. Populate header components using calculated context aggregates from shared logic execution
-    ASSIGN lt_totals[ HeaderUUID = lv_hd_uuid1 ] TO FIELD-SYMBOL(<ls_tot1>).
-    APPEND VALUE #(
-      document_uuid         = lv_hd_uuid1
-      document_number       = zcl_merp_format_util=>format_po_code( iv_number = 1 iv_company_code = '1000' )
-      document_date         = lv_today
-      posting_date          = lv_today
-      company_code          = '1000'
-      warehouse_code        = zcl_merp_format_util=>format_warehouse_code( 1 )
-      business_partner_code = zcl_merp_format_util=>format_bp_code( 1 )
-      currency_code         = 'EUR'
-      total_net_amount      = <ls_tot1>-TotalNetAmount
-      total_gross_amount    = <ls_tot1>-TotalGrossAmount
-      status                = 'N'
-      delivery_date         = lv_today + 5
-      responsible_person    = 'MUELLER_M'
-      remarks               = 'Initial high-volume household goods order'
-    ) TO lt_headers.
-
-    ASSIGN lt_totals[ HeaderUUID = lv_hd_uuid2 ] TO FIELD-SYMBOL(<ls_tot2>).
-    APPEND VALUE #(
-      document_uuid         = lv_hd_uuid2
-      document_number       = zcl_merp_format_util=>format_po_code( iv_number = 2 iv_company_code = '1000' )
-      document_date         = lv_today
-      posting_date          = lv_today
-      company_code          = '1000'
-      warehouse_code        = zcl_merp_format_util=>format_warehouse_code( 2 )
-      business_partner_code = zcl_merp_format_util=>format_bp_code( 4 )
-      currency_code         = 'EUR'
-      total_net_amount      = <ls_tot2>-TotalNetAmount
-      total_gross_amount    = <ls_tot2>-TotalGrossAmount
-      status                = 'N'
-      delivery_date         = lv_today + 3
-      responsible_person    = 'SCHMIDT_A'
-      remarks               = 'Electronics stock replenishment'
-    ) TO lt_headers.
-
-    ASSIGN lt_totals[ HeaderUUID = lv_hd_uuid3 ] TO FIELD-SYMBOL(<ls_tot3>).
-    APPEND VALUE #(
-      document_uuid         = lv_hd_uuid3
-      document_number       = zcl_merp_format_util=>format_po_code( iv_number = 1 iv_company_code = '2000' )
-      document_date         = lv_today
-      posting_date          = lv_today
-      company_code          = '2000'
-      warehouse_code        = zcl_merp_format_util=>format_warehouse_code( 6 )
-      business_partner_code = zcl_merp_format_util=>format_bp_code( 12 )
-      currency_code         = 'EUR'
-      total_net_amount      = <ls_tot3>-TotalNetAmount
-      total_gross_amount    = <ls_tot3>-TotalGrossAmount
-      status                = 'N'
-      delivery_date         = lv_today + 6
-      responsible_person    = 'FISCHER_K'
-      remarks               = 'Initial trading stock supply'
-    ) TO lt_headers.
-
-    ASSIGN lt_totals[ HeaderUUID = lv_hd_uuid4 ] TO FIELD-SYMBOL(<ls_tot4>).
-    APPEND VALUE #(
-      document_uuid         = lv_hd_uuid4
-      document_number       = zcl_merp_format_util=>format_po_code( iv_number = 1 iv_company_code = '3000' )
-      document_date         = lv_today
-      posting_date          = lv_today
-      company_code          = '3000'
-      warehouse_code        = zcl_merp_format_util=>format_warehouse_code( 9 )
-      business_partner_code = zcl_merp_format_util=>format_bp_code( 13 )
-      currency_code         = 'EUR'
-      total_net_amount      = <ls_tot4>-TotalNetAmount
-      total_gross_amount    = <ls_tot4>-TotalGrossAmount
-      status                = 'N'
-      delivery_date         = lv_today + 4
-      responsible_person    = 'WEBER_J'
-      remarks               = 'Modevi branch appliance starter set'
-    ) TO lt_headers.
-
-    " 8. Write target entities to database transactional buffer
-    fill_audit_fields( CHANGING ct_data = lt_headers ).
-    INSERT zmerp_po_hdr FROM TABLE @lt_headers.
-    write_insert_log( iv_entity_name = 'Purchase Order Header' iv_count = sy-dbcnt out = out ).
-
-    fill_audit_fields( CHANGING ct_data = lt_items ).
-    INSERT zmerp_po_itm FROM TABLE @lt_items.
-    write_insert_log( iv_entity_name = 'Purchase Order Item' iv_count = sy-dbcnt out = out ).
-
+    write_log( iv_text = '[Summary] Purchase order statuses:' out = out ).
+    LOOP AT lt_po_status REFERENCE INTO DATA(lr_po_status).
+      write_log( iv_text = |    { lr_po_status->document_number }: { lr_po_status->status }| out = out ).
+    ENDLOOP.
   ENDMETHOD.
 
-  METHOD setup_goods_receipts.
+  METHOD create_purchase_order.
+    DATA(lv_today) = cl_abap_context_info=>get_system_date( ).
 
-    clear_table_data(
-      iv_active_table = CONV tabname( zif_merp_constants=>c_gr_itm-table_db )
-      iv_draft_table  = CONV tabname( zif_merp_constants=>c_gr_itm-table_draft )
-    ).
+    " 1. Header and items: currency, item defaults and amounts are derived by the purchase order logic
+    MODIFY ENTITIES OF zmerp_r_purchaseorder
+      ENTITY PurchaseOrder
+        CREATE FIELDS ( CompanyCode WarehouseCode BusinessPartnerCode DocumentDate DeliveryDate
+                        ResponsiblePerson Remarks )
+        WITH VALUE #( ( %cid                = 'PO'
+                        CompanyCode         = is_po-company_code
+                        WarehouseCode       = zcl_merp_format_util=>format_warehouse_code( is_po-warehouse_no )
+                        BusinessPartnerCode = zcl_merp_format_util=>format_bp_code( is_po-partner_no )
+                        DocumentDate        = CONV d( lv_today - is_po-days_ago )
+                        DeliveryDate        = CONV d( lv_today + is_po-delivery_in )
+                        ResponsiblePerson   = is_po-responsible
+                        Remarks             = is_po-remarks ) )
+        CREATE BY \_Items
+        FIELDS ( ItemCode Quantity Price )
+        WITH VALUE #( ( %cid_ref = 'PO'
+                        %target  = VALUE #( FOR po_line IN is_po-lines INDEX INTO lv_index
+                                            ( %cid     = |PO_ITEM_{ lv_index }|
+                                              ItemCode = zcl_merp_format_util=>format_item_code( po_line-item_no )
+                                              Quantity = po_line-quantity
+                                              Price    = po_line-price ) ) ) )
+      MAPPED DATA(ls_mapped).
 
-    clear_table_data(
-      iv_active_table = CONV tabname( zif_merp_constants=>c_gr-table_db )
-      iv_draft_table  = CONV tabname( zif_merp_constants=>c_gr-table_draft )
-    ).
+    rv_po_uuid = VALUE #( ls_mapped-purchaseorder[ 1 ]-DocumentUUID OPTIONAL ).
 
-  ENDMETHOD.
+    COMMIT ENTITIES RESPONSE OF zmerp_r_purchaseorder
+      FAILED DATA(ls_save_failed)
+      REPORTED DATA(ls_save_reported).
 
-  METHOD clear_table_data.
-    DELETE FROM (iv_active_table).
-    IF iv_draft_table IS NOT INITIAL.
-      DELETE FROM (iv_draft_table).
+    IF ls_save_failed IS NOT INITIAL OR rv_po_uuid IS INITIAL.
+      write_failure(
+        iv_text     = |[Purchase Order]: Creation for company { is_po-company_code } failed:|
+        it_messages = VALUE #( BASE VALUE #( FOR save_hdr IN ls_save_reported-purchaseorder ( save_hdr-%msg ) )
+                               FOR save_itm IN ls_save_reported-purchaseorderitem ( save_itm-%msg ) )
+        out         = out ).
+      ROLLBACK ENTITIES.
+      CLEAR rv_po_uuid.
+      RETURN.
     ENDIF.
+
+    " 2. Release ('New' -> 'Approved')
+    IF is_po-release = abap_true.
+      MODIFY ENTITIES OF zmerp_r_purchaseorder
+        ENTITY PurchaseOrder
+        EXECUTE releaseDocument
+        FROM VALUE #( ( DocumentUUID = rv_po_uuid ) )
+        FAILED DATA(ls_release_failed)
+        REPORTED DATA(ls_release_reported).
+
+      IF ls_release_failed IS INITIAL.
+        COMMIT ENTITIES RESPONSE OF zmerp_r_purchaseorder
+          FAILED DATA(ls_commit_failed)
+          REPORTED DATA(ls_commit_reported).
+      ENDIF.
+
+      IF ls_release_failed IS NOT INITIAL OR ls_commit_failed IS NOT INITIAL.
+        write_failure(
+          iv_text     = |[Purchase Order]: Release for company { is_po-company_code } failed:|
+          it_messages = VALUE #( BASE VALUE #( FOR rel_hdr IN ls_release_reported-purchaseorder ( rel_hdr-%msg ) )
+                                 FOR com_hdr IN ls_commit_reported-purchaseorder ( com_hdr-%msg ) )
+          out         = out ).
+        ROLLBACK ENTITIES.
+      ENDIF.
+    ENDIF.
+
+    SELECT SINGLE document_number, status
+      FROM zmerp_po_hdr
+      WHERE document_uuid = @rv_po_uuid
+      INTO @DATA(ls_po).
+
+    write_log( iv_text = |[Purchase Order]: { ls_po-document_number } created, status { ls_po-status }.| out = out ).
   ENDMETHOD.
 
-  .
+  METHOD create_goods_receipt.
+    IF is_gr-po_uuid IS INITIAL.
+      write_log( iv_text = '[Goods Receipt]: Skipped, the purchase order was not created.' out = out ).
+      RETURN.
+    ENDIF.
+
+    DATA(lv_date) = CONV d( cl_abap_context_info=>get_system_date( ) - is_gr-days_ago ).
+
+    " 1. Header with the purchase order reference: header fields and items (open quantities)
+    "    are derived by the goods receipt logic (deriveDocFromPurchaseOrder)
+    MODIFY ENTITIES OF zmerp_r_goodsreceipt
+      ENTITY GoodsReceipt
+      CREATE FIELDS ( PoReferenceUUID DocumentDate PostingDate ResponsiblePerson Remarks )
+      WITH VALUE #( ( %cid              = 'GR'
+                      PoReferenceUUID   = is_gr-po_uuid
+                      DocumentDate      = lv_date
+                      PostingDate       = lv_date
+                      ResponsiblePerson = is_gr-responsible
+                      Remarks           = is_gr-remarks ) )
+      MAPPED DATA(ls_mapped).
+
+    DATA(lv_gr_uuid) = VALUE #( ls_mapped-goodsreceipt[ 1 ]-DocumentUUID OPTIONAL ).
+
+    " 2. Partial receipt: the listed items get the given quantity, all others keep the open quantity
+    IF is_gr-lines IS NOT INITIAL AND lv_gr_uuid IS NOT INITIAL.
+      DATA(lt_quantities) = VALUE tt_quantities(
+        FOR gr_line IN is_gr-lines ( item_code = zcl_merp_format_util=>format_item_code( gr_line-item_no )
+                                     quantity  = gr_line-quantity ) ).
+
+      READ ENTITIES OF zmerp_r_goodsreceipt
+        ENTITY GoodsReceipt BY \_Items
+        FIELDS ( ItemCode )
+        WITH VALUE #( ( DocumentUUID = lv_gr_uuid ) )
+        RESULT DATA(lt_items).
+
+      MODIFY ENTITIES OF zmerp_r_goodsreceipt
+        ENTITY GoodsReceiptItem
+        UPDATE FIELDS ( Quantity )
+        WITH VALUE #( FOR gr_item IN lt_items
+                      FOR qty IN lt_quantities WHERE ( item_code = gr_item-ItemCode )
+                      ( %tky     = gr_item-%tky
+                        Quantity = qty-quantity ) ).
+    ENDIF.
+
+    COMMIT ENTITIES RESPONSE OF zmerp_r_goodsreceipt
+      FAILED DATA(ls_save_failed)
+      REPORTED DATA(ls_save_reported).
+
+    IF ls_save_failed IS NOT INITIAL OR lv_gr_uuid IS INITIAL.
+      write_failure(
+        iv_text     = '[Goods Receipt]: Saving failed:'
+        it_messages = VALUE #( BASE VALUE #( FOR save_hdr IN ls_save_reported-goodsreceipt ( save_hdr-%msg ) )
+                               FOR save_itm IN ls_save_reported-goodsreceiptitem ( save_itm-%msg ) )
+        out         = out ).
+      ROLLBACK ENTITIES.
+      RETURN.
+    ENDIF.
+
+    " 3. Posting: stock movements and the purchase order status follow the goods receipt logic
+    IF is_gr-post = abap_true.
+      MODIFY ENTITIES OF zmerp_r_goodsreceipt
+        ENTITY GoodsReceipt
+        EXECUTE postDocument
+        FROM VALUE #( ( DocumentUUID = lv_gr_uuid ) )
+        FAILED DATA(ls_post_failed)
+        REPORTED DATA(ls_post_reported).
+
+      IF ls_post_failed IS INITIAL.
+        COMMIT ENTITIES RESPONSE OF zmerp_r_goodsreceipt
+          FAILED DATA(ls_commit_failed)
+          REPORTED DATA(ls_commit_reported).
+      ENDIF.
+
+      IF ls_post_failed IS NOT INITIAL OR ls_commit_failed IS NOT INITIAL.
+        write_failure(
+          iv_text     = '[Goods Receipt]: Posting failed:'
+          it_messages = VALUE #( BASE VALUE #( BASE VALUE #( FOR post_hdr IN ls_post_reported-goodsreceipt ( post_hdr-%msg ) )
+                                               FOR post_itm IN ls_post_reported-goodsreceiptitem ( post_itm-%msg ) )
+                                 FOR com_hdr IN ls_commit_reported-goodsreceipt ( com_hdr-%msg ) )
+          out         = out ).
+        ROLLBACK ENTITIES.
+      ENDIF.
+    ENDIF.
+
+    SELECT SINGLE gr~document_number, gr~status, po~document_number AS po_number, po~status AS po_status
+      FROM zmerp_gr_hdr AS gr
+      INNER JOIN zmerp_po_hdr AS po ON po~document_uuid = gr~po_reference_uuid
+      WHERE gr~document_uuid = @lv_gr_uuid
+      INTO @DATA(ls_gr).
+
+    write_log( iv_text = |[Goods Receipt]: { ls_gr-document_number } for PO { ls_gr-po_number } created, | &&
+                         |status { ls_gr-status }; PO status { ls_gr-po_status }.|
+               out     = out ).
+  ENDMETHOD.
 
 ENDCLASS.
