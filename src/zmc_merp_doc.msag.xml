@@ -173,6 +173,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>112</MSGNR>
+     <TEXT>Item &amp;1: nothing left to receive for the purchase order.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>130</MSGNR>
      <TEXT>Invalid document status.</TEXT>
     </T100>

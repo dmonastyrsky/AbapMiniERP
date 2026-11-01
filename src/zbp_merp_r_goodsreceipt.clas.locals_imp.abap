@@ -1119,6 +1119,13 @@ CLASS lhc_zmerp_r_goodsreceiptitm DEFINITION INHERITING FROM cl_abap_behavior_ha
         keys   REQUEST requested_features FOR GoodsReceiptItem
       RESULT   result.
 
+    "! Sets quantity and amounts of the selected purchase order items to the current open values;
+    "! items without open quantity are only reported, the user decides whether to remove them.
+    METHODS fillOpenQuantity FOR MODIFY
+      IMPORTING
+        keys   FOR ACTION GoodsReceiptItem~fillOpenQuantity
+      RESULT   result.
+
     "! Recalculates total header net and gross amounts (via ZCL_MERP_DOC_CALC) when items are created, changed or deleted.
     METHODS calcHeaderTotals FOR DETERMINE ON MODIFY
       IMPORTING
@@ -1177,18 +1184,88 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
 
     result = VALUE #(
       FOR item IN lt_items
-      LET lv_from_po = xsdbool( item-PoItemReferenceUUID IS NOT INITIAL ) IN
-      ( %tky            = item-%tky
-        %field-ItemCode = COND #( WHEN lv_from_po = abap_true
-                                  THEN if_abap_behv=>fc-f-read_only
-                                  ELSE if_abap_behv=>fc-f-mandatory )
-        %field-Price    = COND #( WHEN lv_from_po = abap_true
-                                  THEN if_abap_behv=>fc-f-read_only
-                                  ELSE if_abap_behv=>fc-f-mandatory )
-        %field-VatCode  = COND #( WHEN lv_from_po = abap_true
-                                  THEN if_abap_behv=>fc-f-read_only
-                                  ELSE if_abap_behv=>fc-f-unrestricted ) )
+      LET lv_from_po = xsdbool( item-PoItemReferenceUUID IS NOT INITIAL )
+          lv_draft   = xsdbool( item-%is_draft = if_abap_behv=>mk-on ) IN
+      ( %tky                     = item-%tky
+        %field-ItemCode          = COND #( WHEN lv_from_po = abap_true
+                                           THEN if_abap_behv=>fc-f-read_only
+                                           ELSE if_abap_behv=>fc-f-mandatory )
+        %field-Price             = COND #( WHEN lv_from_po = abap_true
+                                           THEN if_abap_behv=>fc-f-read_only
+                                           ELSE if_abap_behv=>fc-f-mandatory )
+        %field-VatCode           = COND #( WHEN lv_from_po = abap_true
+                                           THEN if_abap_behv=>fc-f-read_only
+                                           ELSE if_abap_behv=>fc-f-unrestricted )
+        %action-fillOpenQuantity = COND #( WHEN lv_from_po = abap_true AND lv_draft = abap_true
+                                           THEN if_abap_behv=>fc-o-enabled
+                                           ELSE if_abap_behv=>fc-o-disabled ) )
     ).
+  ENDMETHOD.
+
+  METHOD fillOpenQuantity.
+    DATA lt_items_update TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt\\GoodsReceiptItem.
+
+    " Selected items and their parent headers (purchase order reference)
+    READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+      ENTITY GoodsReceiptItem
+        FIELDS ( HeaderUUID ItemNo Quantity NetAmount VatAmount GrossAmount PoItemReferenceUUID )
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(lt_items)
+      ENTITY GoodsReceiptItem BY \_GoodsReceipt
+        FIELDS ( PoReferenceUUID )
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(lt_headers).
+
+    " Current open quantities and amounts of the referenced purchase orders (posted receipts only)
+    DATA(lt_progress) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_progress(
+      VALUE #( FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) ) ).
+
+    " Manually added items have no open quantity and are skipped
+    LOOP AT lt_items REFERENCE INTO DATA(lr_item) WHERE PoItemReferenceUUID IS NOT INITIAL.
+      DATA(ls_item) = lr_item->*.
+
+      ASSIGN lt_progress[ PoItemUUID = ls_item-PoItemReferenceUUID ] TO FIELD-SYMBOL(<open>).
+
+      " 1. Nothing left to receive for the order item: only reported
+      IF sy-subrc <> 0 OR <open>-OpenQuantity <= 0.
+        APPEND VALUE #(
+          %tky  = ls_item-%tky
+          %path = VALUE #( GoodsReceipt-%is_draft    = ls_item-%is_draft
+                           GoodsReceipt-DocumentUUID = ls_item-HeaderUUID )
+          %msg  = NEW zcx_merp_pur(
+                    textid   = zcx_merp_pur=>po_item_nothing_open
+                    attr1    = CONV string( ls_item-ItemNo )
+                    severity = if_abap_behv_message=>severity-warning )
+        ) TO reported-goodsreceiptitem.
+        CONTINUE.
+      ENDIF.
+
+      " 2. Quantity and amounts follow the current open values of the order item
+      ls_item-Quantity    = <open>-OpenQuantity.
+      ls_item-NetAmount   = <open>-OpenNetAmount.
+      ls_item-VatAmount   = <open>-OpenVatAmount.
+      ls_item-GrossAmount = <open>-OpenGrossAmount.
+
+      IF ls_item <> lr_item->*.
+        APPEND CORRESPONDING #( ls_item ) TO lt_items_update.
+      ENDIF.
+    ENDLOOP.
+
+    " Header totals are recalculated by calcHeaderTotals (triggered by the changed amounts)
+    IF lt_items_update IS NOT INITIAL.
+      MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+        ENTITY GoodsReceiptItem
+        UPDATE FIELDS ( Quantity NetAmount VatAmount GrossAmount )
+        WITH lt_items_update.
+    ENDIF.
+
+    READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+      ENTITY GoodsReceiptItem
+      ALL FIELDS
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_result).
+
+    result = VALUE #( FOR item IN lt_result ( %tky = item-%tky %param = item ) ).
   ENDMETHOD.
 
   METHOD validateItemFields.

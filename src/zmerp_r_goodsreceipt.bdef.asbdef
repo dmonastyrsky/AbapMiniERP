@@ -103,6 +103,8 @@ authorization dependent by _GoodsReceipt
   field ( mandatory ) Quantity;
   field ( features : instance ) ItemCode, Price, VatCode;
 
+  action ( features : instance, authorization : update ) fillOpenQuantity result [1] $self;
+
   determination setItemDefaults          on modify { create; field ItemCode; }
   determination calcAmountsOnQtyPrice    on modify { field Quantity, Price; }
   determination calcAmountsOnVatCode     on modify { field VatCode; }

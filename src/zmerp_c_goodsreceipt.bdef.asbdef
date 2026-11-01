@@ -25,6 +25,10 @@ use etag
 
   side effects
   {
+
+    action postDocument affects entity _Items, messages;
+    action cancelDocument affects entity _Items, messages;
+
     field PoReferenceUUID affects field CompanyCode, field WarehouseCode, field BusinessPartnerCode, field CurrencyCode,
         field SupplierReference, field TotalNetAmount, field TotalGrossAmount,
         entity _Items, messages;
@@ -49,10 +53,14 @@ use etag
   use update;
   use delete;
 
+  use action fillOpenQuantity;
+
   use association _GoodsReceipt { with draft; }
 
   side effects
   {
+    action fillOpenQuantity affects $self, field _GoodsReceipt.TotalNetAmount, field _GoodsReceipt.TotalGrossAmount, messages;
+
     field ItemCode affects field UnitOfMeasure, field VatCode, field VatAmount, field GrossAmount, messages;
     field Quantity affects field NetAmount, field VatAmount, field GrossAmount, messages;
     field Price affects field NetAmount, field VatAmount, field GrossAmount, messages;

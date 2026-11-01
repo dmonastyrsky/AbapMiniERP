@@ -66,7 +66,10 @@ annotate view ZMERP_C_GOODSRECEIPTITM with
   HeaderUUID;
 
   /* ---------- Column 1: General Information ---------- */
-  @UI.lineItem: [{ position: 10, importance: #HIGH }]
+  @UI.lineItem: [
+    { position: 10, importance: #HIGH },
+    { type: #FOR_ACTION, dataAction: 'fillOpenQuantity', label: 'Fill Open Quantity' }
+  ]
   ItemNo;
 
   @UI.lineItem: [{ position: 20, importance: #HIGH }]

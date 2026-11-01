@@ -43,6 +43,15 @@ CLASS zcx_merp_pur DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF bp_is_not_supplier,
 
+      BEGIN OF po_item_nothing_open,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '112',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF po_item_nothing_open,
+
       " --- Delivery & Items Specifics ---
       BEGIN OF delivery_date_past_invalid,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
