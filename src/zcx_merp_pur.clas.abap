@@ -87,6 +87,17 @@ CLASS zcx_merp_pur DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF po_receipt_not_allowed,
 
+      " --- Goods Receipt vs. Purchase Order Dates (118) ---
+      " &1 = purchase order document date
+      BEGIN OF posting_date_before_po_date,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '118',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF posting_date_before_po_date,
+
       " --- Goods Receipt Items vs. Purchase Order Open Values (112-114) ---
       " &1 = goods receipt item number
       BEGIN OF po_item_nothing_open,

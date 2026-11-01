@@ -537,7 +537,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt
-        FIELDS ( Status DocumentNumber CompanyCode CurrencyCode PoReferenceUUID )
+        FIELDS ( Status DocumentNumber CompanyCode CurrencyCode PoReferenceUUID PostingDate )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_headers)
       ENTITY GoodsReceipt BY \_Items
@@ -583,6 +583,12 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                             severity = if_abap_behv_message=>severity-error
                             attr1    = CONV #( VALUE #( lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ]-DocumentNumber
                                                         OPTIONAL ) ) ).
+      ELSEIF lr_header->PostingDate < VALUE #( lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ]-DocumentDate
+                                               OPTIONAL ).
+        " Goods cannot be received before they were ordered
+        lo_message = NEW #( textid   = zcx_merp_pur=>posting_date_before_po_date
+                            severity = if_abap_behv_message=>severity-error
+                            attr1    = |{ lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ]-DocumentDate DATE = ISO }| ).
       ENDIF.
 
       " 2. Items of the purchase order are checked against its current open quantities and amounts

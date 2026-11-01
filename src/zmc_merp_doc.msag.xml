@@ -209,6 +209,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>118</MSGNR>
+     <TEXT>Posting Date cannot be before Purchase Order date &amp;1.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>130</MSGNR>
      <TEXT>Invalid document status.</TEXT>
     </T100>
