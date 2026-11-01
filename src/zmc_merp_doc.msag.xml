@@ -179,6 +179,30 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>113</MSGNR>
+     <TEXT>Item &amp;1: quantity exceeds the open quantity &amp;2 of the purchase order.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>114</MSGNR>
+     <TEXT>Item &amp;1: open amounts of the purchase order have changed. Use &apos;Fill Open</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>115</MSGNR>
+     <TEXT>Document currency &amp;1 differs from company currency &amp;2.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>116</MSGNR>
+     <TEXT>Goods receipt for purchase order &amp;1 is not allowed in its current status.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>130</MSGNR>
      <TEXT>Invalid document status.</TEXT>
     </T100>

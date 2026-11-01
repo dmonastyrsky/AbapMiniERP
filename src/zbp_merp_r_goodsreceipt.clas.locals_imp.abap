@@ -11,6 +11,12 @@ CLASS lhc_zmerp_r_goodsreceipt DEFINITION INHERITING FROM cl_abap_behavior_handl
       c_val_doc_date       TYPE string VALUE 'VALIDATE_DOC_DATE',
       c_val_post_date      TYPE string VALUE 'VALIDATE_POST_DATE'.
 
+    TYPES: BEGIN OF ty_po_status,
+             DocumentUUID TYPE sysuuid_x16,
+             Status       TYPE zmerp_po_status,
+           END OF ty_po_status,
+           tt_po_status TYPE STANDARD TABLE OF ty_po_status WITH EMPTY KEY.
+
     "! Evaluates global authorizations for CUD operations.
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
       IMPORTING
@@ -95,6 +101,19 @@ CLASS lhc_zmerp_r_goodsreceipt DEFINITION INHERITING FROM cl_abap_behavior_handl
     METHODS clearMessagesForHeaderFields FOR DETERMINE ON MODIFY
       IMPORTING
         keys FOR GoodsReceipt~clearMessagesForHeaderFields.
+
+    "! Receipt status of the referenced purchase orders after the given goods receipt items are
+    "! posted (iv_sign = 1) or unposted (iv_sign = -1). Only purchase orders touched by the items
+    "! and whose status really changes are returned.
+    "! @parameter it_items    | Goods receipt items (PoItemReferenceUUID, Quantity)
+    "! @parameter it_progress | Receipt progress of the purchase orders (posted receipts only)
+    "! @parameter iv_sign     | 1 = items are added to the received quantity, -1 = removed
+    "! @parameter rt_status   | Purchase orders with their new status
+    METHODS calc_po_receipt_status
+      IMPORTING it_items         TYPE zcl_merp_doc_item_logic=>tt_items
+                it_progress      TYPE zif_merp_doc_po_sel=>tt_progress
+                iv_sign          TYPE i
+      RETURNING VALUE(rt_status) TYPE tt_po_status.
 
 ENDCLASS.
 
@@ -465,37 +484,108 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD postDocument.
-    DATA lt_update  TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt.
-    DATA lo_message TYPE REF TO zcx_merp_pur.
+    DATA lt_update       TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt.
+    DATA lo_message      TYPE REF TO zcx_merp_pur.
+    DATA lo_item_message TYPE REF TO zcx_merp_pur.
+    DATA lv_items_valid  TYPE abap_bool.
 
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt
-        FIELDS ( Status DocumentNumber )
+        FIELDS ( Status DocumentNumber CompanyCode CurrencyCode PoReferenceUUID )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_headers)
       ENTITY GoodsReceipt BY \_Items
-        FIELDS ( ItemCode )
+        FIELDS ( HeaderUUID ItemNo Quantity NetAmount VatAmount GrossAmount PoItemReferenceUUID )
         WITH CORRESPONDING #( keys )
-        LINK DATA(lt_links).
+        RESULT DATA(lt_items).
+
+    " Company currencies and purchase order context of all documents in one selection each
+    DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
+      VALUE #( FOR header IN lt_headers ( CompanyCode = header-CompanyCode ) ) ).
+
+    DATA(lt_po_keys) = VALUE zif_merp_doc_po_sel=>tt_document_keys(
+      FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) ).
+
+    DATA(lo_po_selector) = NEW zcl_merp_doc_po_sel( ).
+    DATA(lt_po_headers)  = lo_po_selector->zif_merp_doc_po_sel~read_headers( lt_po_keys ).
+    DATA(lt_progress)    = lo_po_selector->zif_merp_doc_po_sel~read_progress( lt_po_keys ).
 
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       CLEAR lo_message.
+      lv_items_valid = abap_true.
 
+      " 1. Header checks
       IF zcl_merp_doc_gr_lifecycle=>can_post( lr_header->Status ) = abap_false.
         lo_message = NEW #( textid   = zcx_merp_pur=>post_not_allowed
                             severity = if_abap_behv_message=>severity-error
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
-      ELSEIF NOT line_exists( lt_links[ source-%tky = lr_header->%tky ] ).
+      ELSEIF NOT line_exists( lt_items[ HeaderUUID = lr_header->DocumentUUID ] ).
         lo_message = NEW #( textid   = zcx_merp_pur=>document_empty_items_invalid
                             severity = if_abap_behv_message=>severity-error ).
+      ELSEIF NOT line_exists( lt_companies[ CompanyCode  = lr_header->CompanyCode
+                                            CurrencyCode = lr_header->CurrencyCode ] ).
+        " Stock is valuated in the company currency (no currency conversion yet)
+        lo_message = NEW #( textid   = zcx_merp_pur=>currency_not_company
+                            severity = if_abap_behv_message=>severity-error
+                            attr1    = CONV #( lr_header->CurrencyCode )
+                            attr2    = CONV #( VALUE #( lt_companies[ CompanyCode = lr_header->CompanyCode ]-CurrencyCode
+                                                        OPTIONAL ) ) ).
+      ELSEIF zcl_merp_doc_po_lifecycle=>can_receive_goods(
+               VALUE #( lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ]-Status OPTIONAL ) ) = abap_false.
+        " The purchase order may have been completed or cancelled in the meantime
+        lo_message = NEW #( textid   = zcx_merp_pur=>po_receipt_not_allowed
+                            severity = if_abap_behv_message=>severity-error
+                            attr1    = CONV #( VALUE #( lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ]-DocumentNumber
+                                                        OPTIONAL ) ) ).
       ENDIF.
 
-      IF lo_message IS BOUND.
+      " 2. Items of the purchase order are checked against its current open quantities and amounts
+      "    (another goods receipt may have been posted in the meantime)
+      IF lo_message IS NOT BOUND.
+        LOOP AT lt_items REFERENCE INTO DATA(lr_item)
+             WHERE HeaderUUID          = lr_header->DocumentUUID
+               AND PoItemReferenceUUID IS NOT INITIAL.
+          ASSIGN lt_progress[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO FIELD-SYMBOL(<open>).
+          IF sy-subrc <> 0.
+            CONTINUE.
+          ENDIF.
+
+          CLEAR lo_item_message.
+
+          IF lr_item->Quantity > <open>-OpenQuantity.
+            lo_item_message = NEW #( textid   = zcx_merp_pur=>po_open_quantity_exceeded
+                                     severity = if_abap_behv_message=>severity-error
+                                     attr1    = CONV #( lr_item->ItemNo )
+                                     attr2    = CONV #( <open>-OpenQuantity ) ).
+          " The whole open quantity must take exactly the open amounts, so the order item is closed to zero
+          ELSEIF lr_item->Quantity = <open>-OpenQuantity
+             AND ( lr_item->NetAmount   <> <open>-OpenNetAmount
+                OR lr_item->VatAmount   <> <open>-OpenVatAmount
+                OR lr_item->GrossAmount <> <open>-OpenGrossAmount ).
+            lo_item_message = NEW #( textid   = zcx_merp_pur=>po_open_amounts_changed
+                                     severity = if_abap_behv_message=>severity-error
+                                     attr1    = CONV #( lr_item->ItemNo ) ).
+          ENDIF.
+
+          IF lo_item_message IS BOUND.
+            lv_items_valid = abap_false.
+            APPEND VALUE #( %tky              = lr_item->%tky
+                            %path             = VALUE #( GoodsReceipt-%is_draft    = lr_item->%is_draft
+                                                         GoodsReceipt-DocumentUUID = lr_item->HeaderUUID )
+                            %msg              = lo_item_message
+                            %element-Quantity = if_abap_behv=>mk-on ) TO reported-goodsreceiptitem.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+      IF lo_message IS BOUND OR lv_items_valid = abap_false.
         APPEND VALUE #( %tky        = lr_header->%tky
                         %fail-cause = if_abap_behv=>cause-conflict ) TO failed-goodsreceipt.
-        APPEND VALUE #( %tky                = lr_header->%tky
-                        %msg                = lo_message
-                        %action-postDocument = if_abap_behv=>mk-on ) TO reported-goodsreceipt.
+        IF lo_message IS BOUND.
+          APPEND VALUE #( %tky                 = lr_header->%tky
+                          %msg                 = lo_message
+                          %action-postDocument = if_abap_behv=>mk-on ) TO reported-goodsreceipt.
+        ENDIF.
       ELSE.
         APPEND VALUE #( %tky   = lr_header->%tky
                         Status = zcl_merp_doc_gr_lifecycle=>c_status_posted ) TO lt_update.
@@ -503,6 +593,42 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
     ENDLOOP.
 
     IF lt_update IS NOT INITIAL.
+      " 3. Purchase orders follow the receipt progress including the documents posted now
+      DATA(lt_po_status) = calc_po_receipt_status(
+        it_items    = VALUE #( FOR upd IN lt_update
+                               FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
+                                                            AND PoItemReferenceUUID IS NOT INITIAL )
+                               ( PoItemReferenceUUID = item-PoItemReferenceUUID
+                                 Quantity            = item-Quantity ) )
+        it_progress = lt_progress
+        iv_sign     = 1 ).
+
+      IF lt_po_status IS NOT INITIAL.
+        MODIFY ENTITIES OF zmerp_r_purchaseorder
+          ENTITY PurchaseOrder
+          EXECUTE setReceiptStatus
+          FROM VALUE #( FOR po IN lt_po_status ( DocumentUUID   = po-DocumentUUID
+                                                 %param-Status = po-Status ) )
+          FAILED DATA(lt_po_failed).
+
+        " Without the purchase order update the goods receipts are not posted
+        IF lt_po_failed IS NOT INITIAL.
+          LOOP AT lt_update REFERENCE INTO DATA(lr_update).
+            APPEND VALUE #( %tky        = lr_update->%tky
+                            %fail-cause = if_abap_behv=>cause-conflict ) TO failed-goodsreceipt.
+            APPEND VALUE #( %tky                 = lr_update->%tky
+                            %msg                 = NEW zcx_merp_pur(
+                                                     textid   = zcx_merp_pur=>post_not_allowed
+                                                     severity = if_abap_behv_message=>severity-error
+                                                     attr1    = CONV #( VALUE #( lt_headers[ %tky = lr_update->%tky ]-DocumentNumber
+                                                                                 OPTIONAL ) ) )
+                            %action-postDocument = if_abap_behv=>mk-on ) TO reported-goodsreceipt.
+          ENDLOOP.
+          RETURN.
+        ENDIF.
+      ENDIF.
+
+      " 4. Goods receipts are posted (stock movements are written by the saver)
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceipt
         UPDATE FIELDS ( Status )
@@ -1089,6 +1215,54 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                                severity = if_abap_behv_message=>severity-error )
         ) TO reported-goodsreceipt.
       ENDLOOP.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD calc_po_receipt_status.
+    LOOP AT it_progress INTO DATA(ls_progress)
+         GROUP BY ( po_uuid   = ls_progress-PoHeaderUUID
+                    po_status = ls_progress-PoStatus )
+         INTO DATA(lg_po).
+
+      DATA(lv_touched)      = abap_false.
+      DATA(lv_any_received) = abap_false.
+      DATA(lv_all_received) = abap_true.
+
+      LOOP AT GROUP lg_po INTO DATA(ls_po_item).
+        " Quantity of the given goods receipt items for this order item
+        DATA(lv_delta) = REDUCE zmerp_quantity( INIT sum TYPE zmerp_quantity
+                                                FOR item IN it_items
+                                                WHERE ( PoItemReferenceUUID = ls_po_item-PoItemUUID )
+                                                NEXT sum = sum + item-Quantity ).
+        IF lv_delta <> 0.
+          lv_touched = abap_true.
+        ENDIF.
+
+        " Received quantity after posting / unposting the given items
+        DATA(lv_received) = ls_po_item-ReceivedQuantity + iv_sign * lv_delta.
+
+        IF lv_received > 0.
+          lv_any_received = abap_true.
+        ENDIF.
+        IF lv_received < ls_po_item-OrderedQuantity.
+          lv_all_received = abap_false.
+        ENDIF.
+      ENDLOOP.
+
+      " Purchase orders not touched by the given items keep their status
+      IF lv_touched = abap_false.
+        CONTINUE.
+      ENDIF.
+
+      DATA(lv_new_status) = zcl_merp_doc_po_lifecycle=>derive_receipt_status(
+        iv_status       = lg_po-po_status
+        iv_any_received = lv_any_received
+        iv_all_received = lv_all_received ).
+
+      IF lv_new_status <> lg_po-po_status.
+        APPEND VALUE #( DocumentUUID = lg_po-po_uuid
+                        Status       = lv_new_status ) TO rt_status.
+      ENDIF.
     ENDLOOP.
   ENDMETHOD.
 

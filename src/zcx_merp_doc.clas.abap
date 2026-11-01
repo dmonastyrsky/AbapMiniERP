@@ -181,6 +181,16 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF warehouse_company_mismatch,
 
+      " Stock is valuated in the company currency: &1 = document currency, &2 = company currency
+      BEGIN OF currency_not_company,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '115',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE 'MV_ATTR2',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF currency_not_company,
+
       " --- Status Specifics ---
       BEGIN OF invalid_document_status,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',

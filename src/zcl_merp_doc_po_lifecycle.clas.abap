@@ -60,6 +60,24 @@ CLASS zcl_merp_doc_po_lifecycle DEFINITION
                 iv_today          TYPE d
       RETURNING VALUE(rv_is_valid) TYPE abap_bool.
 
+        "! Statuses driven by the goods receipt progress: Approved, In Delivery, Completed
+    CLASS-METHODS is_receipt_status
+      IMPORTING iv_status        TYPE zmerp_po_status
+      RETURNING VALUE(rv_result) TYPE abap_bool.
+
+    "! Status derived from the goods receipt progress: nothing received -> Approved,
+    "! partly received -> In Delivery, everything received -> Completed.
+    "! Statuses outside the receipt lifecycle (New, Cancelled) are returned unchanged.
+    "! @parameter iv_status       | Current document status
+    "! @parameter iv_any_received | At least one item has a received quantity
+    "! @parameter iv_all_received | All items are received completely
+    "! @parameter rv_status       | Derived document status
+    CLASS-METHODS derive_receipt_status
+      IMPORTING iv_status        TYPE zmerp_po_status
+                iv_any_received  TYPE abap_bool
+                iv_all_received  TYPE abap_bool
+      RETURNING VALUE(rv_status) TYPE zmerp_po_status.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
 ENDCLASS.
@@ -93,6 +111,23 @@ CLASS zcl_merp_doc_po_lifecycle IMPLEMENTATION.
 
   METHOD can_complete.
     rv_allowed = xsdbool( iv_status = c_status_in_delivery ).
+  ENDMETHOD.
+
+  METHOD is_receipt_status.
+    rv_result = xsdbool( iv_status = c_status_approved
+                      OR iv_status = c_status_in_delivery
+                      OR iv_status = c_status_completed ).
+  ENDMETHOD.
+
+  METHOD derive_receipt_status.
+    IF is_receipt_status( iv_status ) = abap_false.
+      rv_status = iv_status.
+      RETURN.
+    ENDIF.
+
+    rv_status = COND #( WHEN iv_all_received = abap_true THEN c_status_completed
+                        WHEN iv_any_received = abap_true THEN c_status_in_delivery
+                        ELSE c_status_approved ).
   ENDMETHOD.
 
   METHOD is_delivery_date_actual.
