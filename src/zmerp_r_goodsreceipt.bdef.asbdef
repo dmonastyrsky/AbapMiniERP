@@ -13,7 +13,7 @@ authorization master ( global )
 {
   create;
   update;
-  delete ( precheck );
+  delete ( features : instance, precheck );
 
   association _Items { create; with draft; }
 
@@ -28,6 +28,7 @@ authorization master ( global )
 
   action ( features : instance ) postDocument result [1] $self;
   action ( features : instance ) cancelDocument result [1] $self;
+  action ( features : instance ) unpostDocument result [1] $self;
 
   determination setHeaderDefaults         on modify { create; }
   determination deriveHeaderOnCompanyCode  on modify { field CompanyCode; }

@@ -14,6 +14,7 @@ use etag
 
   use action postDocument;
   use action cancelDocument;
+  use action unpostDocument;
 
   use action Edit;
   use action Activate;
@@ -28,6 +29,7 @@ use etag
 
     action postDocument affects entity _Items, messages;
     action cancelDocument affects entity _Items, messages;
+    action unpostDocument affects entity _Items, messages;
 
     field PoReferenceUUID affects field CompanyCode, field WarehouseCode, field BusinessPartnerCode, field CurrencyCode,
         field SupplierReference, field TotalNetAmount, field TotalGrossAmount,

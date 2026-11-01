@@ -46,6 +46,13 @@ CLASS lhc_zmerp_r_goodsreceipt DEFINITION INHERITING FROM cl_abap_behavior_handl
         keys   FOR ACTION GoodsReceipt~cancelDocument
       RESULT   result.
 
+    "! Unposts the Goods Receipt (back to 'New'): stock must not become negative,
+    "! purchase order status follows the receipt progress.
+    METHODS unpostDocument FOR MODIFY
+      IMPORTING
+        keys   FOR ACTION GoodsReceipt~unpostDocument
+      RESULT   result.
+
     "! Sets default header values on document creation.
     METHODS setHeaderDefaults FOR DETERMINE ON MODIFY
       IMPORTING
@@ -115,6 +122,18 @@ CLASS lhc_zmerp_r_goodsreceipt DEFINITION INHERITING FROM cl_abap_behavior_handl
                 iv_sign          TYPE i
       RETURNING VALUE(rt_status) TYPE tt_po_status.
 
+    "! Updates the receipt status of the referenced purchase orders (via the PO action setReceiptStatus)
+    "! after the given goods receipt items are posted (iv_sign = 1) or unposted (iv_sign = -1).
+    "! @parameter it_items    | Goods receipt items (PoItemReferenceUUID, Quantity)
+    "! @parameter it_progress | Receipt progress of the purchase orders (posted receipts only)
+    "! @parameter iv_sign     | 1 = items are added to the received quantity, -1 = removed
+    "! @parameter rv_success  | abap_false if a purchase order could not be updated
+    METHODS update_po_receipt_status
+      IMPORTING it_items          TYPE zcl_merp_doc_item_logic=>tt_items
+                it_progress       TYPE zif_merp_doc_po_sel=>tt_progress
+                iv_sign           TYPE i
+      RETURNING VALUE(rv_success) TYPE abap_bool.
+
 ENDCLASS.
 
 CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
@@ -155,15 +174,24 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                              AND zcl_merp_doc_gr_lifecycle=>can_edit( header-Status ) = abap_true )
           lv_post   = xsdbool( lv_active = abap_true
                              AND zcl_merp_doc_gr_lifecycle=>can_post( header-Status ) = abap_true )
+          lv_unpost = xsdbool( lv_active = abap_true
+                             AND zcl_merp_doc_gr_lifecycle=>can_unpost( header-Status ) = abap_true )
           lv_cancel = xsdbool( lv_active = abap_true
-                             AND zcl_merp_doc_gr_lifecycle=>can_cancel( header-Status ) = abap_true ) IN
-      ( %tky               = header-%tky
-        %action-Edit       = COND #( WHEN lv_edit = abap_true
-                                     THEN if_abap_behv=>fc-o-enabled
-                                     ELSE if_abap_behv=>fc-o-disabled )
-        %action-postDocument = COND #( WHEN lv_post = abap_true
-                                       THEN if_abap_behv=>fc-o-enabled
-                                       ELSE if_abap_behv=>fc-o-disabled )
+                             AND zcl_merp_doc_gr_lifecycle=>can_cancel( header-Status ) = abap_true )
+          lv_delete = zcl_merp_doc_gr_lifecycle=>can_delete( header-Status ) IN
+      ( %tky                   = header-%tky
+        %delete                = COND #( WHEN lv_delete = abap_true
+                                         THEN if_abap_behv=>fc-o-enabled
+                                         ELSE if_abap_behv=>fc-o-disabled )
+        %action-Edit           = COND #( WHEN lv_edit = abap_true
+                                         THEN if_abap_behv=>fc-o-enabled
+                                         ELSE if_abap_behv=>fc-o-disabled )
+        %action-postDocument   = COND #( WHEN lv_post = abap_true
+                                         THEN if_abap_behv=>fc-o-enabled
+                                         ELSE if_abap_behv=>fc-o-disabled )
+        %action-unpostDocument = COND #( WHEN lv_unpost = abap_true
+                                         THEN if_abap_behv=>fc-o-enabled
+                                         ELSE if_abap_behv=>fc-o-disabled )
         %action-cancelDocument = COND #( WHEN lv_cancel = abap_true
                                          THEN if_abap_behv=>fc-o-enabled
                                          ELSE if_abap_behv=>fc-o-disabled ) )
@@ -594,41 +622,193 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
     IF lt_update IS NOT INITIAL.
       " 3. Purchase orders follow the receipt progress including the documents posted now
-      DATA(lt_po_status) = calc_po_receipt_status(
-        it_items    = VALUE #( FOR upd IN lt_update
-                               FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
-                                                            AND PoItemReferenceUUID IS NOT INITIAL )
-                               ( PoItemReferenceUUID = item-PoItemReferenceUUID
-                                 Quantity            = item-Quantity ) )
-        it_progress = lt_progress
-        iv_sign     = 1 ).
-
-      IF lt_po_status IS NOT INITIAL.
-        MODIFY ENTITIES OF zmerp_r_purchaseorder
-          ENTITY PurchaseOrder
-          EXECUTE setReceiptStatus
-          FROM VALUE #( FOR po IN lt_po_status ( DocumentUUID   = po-DocumentUUID
-                                                 %param-Status = po-Status ) )
-          FAILED DATA(lt_po_failed).
+      IF update_po_receipt_status(
+           it_items    = VALUE #( FOR upd IN lt_update
+                                  FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
+                                                               AND PoItemReferenceUUID IS NOT INITIAL )
+                                  ( PoItemReferenceUUID = item-PoItemReferenceUUID
+                                    Quantity            = item-Quantity ) )
+           it_progress = lt_progress
+           iv_sign     = 1 ) = abap_false.
 
         " Without the purchase order update the goods receipts are not posted
-        IF lt_po_failed IS NOT INITIAL.
-          LOOP AT lt_update REFERENCE INTO DATA(lr_update).
-            APPEND VALUE #( %tky        = lr_update->%tky
-                            %fail-cause = if_abap_behv=>cause-conflict ) TO failed-goodsreceipt.
-            APPEND VALUE #( %tky                 = lr_update->%tky
-                            %msg                 = NEW zcx_merp_pur(
-                                                     textid   = zcx_merp_pur=>post_not_allowed
-                                                     severity = if_abap_behv_message=>severity-error
-                                                     attr1    = CONV #( VALUE #( lt_headers[ %tky = lr_update->%tky ]-DocumentNumber
-                                                                                 OPTIONAL ) ) )
-                            %action-postDocument = if_abap_behv=>mk-on ) TO reported-goodsreceipt.
-          ENDLOOP.
-          RETURN.
-        ENDIF.
+        LOOP AT lt_update REFERENCE INTO DATA(lr_update).
+          APPEND VALUE #( %tky        = lr_update->%tky
+                          %fail-cause = if_abap_behv=>cause-conflict ) TO failed-goodsreceipt.
+          APPEND VALUE #( %tky                 = lr_update->%tky
+                          %msg                 = NEW zcx_merp_pur(
+                                                   textid   = zcx_merp_pur=>post_not_allowed
+                                                   severity = if_abap_behv_message=>severity-error
+                                                   attr1    = CONV #( VALUE #( lt_headers[ %tky = lr_update->%tky ]-DocumentNumber
+                                                                               OPTIONAL ) ) )
+                          %action-postDocument = if_abap_behv=>mk-on ) TO reported-goodsreceipt.
+        ENDLOOP.
+        RETURN.
       ENDIF.
 
       " 4. Goods receipts are posted (stock movements are written by the saver)
+      MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+        ENTITY GoodsReceipt
+        UPDATE FIELDS ( Status )
+        WITH lt_update
+        FAILED DATA(lt_mod_failed)
+        REPORTED DATA(lt_mod_reported).
+
+      IF lt_mod_failed IS NOT INITIAL.
+        failed-goodsreceipt   = CORRESPONDING #( BASE ( failed-goodsreceipt ) lt_mod_failed-goodsreceipt ).
+        reported-goodsreceipt = CORRESPONDING #( BASE ( reported-goodsreceipt ) lt_mod_reported-goodsreceipt ).
+        RETURN.
+      ENDIF.
+    ENDIF.
+
+    READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+      ENTITY GoodsReceipt
+      ALL FIELDS
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_result).
+
+    result = VALUE #( FOR header IN lt_result ( %tky = header-%tky %param = header ) ).
+  ENDMETHOD.
+
+  METHOD unpostDocument.
+    TYPES: BEGIN OF ty_stock,
+             CompanyCode   TYPE zmerp_company_code,
+             WarehouseCode TYPE zmerp_warehouse_code,
+             ItemCode      TYPE zmerp_item_code,
+             UnitOfMeasure TYPE zmerp_unit,
+             Quantity      TYPE zmerp_quantity,
+           END OF ty_stock.
+
+    DATA lt_stock_keys   TYPE HASHED TABLE OF ty_stock WITH UNIQUE KEY CompanyCode WarehouseCode ItemCode UnitOfMeasure.
+    DATA lt_stock        TYPE HASHED TABLE OF ty_stock WITH UNIQUE KEY CompanyCode WarehouseCode ItemCode UnitOfMeasure.
+    DATA lt_update       TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt.
+    DATA lo_message      TYPE REF TO zcx_merp_pur.
+    DATA lv_items_valid  TYPE abap_bool.
+
+    READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+      ENTITY GoodsReceipt
+        FIELDS ( Status DocumentNumber CompanyCode WarehouseCode PoReferenceUUID )
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(lt_headers)
+      ENTITY GoodsReceipt BY \_Items
+        FIELDS ( HeaderUUID ItemNo ItemCode Quantity UnitOfMeasure PoItemReferenceUUID )
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(lt_items).
+
+    " Current stock of the affected items (including the movements of the documents to be unposted)
+    LOOP AT lt_items REFERENCE INTO DATA(lr_item).
+      ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<header>).
+      IF sy-subrc = 0.
+        INSERT VALUE #( CompanyCode   = <header>-CompanyCode
+                        WarehouseCode = <header>-WarehouseCode
+                        ItemCode      = lr_item->ItemCode
+                        UnitOfMeasure = lr_item->UnitOfMeasure ) INTO TABLE lt_stock_keys.
+      ENDIF.
+    ENDLOOP.
+
+    IF lt_stock_keys IS NOT INITIAL.
+      SELECT bal~CompanyCode, bal~WarehouseCode, bal~ItemCode, bal~UnitOfMeasure,
+             SUM( bal~Quantity ) AS Quantity
+        FROM zmerp_i_stock_balance AS bal
+        INNER JOIN @lt_stock_keys AS key ON  bal~CompanyCode   = key~CompanyCode
+                                         AND bal~WarehouseCode = key~WarehouseCode
+                                         AND bal~ItemCode      = key~ItemCode
+                                         AND bal~UnitOfMeasure = key~UnitOfMeasure
+        GROUP BY bal~CompanyCode, bal~WarehouseCode, bal~ItemCode, bal~UnitOfMeasure
+        INTO CORRESPONDING FIELDS OF TABLE @lt_stock.
+    ENDIF.
+
+    " Receipt progress of the referenced purchase orders (the documents to be unposted are included)
+    DATA(lt_progress) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_progress(
+      VALUE #( FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) ) ).
+
+    LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
+      CLEAR lo_message.
+      lv_items_valid = abap_true.
+
+      " 1. Only posted documents can be unposted
+      IF zcl_merp_doc_gr_lifecycle=>can_unpost( lr_header->Status ) = abap_false.
+        lo_message = NEW #( textid   = zcx_merp_pur=>unpost_not_allowed
+                            severity = if_abap_behv_message=>severity-error
+                            attr1    = CONV #( lr_header->DocumentNumber ) ).
+      ENDIF.
+
+      " 2. Removing the movements of the document must not make the stock negative
+      IF lo_message IS NOT BOUND.
+        LOOP AT lt_items REFERENCE INTO lr_item WHERE HeaderUUID = lr_header->DocumentUUID.
+          ASSIGN lt_stock[ CompanyCode   = lr_header->CompanyCode
+                           WarehouseCode = lr_header->WarehouseCode
+                           ItemCode      = lr_item->ItemCode
+                           UnitOfMeasure = lr_item->UnitOfMeasure ] TO FIELD-SYMBOL(<stock>).
+
+          IF sy-subrc <> 0 OR <stock>-Quantity < lr_item->Quantity.
+            lv_items_valid = abap_false.
+            APPEND VALUE #( %tky              = lr_item->%tky
+                            %path             = VALUE #( GoodsReceipt-%is_draft    = lr_item->%is_draft
+                                                         GoodsReceipt-DocumentUUID = lr_item->HeaderUUID )
+                            %msg              = NEW zcx_merp_pur(
+                                                  textid   = zcx_merp_pur=>stock_would_be_negative
+                                                  severity = if_abap_behv_message=>severity-error
+                                                  attr1    = CONV #( lr_item->ItemNo )
+                                                  attr2    = CONV #( lr_item->ItemCode )
+                                                  attr3    = CONV #( lr_header->WarehouseCode ) )
+                            %element-Quantity = if_abap_behv=>mk-on ) TO reported-goodsreceiptitem.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+      IF lo_message IS BOUND OR lv_items_valid = abap_false.
+        APPEND VALUE #( %tky        = lr_header->%tky
+                        %fail-cause = if_abap_behv=>cause-conflict ) TO failed-goodsreceipt.
+        IF lo_message IS BOUND.
+          APPEND VALUE #( %tky                   = lr_header->%tky
+                          %msg                   = lo_message
+                          %action-unpostDocument = if_abap_behv=>mk-on ) TO reported-goodsreceipt.
+        ENDIF.
+      ELSE.
+        " Stock is reduced already here, so further documents of the same request are checked against it
+        LOOP AT lt_items REFERENCE INTO lr_item WHERE HeaderUUID = lr_header->DocumentUUID.
+          ASSIGN lt_stock[ CompanyCode   = lr_header->CompanyCode
+                           WarehouseCode = lr_header->WarehouseCode
+                           ItemCode      = lr_item->ItemCode
+                           UnitOfMeasure = lr_item->UnitOfMeasure ] TO <stock>.
+          IF sy-subrc = 0.
+            <stock>-Quantity -= lr_item->Quantity.
+          ENDIF.
+        ENDLOOP.
+
+        APPEND VALUE #( %tky   = lr_header->%tky
+                        Status = zcl_merp_doc_gr_lifecycle=>c_status_new ) TO lt_update.
+      ENDIF.
+    ENDLOOP.
+
+    IF lt_update IS NOT INITIAL.
+      " 3. Purchase orders follow the receipt progress without the documents unposted now
+      IF update_po_receipt_status(
+           it_items    = VALUE #( FOR upd IN lt_update
+                                  FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
+                                                               AND PoItemReferenceUUID IS NOT INITIAL )
+                                  ( PoItemReferenceUUID = item-PoItemReferenceUUID
+                                    Quantity            = item-Quantity ) )
+           it_progress = lt_progress
+           iv_sign     = -1 ) = abap_false.
+
+        " Without the purchase order update the goods receipts are not unposted
+        LOOP AT lt_update REFERENCE INTO DATA(lr_update).
+          APPEND VALUE #( %tky        = lr_update->%tky
+                          %fail-cause = if_abap_behv=>cause-conflict ) TO failed-goodsreceipt.
+          APPEND VALUE #( %tky                   = lr_update->%tky
+                          %msg                   = NEW zcx_merp_pur(
+                                                     textid   = zcx_merp_pur=>unpost_not_allowed
+                                                     severity = if_abap_behv_message=>severity-error
+                                                     attr1    = CONV #( VALUE #( lt_headers[ %tky = lr_update->%tky ]-DocumentNumber
+                                                                                 OPTIONAL ) ) )
+                          %action-unpostDocument = if_abap_behv=>mk-on ) TO reported-goodsreceipt.
+        ENDLOOP.
+        RETURN.
+      ENDIF.
+
+      " 4. Goods receipts return to 'New' (stock movements are removed by the saver)
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceipt
         UPDATE FIELDS ( Status )
@@ -1264,6 +1444,26 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                         Status       = lv_new_status ) TO rt_status.
       ENDIF.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD update_po_receipt_status.
+    rv_success = abap_true.
+
+    DATA(lt_po_status) = calc_po_receipt_status( it_items    = it_items
+                                                 it_progress = it_progress
+                                                 iv_sign     = iv_sign ).
+    IF lt_po_status IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    MODIFY ENTITIES OF zmerp_r_purchaseorder
+      ENTITY PurchaseOrder
+      EXECUTE setReceiptStatus
+      FROM VALUE #( FOR po IN lt_po_status ( DocumentUUID   = po-DocumentUUID
+                                             %param-Status = po-Status ) )
+      FAILED DATA(lt_po_failed).
+
+    rv_success = xsdbool( lt_po_failed IS INITIAL ).
   ENDMETHOD.
 
 ENDCLASS.

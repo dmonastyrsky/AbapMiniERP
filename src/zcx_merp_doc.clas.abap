@@ -191,6 +191,16 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF currency_not_company,
 
+      " &1 = item number, &2 = item code, &3 = warehouse code
+      BEGIN OF stock_would_be_negative,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '117',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE 'MV_ATTR2',
+        attr3 TYPE scx_attrname VALUE 'MV_ATTR3',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF stock_would_be_negative,
+
       " --- Status Specifics ---
       BEGIN OF invalid_document_status,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
@@ -246,6 +256,15 @@ CLASS zcx_merp_doc DEFINITION
         attr3 TYPE scx_attrname VALUE '',
         attr4 TYPE scx_attrname VALUE '',
       END OF post_not_allowed,
+
+      BEGIN OF unpost_not_allowed,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '136',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF unpost_not_allowed,
 
       " --- Number Range & Document Generation (200) ---
       BEGIN OF doc_number_generation_failed,

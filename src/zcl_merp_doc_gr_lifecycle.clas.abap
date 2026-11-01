@@ -28,8 +28,13 @@ CLASS zcl_merp_doc_gr_lifecycle DEFINITION
       IMPORTING iv_status         TYPE zmerp_gr_status
       RETURNING VALUE(rv_allowed) TYPE abap_bool.
 
-    "! Only 'New' or 'Posted' documents can be cancelled
+    "! Only 'New' documents can be cancelled (posted documents are unposted first)
     CLASS-METHODS can_cancel
+      IMPORTING iv_status         TYPE zmerp_gr_status
+      RETURNING VALUE(rv_allowed) TYPE abap_bool.
+
+    "! Only 'Posted' documents can be unposted (back to 'New')
+    CLASS-METHODS can_unpost
       IMPORTING iv_status         TYPE zmerp_gr_status
       RETURNING VALUE(rv_allowed) TYPE abap_bool.
 
@@ -66,7 +71,11 @@ CLASS zcl_merp_doc_gr_lifecycle IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD can_cancel.
-    rv_allowed = xsdbool( iv_status = c_status_new OR iv_status = c_status_posted ).
+    rv_allowed = xsdbool( iv_status = c_status_new ).
+  ENDMETHOD.
+
+  METHOD can_unpost.
+    rv_allowed = xsdbool( iv_status = c_status_posted ).
   ENDMETHOD.
 
   METHOD can_delete.

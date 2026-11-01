@@ -132,7 +132,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-        " Only saved (active) documents can be edited or processed; draft instances get no actions
+    " Only saved (active) documents can be edited or processed; draft instances get no actions.
+    " Delete follows the status only (in a draft it discards the draft)
     result = VALUE #(
       FOR header IN lt_headers
       LET lv_active   = xsdbool( header-%is_draft = if_abap_behv=>mk-off )
@@ -143,20 +144,24 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
           lv_delivery = xsdbool( lv_active = abap_true
                              AND zcl_merp_doc_po_lifecycle=>can_set_in_delivery( header-Status ) = abap_true )
           lv_cancel   = xsdbool( lv_active = abap_true
-                             AND zcl_merp_doc_po_lifecycle=>can_cancel( header-Status ) = abap_true ) IN
-      ( %tky                    = header-%tky
-        %action-Edit            = COND #( WHEN lv_edit = abap_true
-                                          THEN if_abap_behv=>fc-o-enabled
-                                          ELSE if_abap_behv=>fc-o-disabled )
-        %action-releaseDocument = COND #( WHEN lv_release = abap_true
-                                          THEN if_abap_behv=>fc-o-enabled
-                                          ELSE if_abap_behv=>fc-o-disabled )
-        %action-setInDeliveryDocument   = COND #( WHEN lv_delivery = abap_true
-                                          THEN if_abap_behv=>fc-o-enabled
-                                          ELSE if_abap_behv=>fc-o-disabled )
-        %action-cancelDocument  = COND #( WHEN lv_cancel = abap_true
-                                          THEN if_abap_behv=>fc-o-enabled
-                                          ELSE if_abap_behv=>fc-o-disabled ) )
+                             AND zcl_merp_doc_po_lifecycle=>can_cancel( header-Status ) = abap_true )
+          lv_delete   = zcl_merp_doc_po_lifecycle=>can_delete( header-Status ) IN
+      ( %tky                          = header-%tky
+        %delete                       = COND #( WHEN lv_delete = abap_true
+                                                THEN if_abap_behv=>fc-o-enabled
+                                                ELSE if_abap_behv=>fc-o-disabled )
+        %action-Edit                  = COND #( WHEN lv_edit = abap_true
+                                                THEN if_abap_behv=>fc-o-enabled
+                                                ELSE if_abap_behv=>fc-o-disabled )
+        %action-releaseDocument       = COND #( WHEN lv_release = abap_true
+                                                THEN if_abap_behv=>fc-o-enabled
+                                                ELSE if_abap_behv=>fc-o-disabled )
+        %action-setInDeliveryDocument = COND #( WHEN lv_delivery = abap_true
+                                                THEN if_abap_behv=>fc-o-enabled
+                                                ELSE if_abap_behv=>fc-o-disabled )
+        %action-cancelDocument        = COND #( WHEN lv_cancel = abap_true
+                                                THEN if_abap_behv=>fc-o-enabled
+                                                ELSE if_abap_behv=>fc-o-disabled ) )
     ).
   ENDMETHOD.
 

@@ -203,6 +203,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>117</MSGNR>
+     <TEXT>Item &amp;1: stock of &amp;2 in warehouse &amp;3 would become negative.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>130</MSGNR>
      <TEXT>Invalid document status.</TEXT>
     </T100>
@@ -235,6 +241,12 @@
      <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>135</MSGNR>
      <TEXT>Posting of document &amp;1 is not allowed.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>136</MSGNR>
+     <TEXT>Reversal of posting of document &amp;1 is not allowed.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
