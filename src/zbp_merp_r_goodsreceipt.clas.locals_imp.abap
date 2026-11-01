@@ -238,18 +238,34 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       VALUE #( FOR header IN lt_headers ( WarehouseCode = header-WarehouseCode ) )
     ).
 
+    DATA(lt_po_headers) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_headers(
+      VALUE #( FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) )
+    ).
+
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       lv_has_error = abap_false.
 
-      " 1. Purchase Order Reference Mandatory Validation
+      " 1. Purchase Order Reference Validation
       IF lr_header->PoReferenceUUID IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
-          %tky                  = lr_header->%tky
-          %state_area           = c_val_po_ref
-          %msg                  = NEW zcx_merp_pur(
-                                    textid   = zcx_merp_pur=>select_po_reference
-                                    severity = if_abap_behv_message=>severity-error )
+          %tky                     = lr_header->%tky
+          %state_area              = c_val_po_ref
+          %msg                     = NEW zcx_merp_pur(
+                                       textid   = zcx_merp_pur=>select_po_reference
+                                       severity = if_abap_behv_message=>severity-error )
+          %element-PoReferenceUUID = if_abap_behv=>mk-on
+        ) TO reported-goodsreceipt.
+      ELSEIF NOT line_exists( lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ] ).
+        " The value help validates only in the UI; references written via API/EML are checked here
+        lv_has_error = abap_true.
+        APPEND VALUE #(
+          %tky                     = lr_header->%tky
+          %state_area              = c_val_po_ref
+          %msg                     = NEW zcx_merp_pur(
+                                       textid   = zcx_merp_pur=>purchase_order_not_found
+                                       attr1    = CONV string( lr_header->PoReferenceUUID )
+                                       severity = if_abap_behv_message=>severity-error )
           %element-PoReferenceUUID = if_abap_behv=>mk-on
         ) TO reported-goodsreceipt.
       ENDIF.
