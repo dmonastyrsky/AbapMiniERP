@@ -22,7 +22,7 @@ authorization master( global )
 
   determination handlePrefixChange on modify { field CompanyPrefix; }
   determination clearMessagesForFilledFields on modify
-        { field CompanyName, CompanyPrefix, CurrencyCode, Country; }
+        { field CompanyName, CurrencyCode, Country; }
 
   validation validateMandatoryFields on save { create; update; field CompanyName, CompanyPrefix, CurrencyCode, Country; }
 

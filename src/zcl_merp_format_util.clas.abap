@@ -76,28 +76,6 @@ CLASS zcl_merp_format_util DEFINITION
       RETURNING
         VALUE(rv_code) TYPE string.
 
-    "! Convenience formatter for Purchase Order number using dynamic company prefix.
-    "! @parameter iv_number       | Raw numeric input
-    "! @parameter iv_company_code | Company code context
-    "! @parameter rv_code         | Formatted Purchase Order number
-    CLASS-METHODS format_po_code
-      IMPORTING
-        iv_number       TYPE simple
-        iv_company_code TYPE zmerp_company_code
-      RETURNING
-        VALUE(rv_code)  TYPE string.
-
-    "! Convenience formatter for Goods Receipt number using dynamic company prefix.
-    "! @parameter iv_number       | Raw numeric input
-    "! @parameter iv_company_code | Company code context
-    "! @parameter rv_code         | Formatted Goods Receipt number
-    CLASS-METHODS format_gr_code
-      IMPORTING
-        iv_number       TYPE simple
-        iv_company_code TYPE zmerp_company_code
-      RETURNING
-        VALUE(rv_code)  TYPE string.
-
   PROTECTED SECTION.
   PRIVATE SECTION.
 
@@ -172,34 +150,6 @@ CLASS zcl_merp_format_util IMPLEMENTATION.
       iv_number       = iv_number
       iv_prefix       = zif_merp_constants=>c_wh-prefix
       iv_total_length = zif_merp_constants=>c_wh-length ).
-  ENDMETHOD.
-
-  METHOD format_po_code.
-    TRY.
-        DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
-        DATA(lv_prefix)  = ls_company-CompanyPrefix.
-      CATCH zcx_merp_md.
-        CLEAR lv_prefix.
-    ENDTRY.
-
-    rv_code = format_code(
-      iv_number       = iv_number
-      iv_prefix       = CONV #( lv_prefix )
-      iv_total_length = zif_merp_constants=>c_po-length ).
-  ENDMETHOD.
-
-  METHOD format_gr_code.
-    TRY.
-        DATA(ls_company) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_company( iv_company_code ).
-        DATA(lv_prefix)  = ls_company-CompanyPrefix.
-      CATCH zcx_merp_md.
-        CLEAR lv_prefix.
-    ENDTRY.
-
-    rv_code = format_code(
-      iv_number       = iv_number
-      iv_prefix       = CONV #( lv_prefix )
-      iv_total_length = zif_merp_constants=>c_gr-length ).
   ENDMETHOD.
 
 ENDCLASS.

@@ -137,6 +137,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_MD</ARBGB>
+     <MSGNR>072</MSGNR>
+     <TEXT>Prefix &amp;1 is already used by company &amp;2.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_MD</ARBGB>
      <MSGNR>100</MSGNR>
      <TEXT>Business Partner &amp;1 does not exist.</TEXT>
     </T100>
@@ -222,7 +228,7 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_MD</ARBGB>
      <MSGNR>201</MSGNR>
-     <TEXT>Failed to generate Company сode.</TEXT>
+     <TEXT>Failed to generate Company code.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>

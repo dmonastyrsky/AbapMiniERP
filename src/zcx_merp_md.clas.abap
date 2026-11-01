@@ -199,6 +199,15 @@ CLASS zcx_merp_md DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF invalid_prefix_length,
 
+      BEGIN OF company_prefix_not_unique,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_MD',
+        msgno TYPE symsgno VALUE '072',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE 'MV_ATTR2',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF company_prefix_not_unique,
+
       " Record existence and not found checks
       BEGIN OF business_partner_not_found,
         msgid TYPE symsgid VALUE 'ZMC_MERP_MD',
