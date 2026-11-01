@@ -687,95 +687,100 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setup_documents.
-    " PO 1 (1000): received completely by two goods receipts -> 'Completed'.
-    "   Rounding check, descaling solution 3 x 4.20 at 19% VAT:
-    "   3 units = 2.39 VAT, 2 units = 1.60 VAT, 1 unit = 0.80 VAT -> the last receipt takes the open 0.79
+    " All prices are round (exact VAT at 19% / 7%), except the TV in PO 1:
+    " it is the only line with rounding, so the closing of cents is easy to see.
+    "   PO line 3 x 1199.99 at 19% VAT = 3599.97 net, VAT 683.9943 -> 683.99
+    "   GR 1:  2 TVs                   = 2399.98 net, VAT 455.9962 -> 456.00
+    "   GR 2:  last TV                 = 1199.99 net, VAT 227.9981 -> 228.00 by calculation,
+    "                                    but takes the open VAT 683.99 - 456.00 = 227.99 -> PO item closed to 0.00
+
+    " PO 1 (1000, Samsung): received completely by two goods receipts -> 'Completed'
     DATA(lv_po1) = create_purchase_order(
-      is_po = VALUE #( company_code = '1000' warehouse_no = 1 partner_no = 3
+      is_po = VALUE #( company_code = '1000' warehouse_no = 1 partner_no = 4
                        days_ago     = 3      delivery_in  = 2
-                       responsible  = 'MUELLER_M'
-                       remarks      = 'Coffee machines and supplies'
+                       responsible  = 'SCHMIDT_A'
+                       remarks      = 'TV season stock'
                        release      = abap_true
-                       lines        = VALUE #( ( item_no = 4  quantity = 4 price = '399.00' )
-                                               ( item_no = 12 quantity = 3 price = '4.20' )
-                                               ( item_no = 5  quantity = 6 price = '29.90' )
-                                               ( item_no = 16 quantity = 1 price = '49.00' ) ) )
+                       lines        = VALUE #( ( item_no = 7  quantity = 3  price = '1199.99' )
+                                               ( item_no = 10 quantity = 10 price = '15.00' )
+                                               ( item_no = 14 quantity = 3  price = '80.00' ) ) )
       out   = out ).
 
     create_goods_receipt(
       is_gr = VALUE #( po_uuid     = lv_po1
                        days_ago    = 1
-                       responsible = 'MUELLER_M'
-                       remarks     = 'Delivery 1 of 2: 1 descaling solution follows'
+                       responsible = 'SCHMIDT_A'
+                       remarks     = 'Delivery 1 of 2: 1 TV follows'
                        post        = abap_true
-                       lines       = VALUE #( ( item_no = 12 quantity = 2 ) ) )
+                       lines       = VALUE #( ( item_no = 7 quantity = 2 ) ) )
       out   = out ).
 
     create_goods_receipt(
       is_gr = VALUE #( po_uuid     = lv_po1
                        days_ago    = 0
-                       responsible = 'MUELLER_M'
-                       remarks     = 'Delivery 2 of 2: remaining descaling solution'
+                       responsible = 'SCHMIDT_A'
+                       remarks     = 'Delivery 2 of 2: last TV closes the cents'
                        post        = abap_true )
       out   = out ).
 
-    " PO 2 (1000): partially received -> 'In Delivery' (2 washing machines and 3 h installation open)
+    " PO 2 (1000, Bosch): partially received -> 'In Delivery' (2 washing machines and 3 h installation open)
     DATA(lv_po2) = create_purchase_order(
       is_po = VALUE #( company_code = '1000' warehouse_no = 2 partner_no = 1
                        days_ago     = 2      delivery_in  = 5
-                       responsible  = 'SCHMIDT_A'
+                       responsible  = 'MUELLER_M'
                        remarks      = 'Large appliances with installation'
                        release      = abap_true
-                       lines        = VALUE #( ( item_no = 1  quantity = 5  price = '550.00' )
-                                               ( item_no = 2  quantity = 2  price = '850.00' )
-                                               ( item_no = 11 quantity = 10 price = '12.50' )
-                                               ( item_no = 13 quantity = 5  price = '65.00' ) ) )
+                       lines        = VALUE #( ( item_no = 1  quantity = 5  price = '500.00' )
+                                               ( item_no = 2  quantity = 2  price = '800.00' )
+                                               ( item_no = 11 quantity = 10 price = '10.00' )
+                                               ( item_no = 13 quantity = 5  price = '60.00' ) ) )
       out   = out ).
 
     create_goods_receipt(
       is_gr = VALUE #( po_uuid     = lv_po2
                        days_ago    = 0
-                       responsible = 'SCHMIDT_A'
+                       responsible = 'MUELLER_M'
                        remarks     = 'Partial delivery: 2 washing machines and 3 h installation open'
                        post        = abap_true
                        lines       = VALUE #( ( item_no = 1  quantity = 3 )
                                               ( item_no = 13 quantity = 2 ) ) )
       out   = out ).
 
-    " PO 3 (1000): released, nothing received -> 'Approved'
+    " PO 3 (1000, DeLonghi): released, nothing received -> 'Approved'
     create_purchase_order(
-      is_po = VALUE #( company_code = '1000' warehouse_no = 1 partner_no = 4
+      is_po = VALUE #( company_code = '1000' warehouse_no = 1 partner_no = 3
                        days_ago     = 1      delivery_in  = 4
-                       responsible  = 'SCHMIDT_A'
-                       remarks      = 'TV season stock'
+                       responsible  = 'MUELLER_M'
+                       remarks      = 'Coffee machines and supplies'
                        release      = abap_true
-                       lines        = VALUE #( ( item_no = 7  quantity = 4  price = '1200.00' )
-                                               ( item_no = 10 quantity = 20 price = '15.00' )
-                                               ( item_no = 14 quantity = 4  price = '80.00' ) ) )
+                       lines        = VALUE #( ( item_no = 4  quantity = 4 price = '400.00' )
+                                               ( item_no = 12 quantity = 6 price = '10.00' )
+                                               ( item_no = 5  quantity = 6 price = '30.00' )
+                                               ( item_no = 16 quantity = 1 price = '50.00' ) ) )
       out   = out ).
 
-    " PO 4 (2000): released, nothing received -> 'Approved'
+    " PO 4 (2000, Conrad): released, nothing received -> 'Approved'
     create_purchase_order(
       is_po = VALUE #( company_code = '2000' warehouse_no = 6 partner_no = 12
                        days_ago     = 2      delivery_in  = 6
                        responsible  = 'FISCHER_K'
                        remarks      = 'Audio assortment for Hamburg'
                        release      = abap_true
-                       lines        = VALUE #( ( item_no = 9  quantity = 10 price = '279.00' )
-                                               ( item_no = 8  quantity = 5  price = '249.00' )
+                       lines        = VALUE #( ( item_no = 9  quantity = 10 price = '300.00' )
+                                               ( item_no = 8  quantity = 5  price = '250.00' )
                                                ( item_no = 10 quantity = 15 price = '15.00' )
-                                               ( item_no = 16 quantity = 1  price = '49.00' ) ) )
+                                               ( item_no = 16 quantity = 1  price = '50.00' ) ) )
       out   = out ).
 
-    " PO 5 (3000): not released -> 'New'
+    " PO 5 (3000, ElectronicPartner): not released -> 'New'
     create_purchase_order(
       is_po = VALUE #( company_code = '3000' warehouse_no = 9 partner_no = 11
                        days_ago     = 1      delivery_in  = 7
                        responsible  = 'WEBER_J'
                        remarks      = 'Modevi starter set, waiting for approval'
                        release      = abap_false
-                       lines        = VALUE #( ( item_no = 6 quantity = 8 price = '39.90' )
-                                               ( item_no = 5 quantity = 8 price = '29.90' ) ) )
+                       lines        = VALUE #( ( item_no = 6 quantity = 8 price = '40.00' )
+                                               ( item_no = 5 quantity = 8 price = '30.00' ) ) )
       out   = out ).
 
     " Summary: resulting purchase order statuses
