@@ -55,6 +55,12 @@ CLASS lhc_zmerp_r_goodsreceipt DEFINITION INHERITING FROM cl_abap_behavior_handl
       IMPORTING
         keys FOR GoodsReceipt~deriveDocFromPurchaseOrder.
 
+    "! Clears the purchase order reference (and by that all items) when company code, business partner
+    "! or warehouse no longer match the referenced purchase order.
+    METHODS clearPoOnHeaderChange FOR DETERMINE ON MODIFY
+      IMPORTING
+        keys FOR GoodsReceipt~clearPoOnHeaderChange.
+
     "! Derives dependent header fields when the document date changes.
     METHODS deriveDatesOnDocumentDate FOR DETERMINE ON MODIFY
       IMPORTING
@@ -623,7 +629,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt
-      FIELDS ( CompanyCode CurrencyCode WarehouseCode )
+      FIELDS ( CompanyCode CurrencyCode WarehouseCode PoReferenceUUID )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_headers).
 
@@ -639,12 +645,20 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       VALUE #( FOR header IN lt_headers ( WarehouseCode = header-WarehouseCode ) )
     ).
 
+    DATA(lt_po_headers) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_headers(
+      VALUE #( FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) )
+    ).
+
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       DATA(ls_header) = lr_header->*.
 
       IF ls_header-CompanyCode IS NOT INITIAL.
+        " Currency of a document based on a purchase order of the same company comes from the order
+        DATA(lv_from_po) = xsdbool( line_exists( lt_po_headers[ DocumentUUID = ls_header-PoReferenceUUID
+                                                                CompanyCode  = ls_header-CompanyCode ] ) ).
+
         ASSIGN lt_companies[ CompanyCode = ls_header-CompanyCode ] TO FIELD-SYMBOL(<company>).
-        IF sy-subrc = 0 AND <company>-CurrencyCode IS NOT INITIAL.
+        IF sy-subrc = 0 AND <company>-CurrencyCode IS NOT INITIAL AND lv_from_po = abap_false.
           ls_header-CurrencyCode = <company>-CurrencyCode.
         ENDIF.
 
@@ -833,6 +847,49 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceipt
         UPDATE FIELDS ( PostingDate )
+        WITH lt_header_update.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD clearPoOnHeaderChange.
+    DATA lt_header_update TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt.
+
+    READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+      ENTITY GoodsReceipt
+      FIELDS ( PoReferenceUUID CompanyCode BusinessPartnerCode WarehouseCode )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_headers).
+
+    DELETE lt_headers WHERE PoReferenceUUID IS INITIAL.
+    IF lt_headers IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    DATA(lt_po_headers) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_headers(
+      VALUE #( FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) ) ).
+
+    LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
+      DATA(ls_header) = lr_header->*.
+
+      " Values taken over from the purchase order match it, so only a manual change clears the reference;
+      " deriveDocFromPurchaseOrder then removes the items
+      ASSIGN lt_po_headers[ DocumentUUID = ls_header-PoReferenceUUID ] TO FIELD-SYMBOL(<po>).
+      IF sy-subrc <> 0
+         OR ls_header-CompanyCode         <> <po>-CompanyCode
+         OR ls_header-BusinessPartnerCode <> <po>-BusinessPartnerCode
+         OR ls_header-WarehouseCode       <> <po>-WarehouseCode.
+        CLEAR ls_header-PoReferenceUUID.
+      ENDIF.
+
+      IF ls_header <> lr_header->*.
+        APPEND CORRESPONDING #( ls_header ) TO lt_header_update.
+      ENDIF.
+    ENDLOOP.
+
+    IF lt_header_update IS NOT INITIAL.
+      MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+        ENTITY GoodsReceipt
+        UPDATE FIELDS ( PoReferenceUUID )
         WITH lt_header_update.
     ENDIF.
   ENDMETHOD.
@@ -1056,6 +1113,12 @@ CLASS lhc_zmerp_r_goodsreceiptitm DEFINITION INHERITING FROM cl_abap_behavior_ha
     " and consumed (and cleared) by calcHeaderTotals within the same request
     CLASS-DATA gt_deleted_headers TYPE STANDARD TABLE OF ty_header_key WITH EMPTY KEY.
 
+    "! Items copied from a purchase order: item code, price and VAT code are fixed by the order, only quantity can change.
+    METHODS get_instance_features FOR INSTANCE FEATURES
+      IMPORTING
+        keys   REQUEST requested_features FOR GoodsReceiptItem
+      RESULT   result.
+
     "! Recalculates total header net and gross amounts (via ZCL_MERP_DOC_CALC) when items are created, changed or deleted.
     METHODS calcHeaderTotals FOR DETERMINE ON MODIFY
       IMPORTING
@@ -1100,6 +1163,33 @@ CLASS lhc_zmerp_r_goodsreceiptitm DEFINITION INHERITING FROM cl_abap_behavior_ha
 ENDCLASS.
 
 CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
+
+  METHOD get_instance_features.
+    IF keys IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+      ENTITY GoodsReceiptItem
+      FIELDS ( PoItemReferenceUUID )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_items).
+
+    result = VALUE #(
+      FOR item IN lt_items
+      LET lv_from_po = xsdbool( item-PoItemReferenceUUID IS NOT INITIAL ) IN
+      ( %tky            = item-%tky
+        %field-ItemCode = COND #( WHEN lv_from_po = abap_true
+                                  THEN if_abap_behv=>fc-f-read_only
+                                  ELSE if_abap_behv=>fc-f-mandatory )
+        %field-Price    = COND #( WHEN lv_from_po = abap_true
+                                  THEN if_abap_behv=>fc-f-read_only
+                                  ELSE if_abap_behv=>fc-f-mandatory )
+        %field-VatCode  = COND #( WHEN lv_from_po = abap_true
+                                  THEN if_abap_behv=>fc-f-read_only
+                                  ELSE if_abap_behv=>fc-f-unrestricted ) )
+    ).
+  ENDMETHOD.
 
   METHOD validateItemFields.
     DATA lv_has_error TYPE abap_bool.

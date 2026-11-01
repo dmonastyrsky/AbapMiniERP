@@ -38,6 +38,7 @@ authorization master ( global )
 
   determination clearMessagesForDates     on modify { field DocumentDate, PostingDate; }
   determination clearMessagesForHeaderFields on modify { field CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode, PoReferenceUUID; }
+  determination clearPoOnHeaderChange      on modify { field CompanyCode, BusinessPartnerCode, WarehouseCode; }
 
   validation validateHeaderFields on save { create; update; field CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode, PoReferenceUUID; }
   validation validateDates on save { create; update; field DocumentDate, PostingDate; }
@@ -99,7 +100,8 @@ authorization dependent by _GoodsReceipt
   field ( readonly ) NetAmount, VatAmount, GrossAmount;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
 
-  field ( mandatory ) ItemCode, Quantity, Price;
+  field ( mandatory ) Quantity;
+  field ( features : instance ) ItemCode, Price, VatCode;
 
   determination setItemDefaults          on modify { create; field ItemCode; }
   determination calcAmountsOnQtyPrice    on modify { field Quantity, Price; }
