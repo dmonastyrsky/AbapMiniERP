@@ -11,6 +11,12 @@ CLASS lhc_zmerp_r_vat_rate DEFINITION INHERITING FROM cl_abap_behavior_handler.
         REQUEST requested_authorizations FOR VatRate
         RESULT result.
 
+    "! VAT codes in use keep their percentage (a new rate needs a new VAT code).
+    METHODS get_instance_features FOR INSTANCE FEATURES
+      IMPORTING
+        keys   REQUEST requested_features FOR VatRate
+      RESULT   result.
+
     "! Validates mandatory fields before saving.
     METHODS validateMandatoryFields FOR VALIDATE ON SAVE
       IMPORTING keys FOR VatRate~validateMandatoryFields.
@@ -47,6 +53,34 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
     IF requested_authorizations-%delete = if_abap_behv=>mk-on.
       result-%delete = if_abap_behv=>auth-allowed.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD get_instance_features.
+    TYPES: BEGIN OF ty_key,
+             vatcode TYPE zmerp_vat_code,
+           END OF ty_key.
+
+    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY vatcode.
+    DATA lt_used TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY vatcode.
+
+    LOOP AT keys REFERENCE INTO DATA(lr_key) WHERE VatCode IS NOT INITIAL.
+      INSERT VALUE #( vatcode = lr_key->VatCode ) INTO TABLE lt_keys.
+    ENDLOOP.
+
+    IF lt_keys IS NOT INITIAL.
+      SELECT DISTINCT usage~VatCode AS vatcode
+        FROM zmerp_i_vat_rate_usage AS usage
+        INNER JOIN @lt_keys AS key ON usage~VatCode = key~vatcode
+        INTO TABLE @lt_used.
+    ENDIF.
+
+    result = VALUE #(
+      FOR key IN keys
+      ( %tky              = key-%tky
+        %field-Percentage = COND #( WHEN line_exists( lt_used[ vatcode = key-VatCode ] )
+                                    THEN if_abap_behv=>fc-f-read_only
+                                    ELSE if_abap_behv=>fc-f-mandatory ) )
+    ).
   ENDMETHOD.
 
   METHOD validateMandatoryFields.

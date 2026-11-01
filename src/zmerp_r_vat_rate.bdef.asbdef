@@ -18,7 +18,8 @@ authorization master( global )
 
   field ( readonly ) VatCode;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
-  field ( mandatory ) Description, Percentage;
+  field ( mandatory ) Description;
+  field ( features : instance ) Percentage;
 
   determination clearMessagesForFilledFields on modify { field Description, Percentage; }
   determination checkPercentageOnModify on modify { field Percentage; }
