@@ -254,6 +254,15 @@ CLASS zcx_merp_md DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF warehouse_not_found,
 
+      BEGIN OF item_type_not_found,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_MD',
+        msgno TYPE symsgno VALUE '106',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF item_type_not_found,
+
       " Usage and referential integrity checks
       BEGIN OF business_partner_in_use,
         msgid TYPE symsgid VALUE 'ZMC_MERP_MD',

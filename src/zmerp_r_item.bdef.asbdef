@@ -17,6 +17,7 @@ authorization master ( global )
   delete ( precheck );
 
   field ( readonly ) ItemCode;
+  field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
   field ( mandatory ) Description, ItemGroupCode, DefaultVatCode;
   field ( features : instance ) ItemTypeCode, BaseUnitOfMeasure;
 

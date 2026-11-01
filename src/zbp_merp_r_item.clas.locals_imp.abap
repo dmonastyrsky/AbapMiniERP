@@ -144,7 +144,8 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
         ) TO reported-item.
       ENDIF.
 
-      " 2. Item Type Mandatory Validation
+      " 2. Item Type Mandatory & Allowed Value Validation
+      "    (the item type decides whether goods receipts create stock movements)
       IF lr_item->ItemTypeCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -152,6 +153,18 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
           %state_area           = c_val_type
           %msg                  = NEW zcx_merp_md(
                                     textid   = zcx_merp_md=>select_item_type
+                                    severity = if_abap_behv_message=>severity-error )
+          %element-ItemTypeCode = if_abap_behv=>mk-on
+        ) TO reported-item.
+      ELSEIF lr_item->ItemTypeCode <> zif_merp_constants=>c_item_type-product
+         AND lr_item->ItemTypeCode <> zif_merp_constants=>c_item_type-service.
+        lv_has_error = abap_true.
+        APPEND VALUE #(
+          %tky                  = lr_item->%tky
+          %state_area           = c_val_type
+          %msg                  = NEW zcx_merp_md(
+                                    textid   = zcx_merp_md=>item_type_not_found
+                                    attr1    = CONV string( lr_item->ItemTypeCode )
                                     severity = if_abap_behv_message=>severity-error )
           %element-ItemTypeCode = if_abap_behv=>mk-on
         ) TO reported-item.

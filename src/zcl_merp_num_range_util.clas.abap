@@ -709,10 +709,11 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       iv_company_code = iv_company_code ).
 
     " Skip draft table search for transactional documents since late numbering leaves draft document numbers initial
+    " (metadata field names are upper case, so the comparison is done in upper case)
     DATA(lv_max_draft) = COND string(
       WHEN is_meta-table_draft IS NOT INITIAL
        AND is_meta-field_draft IS NOT INITIAL
-       AND is_meta-field_db    <> 'document_number'
+       AND to_upper( is_meta-field_db ) <> 'DOCUMENT_NUMBER'
       THEN get_max_code_from_db(
              iv_table        = is_meta-table_draft
              iv_field        = is_meta-field_draft

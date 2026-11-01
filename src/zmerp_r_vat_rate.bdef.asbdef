@@ -21,7 +21,7 @@ authorization master( global )
   field ( mandatory ) Description;
   field ( features : instance ) Percentage;
 
-  determination clearMessagesForFilledFields on modify { field Description, Percentage; }
+  determination clearMessagesForFilledFields on modify { field Description; }
   determination checkPercentageOnModify on modify { field Percentage; }
 
   validation validateMandatoryFields on save { create; update; field Description, Percentage; }

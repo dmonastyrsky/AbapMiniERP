@@ -22,6 +22,7 @@ CLASS lhc_zmerp_r_vat_rate DEFINITION INHERITING FROM cl_abap_behavior_handler.
       IMPORTING keys FOR VatRate~validateMandatoryFields.
 
     "! Clears validation messages for fields that have been filled in.
+    "! Percentage is handled by checkPercentageOnModify (clear and re-check in one place).
     METHODS clearMessagesForFilledFields FOR DETERMINE ON MODIFY
       IMPORTING keys FOR VatRate~clearMessagesForFilledFields.
 
@@ -187,7 +188,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
     " Read entity state in local mode
     READ ENTITIES OF zmerp_r_vat_rate IN LOCAL MODE
       ENTITY VatRate
-      FIELDS ( Description Percentage )
+      FIELDS ( Description )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_vat_rates).
 
@@ -195,11 +196,6 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       " Clear message area for Description
       IF lr_vat->Description IS NOT INITIAL.
         APPEND VALUE #( %tky = lr_vat->%tky %state_area = c_val_desc ) TO reported-vatrate.
-      ENDIF.
-
-      " Clear message area for Percentage if value is within valid range via global validator
-      IF zcl_merp_md_validator=>is_vat_percentage_valid( lr_vat->Percentage ) = abap_true.
-        APPEND VALUE #( %tky = lr_vat->%tky %state_area = c_val_perc ) TO reported-vatrate.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
