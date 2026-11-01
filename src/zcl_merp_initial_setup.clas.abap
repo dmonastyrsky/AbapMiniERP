@@ -710,16 +710,17 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       is_gr = VALUE #( po_uuid     = lv_po1
                        days_ago    = 1
                        responsible = 'SCHMIDT_A'
-                       remarks     = 'Delivery 1 of 2: 1 TV follows'
+                       remarks     = 'Delivery 1 of 2: 1 TV with warranty follows'
                        post        = abap_true
-                       lines       = VALUE #( ( item_no = 7 quantity = 2 ) ) )
+                       lines       = VALUE #( ( item_no = 7  quantity = 2 )
+                                              ( item_no = 14 quantity = 2 ) ) )
       out   = out ).
 
     create_goods_receipt(
       is_gr = VALUE #( po_uuid     = lv_po1
                        days_ago    = 0
                        responsible = 'SCHMIDT_A'
-                       remarks     = 'Delivery 2 of 2: last TV closes the cents'
+                       remarks     = 'Delivery 2 of 2: last TV with warranty closes the cents'
                        post        = abap_true )
       out   = out ).
 
