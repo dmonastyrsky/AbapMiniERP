@@ -1842,4 +1842,89 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
 
 ENDCLASS.
 
+"! Saver for Goods Receipt: writes stock movements (quantity and value) when a document is posted
+"! and removes them when it leaves the posted status.
+CLASS lsc_zmerp_r_goodsreceipt DEFINITION INHERITING FROM cl_abap_behavior_saver.
+  PROTECTED SECTION.
+    CONSTANTS c_document_type TYPE zmerp_doc_type VALUE 'GR'.
+
+    METHODS save_modified REDEFINITION.
+ENDCLASS.
+
+CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
+
+  METHOD save_modified.
+    DATA lt_posted    TYPE TABLE FOR READ IMPORT zmerp_r_goodsreceipt.
+    DATA lt_movements TYPE STANDARD TABLE OF zmerp_stock_mov WITH EMPTY KEY.
+
+    " Only status changes are relevant for stock
+    LOOP AT update-goodsreceipt REFERENCE INTO DATA(lr_header)
+         WHERE %control-Status = if_abap_behv=>mk-on.
+
+      " 1. Any status change first removes the movements of the document (no-op if there are none)
+      DELETE FROM zmerp_stock_mov WHERE document_uuid = @lr_header->DocumentUUID.
+
+      " 2. Posted documents get new movements
+      IF zcl_merp_doc_gr_lifecycle=>is_posted( lr_header->Status ) = abap_true.
+         APPEND VALUE #( %key = lr_header->%key ) TO lt_posted.
+      ENDIF.
+    ENDLOOP.
+
+    IF lt_posted IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+      ENTITY GoodsReceipt
+        FIELDS ( CompanyCode WarehouseCode CurrencyCode PostingDate )
+        WITH lt_posted
+        RESULT DATA(lt_headers)
+      ENTITY GoodsReceipt BY \_Items
+        FIELDS ( HeaderUUID ItemCode Quantity UnitOfMeasure NetAmount )
+        WITH CORRESPONDING #( lt_posted )
+        RESULT DATA(lt_items).
+
+    DATA(lv_user) = cl_abap_context_info=>get_user_technical_name( ).
+    GET TIME STAMP FIELD DATA(lv_timestamp).
+
+    " One incoming movement per goods receipt item: positive quantity, value = net amount
+    " (the document currency equals the company currency, checked on posting)
+    LOOP AT lt_items REFERENCE INTO DATA(lr_item).
+      ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<header>).
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+
+      TRY.
+          APPEND VALUE #(
+            movement_uuid         = cl_system_uuid=>create_uuid_x16_static( )
+            company_code          = <header>-CompanyCode
+            warehouse_code        = <header>-WarehouseCode
+            item_code             = lr_item->ItemCode
+            quantity              = lr_item->Quantity
+            unit_of_measure       = lr_item->UnitOfMeasure
+            amount                = lr_item->NetAmount
+            currency_code         = <header>-CurrencyCode
+            posting_date          = <header>-PostingDate
+            document_type         = c_document_type
+            document_uuid         = lr_item->HeaderUUID
+            document_item_uuid    = lr_item->ItemUUID
+            created_by            = lv_user
+            created_at            = lv_timestamp
+            local_last_changed_by = lv_user
+            local_last_changed_at = lv_timestamp
+            last_changed_at       = lv_timestamp
+          ) TO lt_movements.
+        CATCH cx_uuid_error.
+          " Practically impossible; the movement is skipped rather than aborting the save
+      ENDTRY.
+    ENDLOOP.
+
+    IF lt_movements IS NOT INITIAL.
+      INSERT zmerp_stock_mov FROM TABLE @lt_movements.
+    ENDIF.
+  ENDMETHOD.
+
+ENDCLASS.
+
 

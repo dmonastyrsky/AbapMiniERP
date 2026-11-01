@@ -1,4 +1,4 @@
-managed implementation in class ZBP_MERP_R_GOODSRECEIPT unique;
+managed with additional save implementation in class ZBP_MERP_R_GOODSRECEIPT unique;
 strict ( 2 );
 with draft;
 extensible;
