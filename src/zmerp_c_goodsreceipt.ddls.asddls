@@ -48,14 +48,15 @@ define root view entity ZMERP_C_GOODSRECEIPT
       @Search.fuzzinessThreshold: 0.8
       Remarks,
 
-            @Consumption.valueHelpDefinition: [{ 
-        entity: { name: 'ZMERP_I_PO_VH', element: 'DocumentUUID' }, 
+      @Consumption.valueHelpDefinition: [{
+        entity: { name: 'ZMERP_I_PO_VH', element: 'DocumentUUID' },
         additionalBinding: [
           { localElement: 'CompanyCode',         element: 'CompanyCode',         usage: #FILTER_AND_RESULT },
           { localElement: 'WarehouseCode',       element: 'WarehouseCode',       usage: #FILTER_AND_RESULT },
-          { localElement: 'BusinessPartnerCode', element: 'BusinessPartnerCode', usage: #FILTER_AND_RESULT }
+          { localElement: 'BusinessPartnerCode', element: 'BusinessPartnerCode', usage: #FILTER_AND_RESULT },
+          { localConstant: 'X',                  element: 'CanReceiveGoods',     usage: #FILTER }
         ],
-        useForValidation: true 
+        useForValidation: true
       }]
       PoReferenceUUID,
 

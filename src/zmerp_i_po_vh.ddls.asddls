@@ -13,43 +13,52 @@ define view entity ZMERP_I_PO_VH
       @Search.ranking: #HIGH
       @Search.fuzzinessThreshold: 0.7
       @UI.lineItem: [{ position: 10, importance: #HIGH }]
-  key DocumentNumber,
+      DocumentNumber,
 
-      @ObjectModel.text.element: [ 'CompanyName' ]
-      @UI.textArrangement: #TEXT_FIRST
-      @UI.lineItem: [{ position: 20 }]
-      CompanyCode,     
-      _CompanyCode.CompanyName as CompanyName,
+      @UI.lineItem: [{ position: 20, importance: #HIGH }]
+      DocumentDate,
 
-      @ObjectModel.text.element: [ 'WarehouseName' ]
-      @UI.textArrangement: #TEXT_FIRST
-      @Search.defaultSearchElement: true
-      @UI.lineItem: [{ position: 30 }]
-      WarehouseCode,
-      _Warehouse.WarehouseName as WarehouseName,
-      
       @ObjectModel.text.element: [ 'PartnerName' ]
-      @UI.textArrangement: #TEXT_FIRST
+      @UI.textArrangement: #TEXT_ONLY
       @Search.defaultSearchElement: true
-      @UI.lineItem: [{ position: 40 }]
+      @UI.lineItem: [{ position: 30, importance: #HIGH }]
       BusinessPartnerCode,
       _BusinessPartner.PartnerName as PartnerName,
 
+      @ObjectModel.text.element: [ 'WarehouseName' ]
+      @UI.textArrangement: #TEXT_ONLY
+      @Search.defaultSearchElement: true
+      @UI.lineItem: [{ position: 40, importance: #MEDIUM }]
+      WarehouseCode,
+      _Warehouse.WarehouseName as WarehouseName,
+
+      @ObjectModel.text.element: [ 'CompanyName' ]
+      @UI.textArrangement: #TEXT_ONLY
+      @UI.lineItem: [{ position: 50, importance: #LOW }]
+      CompanyCode,
+      _CompanyCode.CompanyName as CompanyName,
+
       @ObjectModel.text.element: [ 'StatusDescription' ]
       @UI.textArrangement: #TEXT_ONLY
-      @UI.lineItem: [{ position: 50 }]
+      @UI.lineItem: [{ position: 60, importance: #MEDIUM }]
       Status,
       _Status.Description as StatusDescription,
 
+      @UI.hidden: true
       CurrencyCode,
 
       @Semantics.amount.currencyCode: 'CurrencyCode'
-      @UI.lineItem: [{ position: 60 }]
-      TotalNetAmount,
+      @UI.lineItem: [{ position: 70, importance: #HIGH }]
+      TotalGrossAmount,
 
-      @Semantics.amount.currencyCode: 'CurrencyCode'
-      @UI.lineItem: [{ position: 70 }]
-      TotalGrossAmount
+      // Goods receipt is possible for 'Approved' and 'In Delivery' documents
+      // (same rule as ZCL_MERP_DOC_PO_LIFECYCLE=>CAN_RECEIVE_GOODS)
+      @UI.hidden: true
+      cast( case Status
+              when 'A' then 'X'
+              when 'P' then 'X'
+              else ' '
+            end as abap_boolean preserving type ) as CanReceiveGoods
 }
 where
   Status <> 'X'

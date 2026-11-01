@@ -241,6 +241,10 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
         IF sy-subrc = 0.
           <counter>-last_no += c_item_no_step.
           ls_item-ItemNo     = <counter>-last_no.
+        ELSE.
+          INSERT VALUE #( header_uuid = ls_item-HeaderUUID last_no = c_item_no_step )
+            INTO TABLE lt_counters ASSIGNING <counter>.
+          ls_item-ItemNo = c_item_no_step.
         ENDIF.
       ENDIF.
 

@@ -93,6 +93,12 @@ CLASS zcl_merp_initial_setup DEFINITION
       IMPORTING
         out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
+    "! Generates initial business transactional documents (Goods Receipt).
+    "! @parameter out | Console output object for logging setup progress
+    CLASS-METHODS setup_goods_receipts
+      IMPORTING
+        out TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
 ENDCLASS.
 
 CLASS zcl_merp_initial_setup IMPLEMENTATION.
@@ -113,6 +119,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     setup_business_partners( out ).
 
     setup_purchase_orders( out ).
+    setup_goods_receipts( out ).
 
     " Dynamically sync NRO levels with real DB record counts
     zcl_merp_num_range_util=>sync_intervals_from_db( ).
@@ -462,6 +469,13 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
         item_group_code      = lv_grp6
         base_unit_of_measure = 'EA'
         is_blocked           = abap_true )
+
+       ( item_code            = zcl_merp_format_util=>format_item_code( 16 )
+        description          = 'Express Delivery and Connection Service'
+        article              = 'SRV-DELIV-03'
+        item_type            = 'S'
+        item_group_code      = lv_grp5
+        base_unit_of_measure = 'EA' )
     ).
 
     " Bulk-mode item group fetching via interface implementation
@@ -683,6 +697,9 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
         DATA(lv_it_uuid4) = cl_system_uuid=>create_uuid_x16_static( ).
         DATA(lv_it_uuid5) = cl_system_uuid=>create_uuid_x16_static( ).
         DATA(lv_it_uuid6) = cl_system_uuid=>create_uuid_x16_static( ).
+        DATA(lv_it_uuid7) = cl_system_uuid=>create_uuid_x16_static( ).
+        DATA(lv_it_uuid8) = cl_system_uuid=>create_uuid_x16_static( ).
+        DATA(lv_it_uuid9) = cl_system_uuid=>create_uuid_x16_static( ).
       CATCH cx_uuid_error.
     ENDTRY.
 
@@ -701,16 +718,22 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
         ItemCode = zcl_merp_format_util=>format_item_code( 1 )  Quantity = 2 Price = '550.00' )
       ( ItemUUID = lv_it_uuid2 HeaderUUID = lv_hd_uuid1 IsDraft = abap_false
         ItemCode = zcl_merp_format_util=>format_item_code( 2 )  Quantity = 1 Price = '850.00' )
+      ( ItemUUID = lv_it_uuid7 HeaderUUID = lv_hd_uuid1 IsDraft = abap_false
+        ItemCode = zcl_merp_format_util=>format_item_code( 13 ) Quantity = 2 Price = '100.00' )
 
       " Purchase Order 2
       ( ItemUUID = lv_it_uuid3 HeaderUUID = lv_hd_uuid2 IsDraft = abap_false
         ItemCode = zcl_merp_format_util=>format_item_code( 7 )  Quantity = 3 Price = '1200.00' )
       ( ItemUUID = lv_it_uuid4 HeaderUUID = lv_hd_uuid2 IsDraft = abap_false
         ItemCode = zcl_merp_format_util=>format_item_code( 10 ) Quantity = 5 Price = '15.00' )
+      ( ItemUUID = lv_it_uuid8 HeaderUUID = lv_hd_uuid2 IsDraft = abap_false
+        ItemCode = zcl_merp_format_util=>format_item_code( 13 ) Quantity = 2 Price = '100.00' )
 
       " Purchase Order 3 (Company 2000)
       ( ItemUUID = lv_it_uuid5 HeaderUUID = lv_hd_uuid3 IsDraft = abap_false
         ItemCode = zcl_merp_format_util=>format_item_code( 1 )  Quantity = 4 Price = '550.00' )
+      ( ItemUUID = lv_it_uuid9 HeaderUUID = lv_hd_uuid3 IsDraft = abap_false
+        ItemCode = zcl_merp_format_util=>format_item_code( 13 ) Quantity = 1 Price = '100.00' )
 
       " Purchase Order 4 (Company 3000)
       ( ItemUUID = lv_it_uuid6 HeaderUUID = lv_hd_uuid4 IsDraft = abap_false
@@ -832,11 +855,27 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD setup_goods_receipts.
+
+    clear_table_data(
+      iv_active_table = CONV tabname( zif_merp_constants=>c_gr_itm-table_db )
+      iv_draft_table  = CONV tabname( zif_merp_constants=>c_gr_itm-table_draft )
+    ).
+
+    clear_table_data(
+      iv_active_table = CONV tabname( zif_merp_constants=>c_gr-table_db )
+      iv_draft_table  = CONV tabname( zif_merp_constants=>c_gr-table_draft )
+    ).
+
+  ENDMETHOD.
+
   METHOD clear_table_data.
     DELETE FROM (iv_active_table).
     IF iv_draft_table IS NOT INITIAL.
       DELETE FROM (iv_draft_table).
     ENDIF.
   ENDMETHOD.
+
+  .
 
 ENDCLASS.
