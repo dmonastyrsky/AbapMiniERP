@@ -24,14 +24,13 @@ use etag
 
   use association _Items { create; with draft; }
 
-  side effects
+side effects
   {
-
     action postDocument affects entity _Items, messages;
     action cancelDocument affects entity _Items, messages;
     action unpostDocument affects entity _Items, messages;
 
-       field PoReferenceUUID affects field CompanyCode, field WarehouseCode, field BusinessPartnerCode, field CurrencyCode,
+    field PoReferenceUUID affects field CompanyCode, field WarehouseCode, field BusinessPartnerCode, field CurrencyCode,
         field SupplierReference, field TotalNetAmount, field TotalGrossAmount, field PoDocumentNumber,
         entity _Items, messages;
 

@@ -1,3 +1,6 @@
+"! Messages shared by all documents (purchasing, sales, ...), message class ZMC_MERP_DOC.
+"! Document specific messages are defined in the subclasses (e.g. ZCX_MERP_PUR).
+"! Placeholders &1..&4 are filled from the constructor parameters attr1..attr4 (MV_ATTR1..MV_ATTR4).
 CLASS zcx_merp_doc DEFINITION
   PUBLIC
   INHERITING FROM zcx_merp_base
@@ -6,7 +9,11 @@ CLASS zcx_merp_doc DEFINITION
 
   PUBLIC SECTION.
     CONSTANTS:
-      " --- Mandatory Selection & Basic Field Checks (001-021) ---
+      " ==================================================================
+      " Mandatory Fields
+      " ==================================================================
+
+      " --- Selection from Master Data (001-021) ---
       BEGIN OF select_company,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '001',
@@ -79,7 +86,7 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF select_unit_of_measure,
 
-      " --- Header Mandatory Entry Checks (050-052) ---
+      " --- Manual Entry (050-052) ---
       BEGIN OF enter_document_date,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '050',
@@ -107,25 +114,11 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF enter_responsible_person,
 
-      " --- Business Logic & Item Validations (100-107) ---
-      BEGIN OF quantity_must_be_positive,
-        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
-        msgno TYPE symsgno VALUE '100',
-        attr1 TYPE scx_attrname VALUE '',
-        attr2 TYPE scx_attrname VALUE '',
-        attr3 TYPE scx_attrname VALUE '',
-        attr4 TYPE scx_attrname VALUE '',
-      END OF quantity_must_be_positive,
+      " ==================================================================
+      " Header Validations
+      " ==================================================================
 
-      BEGIN OF price_must_be_positive,
-        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
-        msgno TYPE symsgno VALUE '101',
-        attr1 TYPE scx_attrname VALUE '',
-        attr2 TYPE scx_attrname VALUE '',
-        attr3 TYPE scx_attrname VALUE '',
-        attr4 TYPE scx_attrname VALUE '',
-      END OF price_must_be_positive,
-
+      " --- Dates (102-103) ---
       BEGIN OF document_date_future_invalid,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '102',
@@ -143,6 +136,49 @@ CLASS zcx_merp_doc DEFINITION
         attr3 TYPE scx_attrname VALUE '',
         attr4 TYPE scx_attrname VALUE '',
       END OF posting_date_sequence_invalid,
+
+      " --- Organizational Data & Currency (110, 115) ---
+      " &1 = warehouse code, &2 = company code
+      BEGIN OF warehouse_company_mismatch,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '110',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE 'MV_ATTR2',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF warehouse_company_mismatch,
+
+      " Stock is valuated in the company currency (no currency conversion yet)
+      " &1 = document currency, &2 = company currency
+      BEGIN OF currency_not_company,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '115',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE 'MV_ATTR2',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF currency_not_company,
+
+      " ==================================================================
+      " Item Validations (100-101, 105-107)
+      " ==================================================================
+      BEGIN OF quantity_must_be_positive,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '100',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF quantity_must_be_positive,
+
+      BEGIN OF price_must_be_positive,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '101',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF price_must_be_positive,
 
       BEGIN OF quantity_exceeds_ordered,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
@@ -162,6 +198,7 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF document_empty_items_invalid,
 
+      " &1 = item code
       BEGIN OF item_duplicate_invalid,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '107',
@@ -171,25 +208,9 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF item_duplicate_invalid,
 
-      " --- Cross-Entity & Org Assignment Validations (110) ---
-      BEGIN OF warehouse_company_mismatch,
-        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
-        msgno TYPE symsgno VALUE '110',
-        attr1 TYPE scx_attrname VALUE 'MV_ATTR1', "
-        attr2 TYPE scx_attrname VALUE 'MV_ATTR2', "
-        attr3 TYPE scx_attrname VALUE '',
-        attr4 TYPE scx_attrname VALUE '',
-      END OF warehouse_company_mismatch,
-
-      " Stock is valuated in the company currency: &1 = document currency, &2 = company currency
-      BEGIN OF currency_not_company,
-        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
-        msgno TYPE symsgno VALUE '115',
-        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
-        attr2 TYPE scx_attrname VALUE 'MV_ATTR2',
-        attr3 TYPE scx_attrname VALUE '',
-        attr4 TYPE scx_attrname VALUE '',
-      END OF currency_not_company,
+      " ==================================================================
+      " Stock (117)
+      " ==================================================================
 
       " &1 = item number, &2 = item code, &3 = warehouse code
       BEGIN OF stock_would_be_negative,
@@ -201,7 +222,9 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF stock_would_be_negative,
 
-      " --- Status Specifics ---
+      " ==================================================================
+      " Status & Lifecycle Actions (130, 132-137)
+      " ==================================================================
       BEGIN OF invalid_document_status,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '130',
@@ -211,16 +234,7 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF invalid_document_status,
 
-      " --- Document Actions & Lifecycle Restrictions (131-134) ---
-      BEGIN OF doc_number_already_exists,
-        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
-        msgno TYPE symsgno VALUE '131',
-        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
-        attr2 TYPE scx_attrname VALUE '',
-        attr3 TYPE scx_attrname VALUE '',
-        attr4 TYPE scx_attrname VALUE '',
-      END OF doc_number_already_exists,
-
+      " &1 = document number (all actions below)
       BEGIN OF delete_not_allowed,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '132',
@@ -275,7 +289,20 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF complete_not_allowed,
 
-      " --- Number Range & Document Generation (200) ---
+      " ==================================================================
+      " Document Number (131, 200)
+      " ==================================================================
+
+      " &1 = document number
+      BEGIN OF doc_number_already_exists,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '131',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF doc_number_already_exists,
+
       BEGIN OF doc_number_generation_failed,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '200',

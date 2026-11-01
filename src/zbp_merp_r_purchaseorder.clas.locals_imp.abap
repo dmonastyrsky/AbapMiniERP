@@ -309,6 +309,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
           %state_area            = c_val_warehouse
           %msg                   = NEW zcx_merp_pur(
                                      textid   = zcx_merp_pur=>warehouse_company_mismatch
+                                     attr1    = CONV string( lr_header->WarehouseCode )
+                                     attr2    = CONV string( lr_header->CompanyCode )
                                      severity = if_abap_behv_message=>severity-error )
           %element-WarehouseCode = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
