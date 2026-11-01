@@ -74,7 +74,6 @@ annotate view ZMERP_C_ITEM with
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 50 }]
   BaseUnitOfMeasure;
   
-  @EndUserText.label: 'Blocked'
   @UI.lineItem: [{ position: 60, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 60 }]
   IsBlocked;

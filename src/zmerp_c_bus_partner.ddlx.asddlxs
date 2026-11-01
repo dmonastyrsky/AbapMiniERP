@@ -63,15 +63,15 @@ annotate view ZMERP_C_BUS_PARTNER with
   @UI.lineItem: [{ position: 50, importance: #MEDIUM }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 50 }]
   TaxNumber;
-  
+
   @UI.lineItem: [{ position: 60, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'GeneralGroup', position: 60 }]
   IsBlocked;
 
   @UI.fieldGroup: [{ qualifier: 'AddressGroup', position: 10 }]
-  Address;  
+  Address;
 
-  @UI.lineItem: [{ position: 60, importance: #MEDIUM }]
+  @UI.lineItem: [{ position: 65, importance: #MEDIUM }]
   @UI.fieldGroup: [{ qualifier: 'AddressGroup', position: 20 }]
   City;
 
