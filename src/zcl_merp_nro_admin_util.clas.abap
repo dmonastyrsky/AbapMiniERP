@@ -5,8 +5,6 @@ CLASS zcl_merp_nro_admin_util DEFINITION
 
   PUBLIC SECTION.
 
-    INTERFACES zif_merp_constants.
-
     "! Generic bulk number generator wrapping Standard SAP NRO Runtime API based on entity metadata.
     CLASS-METHODS get_next_numbers_from_nro
       IMPORTING

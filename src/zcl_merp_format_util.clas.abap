@@ -5,8 +5,6 @@ CLASS zcl_merp_format_util DEFINITION
 
   PUBLIC SECTION.
 
-    INTERFACES zif_merp_constants.
-
     "! Pads an input numeric value or string with leading zeros to specified total length.
     "! @parameter iv_value  | Input value to be padded
     "! @parameter iv_length | Target length of the output numeric string

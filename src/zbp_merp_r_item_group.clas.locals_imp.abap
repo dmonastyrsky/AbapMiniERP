@@ -155,7 +155,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA lx_nro_error TYPE REF TO cx_root.
+    DATA lx_nro_error TYPE REF TO cx_number_ranges.
     DATA lt_codes     TYPE string_table.
 
     " Step 1: Count entities requiring key generation using the secondary key
@@ -168,7 +168,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
     IF lv_needed_count > 0.
       TRY.
           lt_codes = zcl_merp_num_range_util=>get_next_item_grp_codes_nro( iv_count = lv_needed_count ).
-        CATCH cx_number_ranges cx_root INTO lx_nro_error.
+        CATCH cx_number_ranges INTO lx_nro_error.
           CLEAR lt_codes.
       ENDTRY.
     ENDIF.
@@ -209,7 +209,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
           ) TO reported-itemgroup.
         ENDIF.
       ELSE.
-        " Retain explicitly provided code without affecting lt_codes indexing
+        " Key already assigned (draft activation passes the draft key): keep it, no new number is drawn
         APPEND VALUE #(
           %cid          = lr_entity->%cid
           %is_draft     = lr_entity->%is_draft

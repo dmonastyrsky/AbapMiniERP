@@ -5,8 +5,6 @@ CLASS zcl_merp_num_range_util DEFINITION
 
   PUBLIC SECTION.
 
-    INTERFACES zif_merp_constants.
-
     " Bulk NRO Generation Methods
     "! Generates multiple sequential Business Partner codes using NRO API with DB fallback.
     "! @parameter iv_count | Total count of sequential codes requested
