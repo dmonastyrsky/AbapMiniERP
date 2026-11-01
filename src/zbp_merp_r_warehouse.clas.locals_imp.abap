@@ -102,7 +102,7 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Execute optimized bulk selection via Master Data Selector interface regardless of user restrictions
+    " Read all referenced companies in one selection
     DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
       VALUE #( FOR whse IN lt_warehouses ( CompanyCode = whse-CompanyCode ) )
     ).
@@ -162,7 +162,7 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Read entity fields in local mode identically to the Item BO logic
+    " Read entity state in local mode
     READ ENTITIES OF zmerp_r_warehouse IN LOCAL MODE
       ENTITY Warehouse
       FIELDS ( WarehouseName CompanyCode )
@@ -269,7 +269,7 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
     DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY warehousecode.
     DATA lv_failed_added TYPE abap_bool.
 
-    " Collect key values and remove potential duplicates to optimize SQL predicate standard
+    " Collect unique non-initial keys for one bulk usage check
     lt_keys = VALUE #( FOR key IN keys WHERE ( WarehouseCode IS NOT INITIAL ) ( warehousecode = key-WarehouseCode ) ).
     DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING warehousecode.
 
@@ -292,7 +292,7 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
     LOOP AT keys REFERENCE INTO DATA(lr_key).
       lv_failed_added = abap_false.
 
-      " ABAP runtime automatically performs a highly efficient binary boundary scan here
+      " Dependencies of this key (sorted table: WHERE uses the table key)
       LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
         WHERE warehousecode = lr_key->WarehouseCode.
 

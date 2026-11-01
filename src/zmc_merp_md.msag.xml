@@ -96,25 +96,25 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_MD</ARBGB>
      <MSGNR>052</MSGNR>
-     <TEXT>Enter Prefix.</TEXT>
+     <TEXT>Enter Company Prefix.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_MD</ARBGB>
      <MSGNR>053</MSGNR>
-     <TEXT>Enter Item description.</TEXT>
+     <TEXT>Enter Item Description.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_MD</ARBGB>
      <MSGNR>054</MSGNR>
-     <TEXT>Enter Item Group description.</TEXT>
+     <TEXT>Enter Item Group Description.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_MD</ARBGB>
      <MSGNR>055</MSGNR>
-     <TEXT>Enter VAT description.</TEXT>
+     <TEXT>Enter VAT Description.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
@@ -138,7 +138,7 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_MD</ARBGB>
      <MSGNR>072</MSGNR>
-     <TEXT>Prefix &amp;1 is already used by company &amp;2.</TEXT>
+     <TEXT>Company prefix &amp;1 is already used by company &amp;2.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
@@ -210,7 +210,7 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_MD</ARBGB>
      <MSGNR>154</MSGNR>
-     <TEXT>VAT Rate &amp;1 is used in &amp;2.</TEXT>
+     <TEXT>VAT Code &amp;1 is used in &amp;2.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
@@ -246,7 +246,7 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_MD</ARBGB>
      <MSGNR>204</MSGNR>
-     <TEXT>Failed to generate VAT Rate code.</TEXT>
+     <TEXT>Failed to generate VAT code.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>

@@ -287,7 +287,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
     DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY vatcode.
     DATA lv_failed_added TYPE abap_bool.
 
-    " Collect key values and remove potential duplicates to optimize SQL predicate standard
+    " Collect unique non-initial keys for one bulk usage check
     lt_keys = VALUE #( FOR key IN keys WHERE ( VatCode IS NOT INITIAL ) ( vatcode = key-VatCode ) ).
     DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING vatcode.
 
@@ -310,7 +310,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
     LOOP AT keys REFERENCE INTO DATA(lr_key).
       lv_failed_added = abap_false.
 
-      " ABAP runtime automatically performs a highly efficient binary boundary scan here
+      " Dependencies of this key (sorted table: WHERE uses the table key)
       LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
         WHERE vatcode = lr_key->VatCode.
 

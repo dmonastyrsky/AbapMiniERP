@@ -58,7 +58,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
         %state_area = c_val_vat )
     ).
 
-    " Read entity fields in local mode to bypass global authorization checks during validation
+    " Read entity fields in local mode
     READ ENTITIES OF zmerp_r_item_group IN LOCAL MODE
       ENTITY ItemGroup
       FIELDS ( Description DefaultVatCode )
@@ -69,7 +69,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Execute optimized bulk selection via VAT Rate Master Data Selector interface
+    " Read all referenced VAT codes in one selection
     DATA(lt_vat_rates) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates(
       VALUE #( FOR grp IN lt_groups ( VatCode = grp-DefaultVatCode ) )
     ).
@@ -237,7 +237,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
     DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY itemgroupcode.
     DATA lv_failed_added TYPE abap_bool.
 
-    " Collect key values and remove potential duplicates to optimize SQL predicate standard
+    " Collect unique non-initial keys for one bulk usage check
     lt_keys = VALUE #( FOR key IN keys WHERE ( ItemGroupCode IS NOT INITIAL ) ( itemgroupcode = key-ItemGroupCode ) ).
     DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING itemgroupcode.
 
@@ -260,7 +260,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
     LOOP AT keys REFERENCE INTO DATA(lr_key).
       lv_failed_added = abap_false.
 
-      " ABAP runtime automatically performs a highly efficient binary boundary scan here
+      " Dependencies of this key (sorted table: WHERE uses the table key)
       LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
         WHERE itemgroupcode = lr_key->ItemGroupCode.
 

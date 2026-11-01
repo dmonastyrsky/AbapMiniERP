@@ -118,7 +118,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Execute optimized bulk selections via Master Data Selector interfaces
+    " Read all referenced item groups and VAT codes (one selection each)
     DATA(lt_item_groups) = NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_item_groups(
       VALUE #( FOR item IN lt_items ( ItemGroupCode = item-ItemGroupCode ) )
     ).
@@ -359,7 +359,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
     DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY itemcode.
     DATA lv_failed_added TYPE abap_bool.
 
-    " Collect key values and remove potential duplicates to optimize SQL predicate standard
+    " Collect unique non-initial keys for one bulk usage check
     lt_keys = VALUE #( FOR key IN keys WHERE ( ItemCode IS NOT INITIAL ) ( itemcode = key-ItemCode ) ).
     DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING itemcode.
 
@@ -382,7 +382,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
     LOOP AT keys REFERENCE INTO DATA(lr_key).
       lv_failed_added = abap_false.
 
-      " ABAP runtime automatically performs a highly efficient binary boundary scan here
+      " Dependencies of this key (sorted table: WHERE uses the table key)
       LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
         WHERE itemcode = lr_key->ItemCode.
 
@@ -410,7 +410,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setDefaultVatCode.
-    " Read entity fields in local mode to bypass global authorization checks during validation
+    " Read entity fields in local mode
     READ ENTITIES OF zmerp_r_item IN LOCAL MODE
       ENTITY Item
       FIELDS ( ItemGroupCode DefaultVatCode )
@@ -421,7 +421,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Read item groups master data by calling the selector directly in one line
+    " Read all referenced item groups in one selection
     DATA(item_groups) = NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_item_groups(
       VALUE #( FOR item IN items ( ItemGroupCode = item-ItemGroupCode ) )
     ).
