@@ -29,6 +29,7 @@ authorization master ( global )
   action ( features : instance ) releaseDocument result [1] $self;
   action ( features : instance ) setInDeliveryDocument parameter ZMERP_A_DOC_PO_SET_IN_DELIVERY result [1] $self;
   action ( features : instance ) cancelDocument result [1] $self;
+  action ( features : instance ) completeDocument result [1] $self;
 
   // API for goods receipts: not exposed in the projection
   action ( authorization : update ) setReceiptStatus parameter ZMERP_A_DOC_PO_RECEIPT_STATUS result [1] $self;

@@ -44,7 +44,7 @@ CLASS zcl_merp_doc_po_lifecycle DEFINITION
       IMPORTING iv_status         TYPE zmerp_po_status
       RETURNING VALUE(rv_allowed) TYPE abap_bool.
 
-    "! Only documents 'In Delivery' can be completed
+    "! 'Approved' and 'In Delivery' documents can be completed manually (also with open quantities)
     CLASS-METHODS can_complete
       IMPORTING iv_status         TYPE zmerp_po_status
       RETURNING VALUE(rv_allowed) TYPE abap_bool.
@@ -110,7 +110,7 @@ CLASS zcl_merp_doc_po_lifecycle IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD can_complete.
-    rv_allowed = xsdbool( iv_status = c_status_in_delivery ).
+    rv_allowed = xsdbool( iv_status = c_status_approved OR iv_status = c_status_in_delivery ).
   ENDMETHOD.
 
   METHOD is_receipt_status.

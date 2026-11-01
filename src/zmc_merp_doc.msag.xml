@@ -251,6 +251,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>137</MSGNR>
+     <TEXT>Completion of document &amp;1 is not allowed.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>150</MSGNR>
      <TEXT>Purchase Order &amp;1 is used in &amp;2.</TEXT>
     </T100>

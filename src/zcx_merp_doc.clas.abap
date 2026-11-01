@@ -266,6 +266,15 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF unpost_not_allowed,
 
+      BEGIN OF complete_not_allowed,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '137',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF complete_not_allowed,
+
       " --- Number Range & Document Generation (200) ---
       BEGIN OF doc_number_generation_failed,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',

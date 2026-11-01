@@ -46,6 +46,12 @@ CLASS lhc_zmerp_r_purchaseorder DEFINITION INHERITING FROM cl_abap_behavior_hand
         keys   FOR ACTION PurchaseOrder~cancelDocument
       RESULT   result.
 
+    "! Completes the Purchase Order manually (also with open quantities, e.g. short delivery).
+    METHODS completeDocument FOR MODIFY
+      IMPORTING
+        keys   FOR ACTION PurchaseOrder~completeDocument
+      RESULT   result.
+
     "! Sets the receipt status (Approved / In Delivery / Completed) calculated by the goods receipt.
     "! API for other business objects, not exposed in the service.
     METHODS setReceiptStatus FOR MODIFY
@@ -143,6 +149,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
                              AND zcl_merp_doc_po_lifecycle=>can_release( header-Status ) = abap_true )
           lv_delivery = xsdbool( lv_active = abap_true
                              AND zcl_merp_doc_po_lifecycle=>can_set_in_delivery( header-Status ) = abap_true )
+          lv_complete = xsdbool( lv_active = abap_true
+                             AND zcl_merp_doc_po_lifecycle=>can_complete( header-Status ) = abap_true )
           lv_cancel   = xsdbool( lv_active = abap_true
                              AND zcl_merp_doc_po_lifecycle=>can_cancel( header-Status ) = abap_true )
           lv_delete   = zcl_merp_doc_po_lifecycle=>can_delete( header-Status ) IN
@@ -157,6 +165,9 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
                                                 THEN if_abap_behv=>fc-o-enabled
                                                 ELSE if_abap_behv=>fc-o-disabled )
         %action-setInDeliveryDocument = COND #( WHEN lv_delivery = abap_true
+                                                THEN if_abap_behv=>fc-o-enabled
+                                                ELSE if_abap_behv=>fc-o-disabled )
+        %action-completeDocument      = COND #( WHEN lv_complete = abap_true
                                                 THEN if_abap_behv=>fc-o-enabled
                                                 ELSE if_abap_behv=>fc-o-disabled )
         %action-cancelDocument        = COND #( WHEN lv_cancel = abap_true
@@ -717,6 +728,67 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ELSE.
         APPEND VALUE #( %tky   = lr_header->%tky
                         Status = zcl_merp_doc_po_lifecycle=>c_status_cancelled ) TO lt_update.
+      ENDIF.
+    ENDLOOP.
+
+    " Perform bulk update for successful documents in transactional buffer
+    IF lt_update IS NOT INITIAL.
+      MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
+        ENTITY PurchaseOrder
+        UPDATE FIELDS ( Status )
+        WITH lt_update
+        FAILED DATA(lt_mod_failed)
+        REPORTED DATA(lt_mod_reported).
+
+      " Forward buffer failure exceptions directly to the UI layer
+      IF lt_mod_failed IS NOT INITIAL.
+        failed-purchaseorder   = CORRESPONDING #( BASE ( failed-purchaseorder ) lt_mod_failed-purchaseorder ).
+        reported-purchaseorder = CORRESPONDING #( BASE ( reported-purchaseorder ) lt_mod_reported-purchaseorder ).
+        RETURN.
+      ENDIF.
+    ENDIF.
+
+    " Read the latest state from buffer to return requested action parameters
+    READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
+      ENTITY PurchaseOrder
+      ALL FIELDS
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_result).
+
+    result = VALUE #( FOR header IN lt_result ( %tky = header-%tky %param = header ) ).
+  ENDMETHOD.
+
+  METHOD completeDocument.
+    DATA lt_update  TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
+    DATA lo_message TYPE REF TO zcx_merp_pur.
+
+    READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
+      ENTITY PurchaseOrder
+      FIELDS ( Status DocumentNumber )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_headers).
+
+    LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
+      CLEAR lo_message.
+
+      " Only 'Approved' or 'In Delivery' documents can be completed; open quantities are allowed
+      IF zcl_merp_doc_po_lifecycle=>can_complete( lr_header->Status ) = abap_false.
+        lo_message = NEW #( textid   = zcx_merp_pur=>complete_not_allowed
+                            severity = if_abap_behv_message=>severity-error
+                            attr1    = CONV #( lr_header->DocumentNumber ) ).
+      ENDIF.
+
+      " Handle validation results
+      IF lo_message IS BOUND.
+        APPEND VALUE #( %tky        = lr_header->%tky
+                        %fail-cause = if_abap_behv=>cause-conflict ) TO failed-purchaseorder.
+
+        APPEND VALUE #( %tky                     = lr_header->%tky
+                        %msg                     = lo_message
+                        %action-completeDocument = if_abap_behv=>mk-on ) TO reported-purchaseorder.
+      ELSE.
+        APPEND VALUE #( %tky   = lr_header->%tky
+                        Status = zcl_merp_doc_po_lifecycle=>c_status_completed ) TO lt_update.
       ENDIF.
     ENDLOOP.
 

@@ -15,6 +15,7 @@ use etag
   use action releaseDocument;
   use action setInDeliveryDocument;
   use action cancelDocument;
+  use action completeDocument;
 
   use action Edit;
   use action Activate;
