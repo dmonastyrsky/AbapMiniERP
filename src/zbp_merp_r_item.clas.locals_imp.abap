@@ -367,44 +367,44 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
       ENTITY Item
       FIELDS ( ItemGroupCode DefaultVatCode )
       WITH CORRESPONDING #( keys )
-      RESULT DATA(items).
+      RESULT DATA(lt_items).
 
-    IF items IS INITIAL.
+    IF lt_items IS INITIAL.
       RETURN.
     ENDIF.
 
     " Read all referenced item groups in one selection
-    DATA(item_groups) = NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_item_groups(
-      VALUE #( FOR item IN items ( ItemGroupCode = item-ItemGroupCode ) )
+    DATA(lt_item_groups) = NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_item_groups(
+      VALUE #( FOR item IN lt_items ( ItemGroupCode = item-ItemGroupCode ) )
     ).
 
-    IF item_groups IS INITIAL.
+    IF lt_item_groups IS INITIAL.
       RETURN.
     ENDIF.
 
-    DATA items_to_update TYPE TABLE FOR UPDATE zmerp_r_item.
+    DATA lt_update TYPE TABLE FOR UPDATE zmerp_r_item.
 
     " Map default VAT code from item groups back to items (overwrite only if values differ)
-    LOOP AT items REFERENCE INTO DATA(lr_item) WHERE ItemGroupCode IS NOT INITIAL.
-      ASSIGN item_groups[ ItemGroupCode = lr_item->ItemGroupCode ] TO FIELD-SYMBOL(<item_group>).
+    LOOP AT lt_items REFERENCE INTO DATA(lr_item) WHERE ItemGroupCode IS NOT INITIAL.
+      ASSIGN lt_item_groups[ ItemGroupCode = lr_item->ItemGroupCode ] TO FIELD-SYMBOL(<ls_item_group>).
 
       IF sy-subrc = 0
-         AND <item_group>-DefaultVatCode IS NOT INITIAL
-         AND lr_item->DefaultVatCode <> <item_group>-DefaultVatCode.
+         AND <ls_item_group>-DefaultVatCode IS NOT INITIAL
+         AND lr_item->DefaultVatCode <> <ls_item_group>-DefaultVatCode.
 
         APPEND VALUE #(
           %tky           = lr_item->%tky
-          DefaultVatCode = <item_group>-DefaultVatCode
-        ) TO items_to_update.
+          DefaultVatCode = <ls_item_group>-DefaultVatCode
+        ) TO lt_update.
       ENDIF.
     ENDLOOP.
 
     " Perform mass local update on RAP business object only if changes exist
-    IF items_to_update IS NOT INITIAL.
+    IF lt_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_item IN LOCAL MODE
         ENTITY Item
         UPDATE FIELDS ( DefaultVatCode )
-        WITH items_to_update.
+        WITH lt_update.
     ENDIF.
   ENDMETHOD.
 
