@@ -42,6 +42,7 @@ authorization master ( global )
   determination clearPoOnHeaderChange      on modify { field CompanyCode, BusinessPartnerCode, WarehouseCode; }
 
   validation validateHeaderFields on save { create; update; field CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode, PoReferenceUUID; }
+  validation validateDocumentNumber on save { create; }
   validation validateDates on save { create; update; field DocumentDate, PostingDate; }
 
   draft action ( features : instance ) Edit;

@@ -84,6 +84,12 @@ CLASS lhc_zmerp_r_purchaseorder DEFINITION INHERITING FROM cl_abap_behavior_hand
       IMPORTING
         keys FOR PurchaseOrder~assignDocumentNumber.
 
+    "! A document is not saved without a number: runs after assignDocumentNumber
+    "! (save determinations come before save validations) and fails the instance if no number was assigned.
+    METHODS validateDocumentNumber FOR VALIDATE ON SAVE
+      IMPORTING
+        keys FOR PurchaseOrder~validateDocumentNumber.
+
     "! Validates document date and delivery date consistency.
     METHODS validateDates FOR VALIDATE ON SAVE
       IMPORTING
@@ -1077,7 +1083,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA lx_nro_error TYPE REF TO cx_number_ranges.
     DATA lt_codes     TYPE string_table.
     DATA lt_po_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
 
@@ -1100,8 +1105,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 
     LOOP AT lt_companies REFERENCE INTO DATA(lr_company) WHERE CompanyCode IS NOT INITIAL.
 
-      CLEAR lx_nro_error.
-
       " Count entities requiring key generation for this specific company code context
       DATA(lv_needed_count) = REDUCE i( INIT count = 0
                                          FOR header IN lt_headers
@@ -1117,7 +1120,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
           lt_codes = zcl_merp_num_range_util=>get_next_po_numbers_nro(
             iv_company_code = lr_company->CompanyCode
             iv_count        = lv_needed_count ).
-        CATCH cx_number_ranges INTO lx_nro_error.
+        CATCH cx_number_ranges.
           CLEAR lt_codes.
       ENDTRY.
 
@@ -1136,15 +1139,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 
           lv_index += 1.
         ELSE.
-          " Report error metadata (RAP handles the transaction rollback automatically on save via severity-error)
-          APPEND VALUE #(
-            %tky = lr_hdr->%tky
-            %msg = NEW zcx_merp_pur(
-                     textid   = zcx_merp_pur=>doc_number_generation_failed
-                     previous = lx_nro_error
-                     severity = if_abap_behv_message=>severity-error )
-            %element-documentnumber = if_abap_behv=>mk-on
-          ) TO reported-purchaseorder.
+          " No number: validateDocumentNumber rejects the save
+          CONTINUE.
         ENDIF.
       ENDLOOP.
     ENDLOOP.
@@ -1156,6 +1152,32 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         UPDATE FIELDS ( DocumentNumber )
         WITH lt_po_update.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD validateDocumentNumber.
+    READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
+      ENTITY PurchaseOrder
+      FIELDS ( DocumentNumber CompanyCode )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_headers).
+
+    " Without a company no number can be drawn; that case is already reported by validateHeaderFields
+    LOOP AT lt_headers REFERENCE INTO DATA(lr_header)
+         WHERE DocumentNumber IS INITIAL
+           AND CompanyCode    IS NOT INITIAL.
+      APPEND VALUE #(
+        %tky        = lr_header->%tky
+        %fail-cause = if_abap_behv=>cause-unspecific
+      ) TO failed-purchaseorder.
+
+      APPEND VALUE #(
+        %tky                    = lr_header->%tky
+        %msg                    = NEW zcx_merp_pur(
+                                    textid   = zcx_merp_pur=>doc_number_generation_failed
+                                    severity = if_abap_behv_message=>severity-error )
+        %element-DocumentNumber = if_abap_behv=>mk-on
+      ) TO reported-purchaseorder.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD precheck_delete.
@@ -1848,4 +1870,5 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 

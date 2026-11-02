@@ -168,7 +168,7 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>111</MSGNR>
-     <TEXT>Purchase order &amp;1 cannot be set to &apos;In Delivery&apos;: only approved documents</TEXT>
+     <TEXT>Purchase order &amp;1 can be set to ‘In Delivery’ only when approved.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
@@ -186,7 +186,7 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>114</MSGNR>
-     <TEXT>Item &amp;1: open amounts of the purchase order have changed. Use &apos;Fill Open</TEXT>
+     <TEXT>Item &amp;1: open PO amounts have changed, use ‘Fill Open Quantity’.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
@@ -288,7 +288,7 @@
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>170</MSGNR>
-     <TEXT>Purchase Order &amp;1 does not exist.</TEXT>
+     <TEXT>Purchase Order does not exist.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>

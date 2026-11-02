@@ -89,6 +89,12 @@ CLASS lhc_zmerp_r_goodsreceipt DEFINITION INHERITING FROM cl_abap_behavior_handl
       IMPORTING
         keys FOR GoodsReceipt~assignDocumentNumber.
 
+    "! A document is not saved without a number: runs after assignDocumentNumber
+    "! (save determinations come before save validations) and fails the instance if no number was assigned.
+    METHODS validateDocumentNumber FOR VALIDATE ON SAVE
+      IMPORTING
+        keys FOR GoodsReceipt~validateDocumentNumber.
+
     "! Validates document date and posting date consistency.
     METHODS validateDates FOR VALIDATE ON SAVE
       IMPORTING
@@ -264,7 +270,6 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
           %state_area              = c_val_po_ref
           %msg                     = NEW zcx_merp_pur(
                                        textid   = zcx_merp_pur=>purchase_order_not_found
-                                       attr1    = CONV string( lr_header->PoReferenceUUID )
                                        severity = if_abap_behv_message=>severity-error )
           %element-PoReferenceUUID = if_abap_behv=>mk-on
         ) TO reported-goodsreceipt.
@@ -556,6 +561,11 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
     DATA(lt_po_headers)  = lo_po_selector->zif_merp_doc_po_sel~read_headers( lt_po_keys ).
     DATA(lt_progress)    = lo_po_selector->zif_merp_doc_po_sel~read_progress( lt_po_keys ).
 
+    " Open quantities and amounts are reduced by each document accepted below, so further documents
+    " of the same request on the same purchase order are checked against the remaining values
+    " (lt_progress stays unchanged: the purchase order status is derived from it including all documents)
+    DATA(lt_open) = lt_progress.
+
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       CLEAR lo_message.
       lv_items_valid = abap_true.
@@ -597,7 +607,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         LOOP AT lt_items REFERENCE INTO DATA(lr_item)
              WHERE HeaderUUID          = lr_header->DocumentUUID
                AND PoItemReferenceUUID IS NOT INITIAL.
-          ASSIGN lt_progress[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO FIELD-SYMBOL(<open>).
+          ASSIGN lt_open[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO FIELD-SYMBOL(<open>).
           IF sy-subrc <> 0.
             CONTINUE.
           ENDIF.
@@ -641,6 +651,19 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       ELSE.
         APPEND VALUE #( %tky   = lr_header->%tky
                         Status = zcl_merp_doc_gr_lifecycle=>c_status_posted ) TO lt_update.
+
+        " This document now takes its part of the open values
+        LOOP AT lt_items REFERENCE INTO lr_item
+             WHERE HeaderUUID          = lr_header->DocumentUUID
+               AND PoItemReferenceUUID IS NOT INITIAL.
+          ASSIGN lt_open[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO <open>.
+          IF sy-subrc = 0.
+            <open>-OpenQuantity    -= lr_item->Quantity.
+            <open>-OpenNetAmount   -= lr_item->NetAmount.
+            <open>-OpenVatAmount   -= lr_item->VatAmount.
+            <open>-OpenGrossAmount -= lr_item->GrossAmount.
+          ENDIF.
+        ENDLOOP.
       ENDIF.
     ENDLOOP.
 
@@ -1279,7 +1302,6 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA lx_nro_error TYPE REF TO cx_number_ranges.
     DATA lt_codes     TYPE string_table.
     DATA lt_gr_update TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt.
 
@@ -1299,8 +1321,6 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
     DELETE ADJACENT DUPLICATES FROM lt_companies COMPARING CompanyCode.
 
     LOOP AT lt_companies REFERENCE INTO DATA(lr_company) WHERE CompanyCode IS NOT INITIAL.
-      CLEAR lx_nro_error.
-
       DATA(lv_needed_count) = REDUCE i( INIT count = 0
                                          FOR header IN lt_headers
                                          WHERE ( CompanyCode = lr_company->CompanyCode )
@@ -1314,7 +1334,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
           lt_codes = zcl_merp_num_range_util=>get_next_gr_numbers_nro(
             iv_company_code = lr_company->CompanyCode
             iv_count        = lv_needed_count ).
-        CATCH cx_number_ranges INTO lx_nro_error.
+        CATCH cx_number_ranges.
           CLEAR lt_codes.
       ENDTRY.
 
@@ -1331,14 +1351,8 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
           lv_index += 1.
         ELSE.
-          APPEND VALUE #(
-            %tky = lr_hdr->%tky
-            %msg = NEW zcx_merp_pur(
-                     textid   = zcx_merp_pur=>doc_number_generation_failed
-                     previous = lx_nro_error
-                     severity = if_abap_behv_message=>severity-error )
-            %element-documentnumber = if_abap_behv=>mk-on
-          ) TO reported-goodsreceipt.
+          " No number: validateDocumentNumber rejects the save
+          CONTINUE.
         ENDIF.
       ENDLOOP.
     ENDLOOP.
@@ -1349,6 +1363,32 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         UPDATE FIELDS ( DocumentNumber )
         WITH lt_gr_update.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD validateDocumentNumber.
+    READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
+      ENTITY GoodsReceipt
+      FIELDS ( DocumentNumber CompanyCode )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_headers).
+
+    " Without a company no number can be drawn; that case is already reported by validateHeaderFields
+    LOOP AT lt_headers REFERENCE INTO DATA(lr_header)
+         WHERE DocumentNumber IS INITIAL
+           AND CompanyCode    IS NOT INITIAL.
+      APPEND VALUE #(
+        %tky        = lr_header->%tky
+        %fail-cause = if_abap_behv=>cause-unspecific
+      ) TO failed-goodsreceipt.
+
+      APPEND VALUE #(
+        %tky                    = lr_header->%tky
+        %msg                    = NEW zcx_merp_pur(
+                                    textid   = zcx_merp_pur=>doc_number_generation_failed
+                                    severity = if_abap_behv_message=>severity-error )
+        %element-DocumentNumber = if_abap_behv=>mk-on
+      ) TO reported-goodsreceipt.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD precheck_delete.
@@ -2335,8 +2375,10 @@ CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
             local_last_changed_at = lv_timestamp
             last_changed_at       = lv_timestamp
           ) TO lt_movements.
-        CATCH cx_uuid_error.
-          " Practically impossible; the movement is skipped rather than aborting the save
+        CATCH cx_uuid_error INTO DATA(lx_uuid).
+          " A posted goods receipt without its stock movement would break the stock:
+          " abort the save (the whole transaction is rolled back) instead of skipping the movement
+          RAISE SHORTDUMP lx_uuid.
       ENDTRY.
     ENDLOOP.
 
@@ -2346,5 +2388,4 @@ CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-
 

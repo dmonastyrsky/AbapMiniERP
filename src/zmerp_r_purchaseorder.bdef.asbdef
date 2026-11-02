@@ -44,6 +44,7 @@ authorization master ( global )
   determination clearMessagesForHeaderFields on modify { field CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode; }
 
   validation validateHeaderFields on save { create; update; field CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode; }
+  validation validateDocumentNumber on save { create; }
   validation validateDates on save { create; update; field DocumentDate, PostingDate, DeliveryDate; }
 
   draft action ( features : instance ) Edit;

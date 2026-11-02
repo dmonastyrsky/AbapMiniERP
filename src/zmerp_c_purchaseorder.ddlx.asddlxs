@@ -94,12 +94,12 @@ annotate view ZMERP_C_PURCHASEORDER with
   DocumentNumber;
 
   /* ---------- Column 1: Organization ---------- */
-  @UI.lineItem: [{ position: 50, importance: #HIGH }]
+  @UI.lineItem: [{ position: 70, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'OrgGroup', position: 10 }]
   @UI.selectionField: [{ position: 40 }]
   CompanyCode;
 
-  @UI.lineItem: [{ position: 60, importance: #HIGH }]
+  @UI.lineItem: [{ position: 80, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'OrgGroup', position: 20 }]
   @UI.selectionField: [{ position: 50 }]
   WarehouseCode;
@@ -108,12 +108,12 @@ annotate view ZMERP_C_PURCHASEORDER with
   CurrencyCode;
 
   /* ---------- Column 2: Supplier ---------- */
-  @UI.lineItem: [{ position: 70, importance: #HIGH }]
+  @UI.lineItem: [{ position: 40, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'PartnerGroup', position: 10 }]
   @UI.selectionField: [{ position: 60 }]
   BusinessPartnerCode;
 
-  @UI.lineItem: [{ position: 75, importance: #MEDIUM }]
+  @UI.lineItem: [{ position: 110, importance: #MEDIUM }]
   @UI.fieldGroup: [{ qualifier: 'PartnerGroup', position: 20 }]
   SupplierReference;
 
@@ -121,29 +121,29 @@ annotate view ZMERP_C_PURCHASEORDER with
   ResponsiblePerson;
 
   /* ---------- Column 3: Dates ---------- */
-  @UI.lineItem: [{ position: 30, importance: #MEDIUM }]
+  @UI.lineItem: [{ position: 30, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'DatesGroup', position: 10 }]
   @UI.selectionField: [{ position: 30 }]
   DocumentDate;
 
-  @UI.lineItem: [{ position: 40, importance: #MEDIUM }]
+  @UI.lineItem: [{ position: 90, importance: #MEDIUM }]
   @UI.fieldGroup: [{ qualifier: 'DatesGroup', position: 20 }]
   PostingDate;
 
-  @UI.lineItem: [{ position: 78, importance: #MEDIUM }]
+  @UI.lineItem: [{ position: 100, importance: #MEDIUM }]
   @UI.fieldGroup: [{ qualifier: 'DatesGroup', position: 30 }]
   DeliveryDate;
 
   /* ---------- Column 4: Totals & Remarks ---------- */
-  @UI.lineItem: [{ position: 80, importance: #HIGH }]
+  @UI.lineItem: [{ position: 50, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'TotalsGroup', position: 10 }]
   TotalNetAmount;
 
-  @UI.lineItem: [{ position: 90, importance: #HIGH }]
+  @UI.lineItem: [{ position: 60, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'TotalsGroup', position: 20 }]
   TotalGrossAmount;
 
-  @UI.lineItem: [{ position: 100, importance: #LOW }]
+  @UI.lineItem: [{ position: 120, importance: #LOW }]
   @UI.fieldGroup: [{ qualifier: 'TotalsGroup', position: 30 }]
   Remarks;
 
