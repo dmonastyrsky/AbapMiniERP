@@ -12,7 +12,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string,
       table_draft   TYPE string,
       field_draft   TYPE string,
-      cds_view      TYPE string,
     END OF ty_entity_metadata,
 
     " Global table types for Master Data (MD) components
@@ -21,13 +20,7 @@ INTERFACE zif_merp_constants
     ty_md_item_tt     TYPE STANDARD TABLE OF zmerp_item WITH EMPTY KEY,
     ty_md_itemgr_tt   TYPE STANDARD TABLE OF zmerp_item_group WITH EMPTY KEY,
     ty_md_vat_tt      TYPE STANDARD TABLE OF zmerp_vat_rate WITH EMPTY KEY,
-    ty_md_wh_tt       TYPE STANDARD TABLE OF zmerp_warehouse WITH EMPTY KEY,
-
-    " Global table types for Transactional Documents (DOC) components
-    ty_doc_po_hdr_tt  TYPE STANDARD TABLE OF zmerp_po_hdr WITH EMPTY KEY,
-    ty_doc_po_itm_tt  TYPE STANDARD TABLE OF zmerp_po_itm WITH EMPTY KEY,
-    ty_doc_gr_hdr_tt  TYPE STANDARD TABLE OF zmerp_gr_hdr WITH EMPTY KEY,
-    ty_doc_gr_itm_tt  TYPE STANDARD TABLE OF zmerp_gr_itm WITH EMPTY KEY.
+    ty_md_wh_tt       TYPE STANDARD TABLE OF zmerp_warehouse WITH EMPTY KEY.
 
   CONSTANTS:
     " Business Partners Metadata
@@ -39,7 +32,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string VALUE 'PARTNER_CODE',
       table_draft   TYPE string VALUE 'ZMERP_BUS_PART_D',
       field_draft   TYPE string VALUE 'PARTNERCODE',
-      cds_view      TYPE string VALUE 'ZMERP_R_BUS_PARTNER',
     END OF c_bp,
 
     " Company Codes Metadata
@@ -51,7 +43,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string VALUE 'COMPANY_CODE',
       table_draft   TYPE string VALUE 'ZMERP_COMP_D',
       field_draft   TYPE string VALUE 'COMPANYCODE',
-      cds_view      TYPE string VALUE 'ZMERP_R_COMPANY_CODE',
     END OF c_comp,
 
     " Items Metadata
@@ -63,7 +54,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string VALUE 'ITEM_CODE',
       table_draft   TYPE string VALUE 'ZMERP_ITEM_D',
       field_draft   TYPE string VALUE 'ITEMCODE',
-      cds_view      TYPE string VALUE 'ZMERP_R_ITEM',
     END OF c_item,
 
     " Item Groups Metadata
@@ -75,7 +65,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string VALUE 'ITEM_GROUP_CODE',
       table_draft   TYPE string VALUE 'ZMERP_ITEM_GRP_D',
       field_draft   TYPE string VALUE 'ITEMGROUPCODE',
-      cds_view      TYPE string VALUE 'ZMERP_R_ITEM_GROUP',
     END OF c_ig,
 
     " VAT Rates Metadata
@@ -87,7 +76,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string VALUE 'VAT_CODE',
       table_draft   TYPE string VALUE 'ZMERP_VATR_D',
       field_draft   TYPE string VALUE 'VATCODE',
-      cds_view      TYPE string VALUE 'ZMERP_R_VAT_RATE',
     END OF c_vat,
 
     " Warehouses Metadata
@@ -99,7 +87,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string VALUE 'WAREHOUSE_CODE',
       table_draft   TYPE string VALUE 'ZMERP_WHSE_D',
       field_draft   TYPE string VALUE 'WAREHOUSECODE',
-      cds_view      TYPE string VALUE 'ZMERP_R_WAREHOUSE',
     END OF c_wh,
 
     " Purchase Orders Metadata
@@ -111,7 +98,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string VALUE 'DOCUMENT_NUMBER',
       table_draft   TYPE string VALUE 'ZMERP_PO_HDR_D',
       field_draft   TYPE string VALUE 'DOCUMENTNUMBER',
-      cds_view      TYPE string VALUE 'ZMERP_R_PURCHASEORDER',
     END OF c_po,
 
     " Purchase Order Items Metadata
@@ -123,7 +109,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string VALUE 'ITEM_UUID',
       table_draft   TYPE string VALUE 'ZMERP_PO_ITM_D',
       field_draft   TYPE string VALUE 'ITEMUUID',
-      cds_view      TYPE string VALUE 'ZMERP_R_PURCHASEORDERITM',
     END OF c_po_itm,
 
     " Goods Receipts Metadata
@@ -135,7 +120,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string VALUE 'DOCUMENT_NUMBER',
       table_draft   TYPE string VALUE 'ZMERP_GR_HDR_D',
       field_draft   TYPE string VALUE 'DOCUMENTNUMBER',
-      cds_view      TYPE string VALUE 'ZMERP_R_GOODSRECEIPT',
     END OF c_gr,
 
     " Goods Receipt Items Metadata
@@ -147,7 +131,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string VALUE 'ITEM_UUID',
       table_draft   TYPE string VALUE 'ZMERP_GR_ITM_D',
       field_draft   TYPE string VALUE 'ITEMUUID',
-      cds_view      TYPE string VALUE 'ZMERP_R_GOODSRECEIPTITM',
     END OF c_gr_itm,
 
     " Stock Movements Metadata (journal: no draft, no number range)
@@ -159,7 +142,6 @@ INTERFACE zif_merp_constants
       field_db      TYPE string VALUE 'MOVEMENT_UUID',
       table_draft   TYPE string VALUE '',
       field_draft   TYPE string VALUE '',
-      cds_view      TYPE string VALUE 'ZMERP_I_STOCK_BALANCE',
     END OF c_stock_mov,
 
     " Item types (domain ZMERP_ITEM_TYPE): only products are kept in stock
@@ -167,6 +149,5 @@ INTERFACE zif_merp_constants
       product TYPE zmerp_item_type VALUE 'P',
       service TYPE zmerp_item_type VALUE 'S',
     END OF c_item_type.
-
 
 ENDINTERFACE.

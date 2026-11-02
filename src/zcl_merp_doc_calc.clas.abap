@@ -35,13 +35,6 @@ CLASS zcl_merp_doc_calc DEFINITION
                 iv_vat_percentage TYPE decfloat34
       RETURNING VALUE(rs_amounts) TYPE ty_item_amounts.
 
-    "! VAT amount changed manually: only gross amount is recalculated
-    "! @parameter is_amounts | Current item amounts (with the new VAT amount)
-    "! @parameter rs_amounts | Amounts with recalculated gross amount
-    CLASS-METHODS calc_on_vat_amount_change
-      IMPORTING is_amounts        TYPE ty_item_amounts
-      RETURNING VALUE(rs_amounts) TYPE ty_item_amounts.
-
     "! Sums up item amounts into document header totals
     CLASS-METHODS calculate_header_totals
       IMPORTING it_item_amounts  TYPE tt_item_amounts
@@ -84,12 +77,6 @@ CLASS zcl_merp_doc_calc IMPLEMENTATION.
                                           iv_vat_percentage = iv_vat_percentage ).
     rs_amounts-gross_amount = gross_amount( iv_net_amount = is_amounts-net_amount
                                             iv_vat_amount = rs_amounts-vat_amount ).
-  ENDMETHOD.
-
-  METHOD calc_on_vat_amount_change.
-    rs_amounts              = is_amounts.
-    rs_amounts-gross_amount = gross_amount( iv_net_amount = is_amounts-net_amount
-                                            iv_vat_amount = is_amounts-vat_amount ).
   ENDMETHOD.
 
   METHOD calculate_header_totals.

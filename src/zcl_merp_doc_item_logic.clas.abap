@@ -96,16 +96,6 @@ CLASS zcl_merp_doc_item_logic DEFINITION
                 it_items          TYPE tt_items
       RETURNING VALUE(rt_totals)  TYPE tt_header_totals.
 
-    "! Header currency changed: item currency follows the document currency (overwrites).
-    "! Items of an unknown document are ignored.
-    "! @parameter it_items             | Items (ItemUUID, HeaderUUID, IsDraft, CurrencyCode)
-    "! @parameter it_header_currencies | Currencies of the parent documents
-    "! @parameter rt_changed           | Only the items whose currency really changed (with the new currency)
-    METHODS sync_currency
-      IMPORTING it_items             TYPE tt_items
-                it_header_currencies TYPE tt_header_currencies
-      RETURNING VALUE(rt_changed)    TYPE tt_items.
-
   PROTECTED SECTION.
   PRIVATE SECTION.
     DATA mo_vat_selector  TYPE REF TO zif_merp_md_vat_rate_sel.
@@ -311,16 +301,5 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD sync_currency.
-    LOOP AT it_items INTO DATA(ls_item).
-      ASSIGN it_header_currencies[ HeaderUUID = ls_item-HeaderUUID
-                                   IsDraft    = ls_item-IsDraft ] TO FIELD-SYMBOL(<ls_header>).
-
-      IF sy-subrc = 0 AND ls_item-CurrencyCode <> <ls_header>-CurrencyCode.
-        ls_item-CurrencyCode = <ls_header>-CurrencyCode.
-        APPEND ls_item TO rt_changed.
-      ENDIF.
-    ENDLOOP.
-  ENDMETHOD.
-
 ENDCLASS.
+
