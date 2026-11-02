@@ -40,6 +40,12 @@ CLASS lhc_zmerp_r_purchaseorder DEFINITION INHERITING FROM cl_abap_behavior_hand
         keys   FOR ACTION PurchaseOrder~setInDeliveryDocument
       RESULT   result.
 
+    "! Default value of the 'In Delivery' dialog: the delivery date of the document, otherwise its document date.
+    METHODS GetDefaultsForSetInDelivery FOR READ
+      IMPORTING
+        keys   FOR FUNCTION PurchaseOrder~GetDefaultsForSetInDelivery
+      RESULT   result.
+
     "! Cancels the Purchase Order.
     METHODS cancelDocument FOR MODIFY
       IMPORTING
@@ -144,6 +150,12 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    " An 'In Delivery' document can be cancelled only while it has no posted goods receipts.
+    " New and Approved documents cannot have posted receipts (a receipt moves the order on)
+    DATA(lt_received) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_received_documents(
+      VALUE #( FOR header IN lt_headers WHERE ( Status = zcl_merp_doc_po_lifecycle=>c_status_in_delivery )
+               ( DocumentUUID = header-DocumentUUID ) ) ).
+
     " Only saved (active) documents can be edited or processed; draft instances get no actions.
     " Delete follows the status only (in a draft it discards the draft)
     result = VALUE #(
@@ -158,7 +170,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
           lv_complete = xsdbool( lv_active = abap_true
                              AND zcl_merp_doc_po_lifecycle=>can_complete( header-Status ) = abap_true )
           lv_cancel   = xsdbool( lv_active = abap_true
-                             AND zcl_merp_doc_po_lifecycle=>can_cancel( header-Status ) = abap_true )
+                             AND zcl_merp_doc_po_lifecycle=>can_cancel( header-Status ) = abap_true
+                             AND NOT line_exists( lt_received[ DocumentUUID = header-DocumentUUID ] ) )
           lv_delete   = zcl_merp_doc_po_lifecycle=>can_delete( header-Status ) IN
       ( %tky                          = header-%tky
         %delete                       = COND #( WHEN lv_delete = abap_true
@@ -631,18 +644,10 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RESULT DATA(lt_headers).
 
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
-      CLEAR: lo_message, lv_delivery_date.
+      CLEAR lo_message.
 
-      " Delivery date entered by the user in the action dialog
-      ASSIGN keys[ %tky = lr_header->%tky ] TO FIELD-SYMBOL(<ls_key>).
-      IF sy-subrc = 0.
-        lv_delivery_date = <ls_key>-%param-DeliveryDate.
-      ENDIF.
-
-      " If the user left the date empty, the date already stored in the document is used
-      IF lv_delivery_date IS INITIAL.
-        lv_delivery_date = lr_header->DeliveryDate.
-      ENDIF.
+      " Delivery date entered in the dialog (proposed by GetDefaultsForSetInDelivery)
+      lv_delivery_date = VALUE #( keys[ %tky = lr_header->%tky ]-%param-DeliveryDate OPTIONAL ).
 
       " Only Approved documents can be moved to delivery
       IF zcl_merp_doc_po_lifecycle=>can_set_in_delivery( lr_header->Status ) = abap_false.
@@ -650,12 +655,12 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
                             severity = if_abap_behv_message=>severity-error
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
 
-      " Delivery date is mandatory
+      " Delivery date is mandatory (the dialog field can be cleared by the user)
       ELSEIF lv_delivery_date IS INITIAL.
         lo_message = NEW #( textid   = zcx_merp_pur=>enter_delivery_date
                             severity = if_abap_behv_message=>severity-error ).
 
-      " Delivery date must not precede the document date
+      " Delivery date must not precede the document date (as in validateDates)
       ELSEIF zcl_merp_doc_validator=>is_delivery_date_valid( iv_doc_date   = lr_header->DocumentDate
                                                              iv_deliv_date = lv_delivery_date ) = abap_false.
         lo_message = NEW #( textid   = zcx_merp_pur=>delivery_date_before_doc_date
@@ -667,8 +672,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         APPEND VALUE #( %tky        = lr_header->%tky
                         %fail-cause = if_abap_behv=>cause-conflict ) TO failed-purchaseorder.
 
-        APPEND VALUE #( %tky                  = lr_header->%tky
-                        %msg                  = lo_message
+        APPEND VALUE #( %tky                          = lr_header->%tky
+                        %msg                          = lo_message
                         %action-setInDeliveryDocument = if_abap_behv=>mk-on ) TO reported-purchaseorder.
       ELSE.
         APPEND VALUE #( %tky         = lr_header->%tky
@@ -704,6 +709,21 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
     result = VALUE #( FOR header IN lt_result ( %tky = header-%tky %param = header ) ).
   ENDMETHOD.
 
+  METHOD GetDefaultsForSetInDelivery.
+    READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
+      ENTITY PurchaseOrder
+      FIELDS ( DocumentDate DeliveryDate )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_headers).
+
+    result = VALUE #(
+      FOR header IN lt_headers
+      ( %tky                = header-%tky
+        %param-DeliveryDate = COND #( WHEN header-DeliveryDate IS NOT INITIAL
+                                      THEN header-DeliveryDate
+                                      ELSE header-DocumentDate ) ) ).
+  ENDMETHOD.
+
   METHOD cancelDocument.
     DATA lt_update  TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
     DATA lo_message TYPE REF TO zcx_merp_pur.
@@ -715,12 +735,22 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_headers).
 
+    " A cancelled order with posted goods receipts would leave stock without an order.
+    " New and Approved documents cannot have posted receipts (a receipt moves the order on)
+    DATA(lt_received) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_received_documents(
+      VALUE #( FOR header IN lt_headers WHERE ( Status = zcl_merp_doc_po_lifecycle=>c_status_in_delivery )
+               ( DocumentUUID = header-DocumentUUID ) ) ).
+
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       CLEAR lo_message.
 
-      " Only New or Approved documents can be cancelled
+      " New, Approved and In Delivery documents can be cancelled, In Delivery only without posted receipts
       IF zcl_merp_doc_po_lifecycle=>can_cancel( lr_header->Status ) = abap_false.
         lo_message = NEW #( textid   = zcx_merp_pur=>cancel_not_allowed
+                            severity = if_abap_behv_message=>severity-error
+                            attr1    = CONV #( lr_header->DocumentNumber ) ).
+      ELSEIF line_exists( lt_received[ DocumentUUID = lr_header->DocumentUUID ] ).
+        lo_message = NEW #( textid   = zcx_merp_pur=>po_has_posted_receipts
                             severity = if_abap_behv_message=>severity-error
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
       ENDIF.
@@ -1870,5 +1900,3 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-
-

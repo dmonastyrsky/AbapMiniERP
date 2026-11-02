@@ -14,6 +14,7 @@ use etag
 
   use action releaseDocument;
   use action setInDeliveryDocument;
+  use function GetDefaultsForSetInDelivery;
   use action cancelDocument;
   use action completeDocument;
 

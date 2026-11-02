@@ -95,6 +95,20 @@ CLASS zcl_merp_doc_po_sel IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD zif_merp_doc_po_sel~read_received_documents.
+    DATA(lt_clean_keys) = prepare_keys( it_document_keys ).
+    IF lt_clean_keys IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    " Received quantity comes from posted goods receipts only (see ZMERP_I_PO_PROGRESS)
+    SELECT DISTINCT prg~PoHeaderUUID
+      FROM zmerp_i_po_progress AS prg
+      INNER JOIN @lt_clean_keys AS keys ON prg~PoHeaderUUID = keys~DocumentUUID
+      WHERE prg~ReceivedQuantity > 0
+      INTO TABLE @rt_document_keys.
+  ENDMETHOD.
+
   METHOD zif_merp_doc_po_sel~validate_documents.
     DATA lt_existing_keys TYPE tt_document_keys_unique.
 
@@ -133,3 +147,4 @@ CLASS zcl_merp_doc_po_sel IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+

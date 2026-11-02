@@ -23,7 +23,8 @@ INTERFACE zif_merp_doc_po_sel
   TYPES: BEGIN OF ty_document_key,
            DocumentUUID TYPE zmerp_r_purchaseorder-DocumentUUID,
          END OF ty_document_key,
-         tt_document_keys TYPE STANDARD TABLE OF ty_document_key WITH EMPTY KEY.
+         tt_document_keys TYPE STANDARD TABLE OF ty_document_key WITH EMPTY KEY,
+         tt_document_keys_sorted TYPE SORTED TABLE OF ty_document_key WITH UNIQUE KEY DocumentUUID.
 
   "! Reads the header of a single purchase order (without items)
   "! @parameter iv_document_uuid | Requested purchase order document key
@@ -65,6 +66,13 @@ INTERFACE zif_merp_doc_po_sel
   METHODS read_progress
     IMPORTING it_document_keys   TYPE tt_document_keys
     RETURNING VALUE(rt_progress) TYPE tt_progress.
+
+  "! Returns the purchase orders that have at least one posted goods receipt
+  "! @parameter it_document_keys  | Table of purchase order document keys
+  "! @parameter rt_document_keys  | Purchase orders with a received quantity on at least one item
+  METHODS read_received_documents
+    IMPORTING it_document_keys        TYPE tt_document_keys
+    RETURNING VALUE(rt_document_keys) TYPE tt_document_keys_sorted.
 
   "! Validates purchase order document keys and returns missing/invalid keys
   "! @parameter it_document_keys | Table of purchase order document keys to validate

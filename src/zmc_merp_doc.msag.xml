@@ -215,6 +215,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>119</MSGNR>
+     <TEXT>Purchase order &amp;1 has posted goods receipts and cannot be cancelled.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>130</MSGNR>
      <TEXT>Invalid document status.</TEXT>
     </T100>

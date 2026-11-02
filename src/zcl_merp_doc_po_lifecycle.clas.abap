@@ -24,7 +24,8 @@ CLASS zcl_merp_doc_po_lifecycle DEFINITION
       IMPORTING iv_status         TYPE zmerp_po_status
       RETURNING VALUE(rv_allowed) TYPE abap_bool.
 
-    "! Only 'New' or 'Approved' documents can be cancelled
+    "! 'New', 'Approved' and 'In Delivery' documents can be cancelled by status;
+    "! an 'In Delivery' document additionally must not have posted goods receipts (checked by the caller)
     CLASS-METHODS can_cancel
       IMPORTING iv_status         TYPE zmerp_po_status
       RETURNING VALUE(rv_allowed) TYPE abap_bool.
@@ -94,7 +95,9 @@ CLASS zcl_merp_doc_po_lifecycle IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD can_cancel.
-    rv_allowed = xsdbool( iv_status = c_status_new OR iv_status = c_status_approved ).
+    rv_allowed = xsdbool( iv_status = c_status_new
+                       OR iv_status = c_status_approved
+                       OR iv_status = c_status_in_delivery ).
   ENDMETHOD.
 
   METHOD can_delete.

@@ -129,6 +129,16 @@ CLASS zcx_merp_pur DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF po_open_amounts_changed,
 
+      " &1 = purchase order number
+      BEGIN OF po_has_posted_receipts,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '119',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF po_has_posted_receipts,
+
       " --- Dependency Checks (150, 152) ---
       " &1 = document number, &2 = entity that uses the document
       BEGIN OF purchase_order_in_use,
