@@ -53,7 +53,7 @@ CLASS zcl_merp_md_bus_partner_sel IMPLEMENTATION.
     ENDIF.
 
     " DISTINCT: one row per code and using entity, however many documents use the code
-    SELECT DISTINCT usage~PartnerCode, usage~UsedInEntity
+    SELECT DISTINCT usage~PartnerCode, usage~UsedInEntity, usage~UsedAsSupplier, usage~UsedAsCustomer
       FROM zmerp_i_bus_partner_usage AS usage
       INNER JOIN @lt_clean_keys AS keys ON usage~PartnerCode = keys~PartnerCode
       INTO CORRESPONDING FIELDS OF TABLE @rt_usages.

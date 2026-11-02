@@ -137,6 +137,15 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF posting_date_sequence_invalid,
 
+      BEGIN OF posting_date_future_invalid,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '122',
+        attr1 TYPE scx_attrname VALUE '',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF posting_date_future_invalid,
+
       " --- Organizational Data & Currency (110, 115) ---
       " &1 = warehouse code, &2 = company code
       BEGIN OF warehouse_company_mismatch,

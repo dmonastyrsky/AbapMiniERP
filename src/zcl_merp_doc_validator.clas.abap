@@ -22,6 +22,15 @@ CLASS zcl_merp_doc_validator DEFINITION
                 iv_today          TYPE d
       RETURNING VALUE(rv_is_valid) TYPE abap_bool.
 
+    "! Validates if the given Posting Date is not in the future (no postings ahead of time, e.g. stock).
+    "! @parameter iv_post_date | The posting date to be validated
+    "! @parameter iv_today     | Current system date context
+    "! @parameter rv_is_valid  | Returns abap_true if valid, otherwise abap_false
+    CLASS-METHODS is_posting_date_not_future
+      IMPORTING iv_post_date      TYPE zmerp_posting_date
+                iv_today          TYPE d
+      RETURNING VALUE(rv_is_valid) TYPE abap_bool.
+
     "! Validates if the Posting Date correctly follows the Document Date.
     "! @parameter iv_doc_date  | Document date anchor
     "! @parameter iv_post_date | Posting date to be validated
@@ -87,6 +96,10 @@ CLASS zcl_merp_doc_validator IMPLEMENTATION.
     rv_is_valid = xsdbool( iv_doc_date <= iv_today ).
   ENDMETHOD.
 
+  METHOD is_posting_date_not_future.
+    rv_is_valid = xsdbool( iv_post_date <= iv_today ).
+  ENDMETHOD.
+
   METHOD is_posting_date_valid.
     " Financial subledger constraint: Posting date cannot precede the baseline document date
     rv_is_valid = xsdbool( iv_post_date >= iv_doc_date ).
@@ -141,4 +154,3 @@ CLASS zcl_merp_doc_validator IMPLEMENTATION.
 
 
 ENDCLASS.
-

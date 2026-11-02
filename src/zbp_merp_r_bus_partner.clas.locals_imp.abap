@@ -10,6 +10,13 @@ CLASS lhc_zmerp_r_bus_partner DEFINITION INHERITING FROM cl_abap_behavior_handle
       IMPORTING REQUEST requested_authorizations FOR BusinessPartner
       RESULT result.
 
+    "! Partners used in purchasing documents stay suppliers, partners used in sales documents stay customers
+    "! (the documents require the role flag).
+    METHODS get_instance_features FOR INSTANCE FEATURES
+      IMPORTING
+        keys   REQUEST requested_features FOR BusinessPartner
+      RESULT   result.
+
     "! Validates mandatory fields before saving.
     METHODS validateMandatoryFields FOR VALIDATE ON SAVE
       IMPORTING keys FOR BusinessPartner~validateMandatoryFields.
@@ -41,6 +48,38 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
     IF requested_authorizations-%delete = if_abap_behv=>mk-on.
       result-%delete = if_abap_behv=>auth-allowed.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD get_instance_features.
+    " Current role flags: only a set flag is locked, an unset flag can always be set
+    READ ENTITIES OF zmerp_r_bus_partner IN LOCAL MODE
+      ENTITY BusinessPartner
+      FIELDS ( IsSupplier IsCustomer )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_partners).
+
+    IF lt_partners IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    " A role used in documents keeps its flag (one selection for all keys)
+    DATA(lt_usages) = NEW zcl_merp_md_bus_partner_sel( )->zif_merp_md_bus_partner_sel~read_usages(
+      VALUE #( FOR partner IN lt_partners ( PartnerCode = partner-PartnerCode ) ) ).
+
+    result = VALUE #(
+      FOR partner IN lt_partners
+      ( %tky              = partner-%tky
+        %field-IsSupplier = COND #( WHEN partner-IsSupplier = abap_true
+                                     AND line_exists( lt_usages[ PartnerCode    = partner-PartnerCode
+                                                                 UsedAsSupplier = abap_true ] )
+                                    THEN if_abap_behv=>fc-f-read_only
+                                    ELSE if_abap_behv=>fc-f-unrestricted )
+        %field-IsCustomer = COND #( WHEN partner-IsCustomer = abap_true
+                                     AND line_exists( lt_usages[ PartnerCode    = partner-PartnerCode
+                                                                 UsedAsCustomer = abap_true ] )
+                                    THEN if_abap_behv=>fc-f-read_only
+                                    ELSE if_abap_behv=>fc-f-unrestricted ) )
+    ).
   ENDMETHOD.
 
   METHOD validateMandatoryFields.
@@ -236,4 +275,5 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 

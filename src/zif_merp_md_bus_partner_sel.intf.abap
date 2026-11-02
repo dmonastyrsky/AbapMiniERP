@@ -11,7 +11,9 @@ INTERFACE zif_merp_md_bus_partner_sel
 
   TYPES: BEGIN OF ty_usage,
            PartnerCode  TYPE zmerp_r_bus_partner-PartnerCode,
-           UsedInEntity TYPE zmerp_entity_name,
+           UsedInEntity   TYPE zmerp_entity_name,
+           UsedAsSupplier TYPE abap_boolean,
+           UsedAsCustomer TYPE abap_boolean,
          END OF ty_usage,
          tt_usages TYPE SORTED TABLE OF ty_usage WITH UNIQUE KEY PartnerCode UsedInEntity.
 
@@ -32,7 +34,8 @@ INTERFACE zif_merp_md_bus_partner_sel
     RETURNING VALUE(rt_partners) TYPE tt_partners.
 
   "! Reads where the given business partners are used (usage view): one row per code and using entity.
-  "! Codes that are not used are not returned.
+  "! Codes that are not used are not returned. UsedAsSupplier / UsedAsCustomer mark usage in purchasing /
+  "! sales documents (the role flag cannot be removed); any usage blocks delete.
   "! @parameter it_partner_keys | Keys to check
   "! @parameter rt_usages       | Codes in use with the entity that uses them
   METHODS read_usages

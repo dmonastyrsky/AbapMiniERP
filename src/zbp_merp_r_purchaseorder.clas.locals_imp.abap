@@ -444,6 +444,17 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
                                    severity = if_abap_behv_message=>severity-error )
           %element-PostingDate = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
+      ELSEIF zcl_merp_doc_validator=>is_posting_date_not_future( iv_post_date = lr_header->PostingDate
+                                                                 iv_today     = lv_today ) = abap_false.
+        lv_has_error = abap_true.
+        APPEND VALUE #(
+          %tky                 = lr_header->%tky
+          %state_area          = c_val_post_date
+          %msg                 = NEW zcx_merp_pur(
+                                   textid   = zcx_merp_pur=>posting_date_future_invalid
+                                   severity = if_abap_behv_message=>severity-error )
+          %element-PostingDate = if_abap_behv=>mk-on
+        ) TO reported-purchaseorder.
       ELSEIF lr_header->DocumentDate IS NOT INITIAL
          AND zcl_merp_doc_validator=>is_posting_date_valid( iv_doc_date  = lr_header->DocumentDate
                                                             iv_post_date = lr_header->PostingDate ) = abap_false.

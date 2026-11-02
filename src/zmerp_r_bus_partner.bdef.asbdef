@@ -19,6 +19,7 @@ authorization master ( global )
   field ( readonly ) PartnerCode;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
   field ( mandatory ) PartnerName;
+  field ( features : instance ) IsSupplier, IsCustomer;  // read-only once used in purchasing / sales documents
 
   determination clearMessagesForFilledFields on modify
         { field PartnerName, IsCustomer, IsSupplier; }
