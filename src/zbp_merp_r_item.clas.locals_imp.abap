@@ -361,7 +361,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-    METHOD setDefaultVatCode.
+  METHOD setDefaultVatCode.
     " Read entity fields in local mode
     READ ENTITIES OF zmerp_r_item IN LOCAL MODE
       ENTITY Item
@@ -389,20 +389,20 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
 
     DATA lt_update TYPE TABLE FOR UPDATE zmerp_r_item.
 
-    " Map default VAT code from item groups back to items (overwrite only if values differ)
+    " Item VAT code = group VAT code if it is current, otherwise empty
     LOOP AT lt_items REFERENCE INTO DATA(lr_item) WHERE ItemGroupCode IS NOT INITIAL.
       ASSIGN lt_item_groups[ ItemGroupCode = lr_item->ItemGroupCode ] TO FIELD-SYMBOL(<ls_item_group>).
 
-      IF sy-subrc = 0
-         AND <ls_item_group>-DefaultVatCode IS NOT INITIAL
-         AND lr_item->DefaultVatCode <> <ls_item_group>-DefaultVatCode
-         AND line_exists( lt_vat_rates[ VatCode   = <ls_item_group>-DefaultVatCode
-                                        IsBlocked = abap_false ] ).
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
 
-        APPEND VALUE #(
-          %tky           = lr_item->%tky
-          DefaultVatCode = <ls_item_group>-DefaultVatCode
-        ) TO lt_update.
+      DATA(lv_vat_code) = COND zmerp_vat_code( WHEN line_exists( lt_vat_rates[ VatCode   = <ls_item_group>-DefaultVatCode
+                                                                               IsBlocked = abap_false ] )
+                                               THEN <ls_item_group>-DefaultVatCode ).
+
+      IF lr_item->DefaultVatCode <> lv_vat_code.
+        APPEND VALUE #( %tky = lr_item->%tky DefaultVatCode = lv_vat_code ) TO lt_update.
       ENDIF.
     ENDLOOP.
 
