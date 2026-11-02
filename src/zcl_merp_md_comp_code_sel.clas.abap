@@ -40,9 +40,9 @@ CLASS zcl_merp_md_comp_code_sel IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SELECT FROM zmerp_r_company_code AS comp
+    SELECT comp~*
+      FROM zmerp_r_company_code AS comp
       INNER JOIN @lt_clean_keys AS keys ON comp~CompanyCode = keys~CompanyCode
-      FIELDS comp~*
       INTO TABLE @rt_companies.
   ENDMETHOD.
 
@@ -67,3 +67,4 @@ CLASS zcl_merp_md_comp_code_sel IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+

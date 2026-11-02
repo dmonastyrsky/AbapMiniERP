@@ -1246,17 +1246,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    TYPES: BEGIN OF ty_key,
-             documentuuid TYPE sysuuid_x16,
-           END OF ty_key.
-
-    TYPES: BEGIN OF ty_dependency,
-             documentuuid TYPE sysuuid_x16,
-             usedinentity TYPE zmerp_entity_name,
-           END OF ty_dependency.
-
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY documentuuid.
-    DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY documentuuid.
     DATA lv_failed_added TYPE abap_bool.
 
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
@@ -1269,17 +1258,9 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    lt_keys = VALUE #( FOR hdr IN lt_headers WHERE ( DocumentUUID IS NOT INITIAL ) ( documentuuid = hdr-DocumentUUID ) ).
-    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING documentuuid.
-
-    IF lt_keys IS NOT INITIAL.
-      SELECT DISTINCT
-             usage~DocumentUUID AS documentuuid,
-             usage~UsedInEntity AS usedinentity
-        FROM zmerp_i_po_usage AS usage
-        INNER JOIN @lt_keys AS key ON usage~DocumentUUID = key~documentuuid
-        INTO TABLE @lt_dependencies.
-    ENDIF.
+    " Usages of all documents in one selection (the selector skips initial keys)
+    DATA(lt_usages) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_usages(
+      VALUE #( FOR hdr IN lt_headers ( DocumentUUID = hdr-DocumentUUID ) ) ).
 
     LOOP AT lt_headers REFERENCE INTO DATA(lr_hdr).
       lv_failed_added = abap_false.
@@ -1302,9 +1283,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         CONTINUE.
       ENDIF.
 
-      " Database dependency check
-      LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
-        WHERE documentuuid = lr_hdr->DocumentUUID.
+      " Usage check: one message per using entity (sorted table: WHERE uses the table key)
+      LOOP AT lt_usages REFERENCE INTO DATA(lr_usage) WHERE DocumentUUID = lr_hdr->DocumentUUID.
 
         IF lv_failed_added = abap_false.
           APPEND VALUE #(
@@ -1321,7 +1301,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
           %msg            = NEW zcx_merp_pur(
                                textid   = zcx_merp_pur=>purchase_order_in_use
                                attr1    = CONV #( lr_hdr->DocumentNumber )
-                               attr2    = CONV #( lr_dep->usedinentity )
+                               attr2    = CONV #( lr_usage->UsedInEntity )
                                severity = if_abap_behv_message=>severity-error )
         ) TO reported-purchaseorder.
       ENDLOOP.

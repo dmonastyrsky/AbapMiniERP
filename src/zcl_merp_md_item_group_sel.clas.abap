@@ -40,9 +40,9 @@ CLASS zcl_merp_md_item_group_sel IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SELECT FROM zmerp_r_item_group AS grp
+    SELECT grp~*
+      FROM zmerp_r_item_group AS grp
       INNER JOIN @lt_clean_keys AS keys ON grp~ItemGroupCode = keys~ItemGroupCode
-      FIELDS grp~*
       INTO TABLE @rt_item_groups.
   ENDMETHOD.
 

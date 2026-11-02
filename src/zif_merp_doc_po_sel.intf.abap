@@ -26,6 +26,12 @@ INTERFACE zif_merp_doc_po_sel
          tt_document_keys TYPE STANDARD TABLE OF ty_document_key WITH EMPTY KEY,
          tt_document_keys_sorted TYPE SORTED TABLE OF ty_document_key WITH UNIQUE KEY DocumentUUID.
 
+  TYPES: BEGIN OF ty_usage,
+           DocumentUUID TYPE zmerp_r_purchaseorder-DocumentUUID,
+           UsedInEntity TYPE zmerp_entity_name,
+         END OF ty_usage,
+         tt_usages TYPE SORTED TABLE OF ty_usage WITH UNIQUE KEY DocumentUUID UsedInEntity.
+
   "! Reads the header of a single purchase order (without items)
   "! @parameter iv_document_uuid | Requested purchase order document key
   "! @parameter rs_header        | Returned header data structure
@@ -73,6 +79,14 @@ INTERFACE zif_merp_doc_po_sel
   METHODS read_received_documents
     IMPORTING it_document_keys        TYPE tt_document_keys
     RETURNING VALUE(rt_document_keys) TYPE tt_document_keys_sorted.
+
+  "! Reads where the given purchase orders are used (usage view): one row per document and using entity.
+  "! Documents that are not used are not returned.
+  "! @parameter it_document_keys | Keys to check
+  "! @parameter rt_usages        | Documents in use with the entity that uses them
+  METHODS read_usages
+    IMPORTING it_document_keys TYPE tt_document_keys
+    RETURNING VALUE(rt_usages) TYPE tt_usages.
 
   "! Validates purchase order document keys and returns missing/invalid keys
   "! @parameter it_document_keys | Table of purchase order document keys to validate

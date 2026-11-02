@@ -40,9 +40,9 @@ CLASS zcl_merp_md_warehouse_sel IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SELECT FROM zmerp_r_warehouse AS wh
+    SELECT wh~*
+      FROM zmerp_r_warehouse AS wh
       INNER JOIN @lt_clean_keys AS keys ON wh~WarehouseCode = keys~WarehouseCode
-      FIELDS wh~*
       INTO TABLE @rt_warehouses.
   ENDMETHOD.
 

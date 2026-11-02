@@ -40,9 +40,9 @@ CLASS zcl_merp_md_vat_rate_sel IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SELECT FROM zmerp_r_vat_rate AS vat
+    SELECT vat~*
+      FROM zmerp_r_vat_rate AS vat
       INNER JOIN @lt_clean_keys AS keys ON vat~VatCode = keys~VatCode
-      FIELDS vat~*
       INTO TABLE @rt_vat_rates.
   ENDMETHOD.
 

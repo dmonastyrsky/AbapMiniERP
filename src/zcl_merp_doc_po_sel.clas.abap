@@ -53,9 +53,9 @@ CLASS zcl_merp_doc_po_sel IMPLEMENTATION.
 
     " ty_header is derived from the same view, so INTO TABLE (without CORRESPONDING)
     " makes any structure mismatch visible at compile time instead of silently skipping fields
-    SELECT FROM zmerp_r_purchaseorder AS po
+    SELECT po~*
+      FROM zmerp_r_purchaseorder AS po
       INNER JOIN @lt_clean_keys AS keys ON po~DocumentUUID = keys~DocumentUUID
-      FIELDS po~*
       INTO TABLE @rt_headers.
   ENDMETHOD.
 
@@ -88,9 +88,9 @@ CLASS zcl_merp_doc_po_sel IMPLEMENTATION.
     ENDIF.
 
     " ty_progress is derived from the same view, see the comment in read_headers
-    SELECT FROM zmerp_i_po_progress AS prg
+    SELECT prg~*
+      FROM zmerp_i_po_progress AS prg
       INNER JOIN @lt_clean_keys AS keys ON prg~PoHeaderUUID = keys~DocumentUUID
-      FIELDS prg~*
       INTO TABLE @rt_progress.
   ENDMETHOD.
 
@@ -108,6 +108,20 @@ CLASS zcl_merp_doc_po_sel IMPLEMENTATION.
       WHERE prg~ReceivedQuantity > 0
       INTO TABLE @rt_document_keys.
   ENDMETHOD.
+
+  METHOD zif_merp_doc_po_sel~read_usages.
+    DATA(lt_clean_keys) = prepare_keys( it_document_keys ).
+    IF lt_clean_keys IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    " DISTINCT: one row per document and using entity, however many documents reference it
+    SELECT DISTINCT usage~DocumentUUID, usage~UsedInEntity
+      FROM zmerp_i_po_usage AS usage
+      INNER JOIN @lt_clean_keys AS keys ON usage~DocumentUUID = keys~DocumentUUID
+      INTO CORRESPONDING FIELDS OF TABLE @rt_usages.
+  ENDMETHOD.
+
 
   METHOD zif_merp_doc_po_sel~validate_documents.
     DATA lt_existing_keys TYPE tt_document_keys_unique.
@@ -132,9 +146,9 @@ CLASS zcl_merp_doc_po_sel IMPLEMENTATION.
 
   METHOD select_items.
     " ty_item is derived from the same view, see the comment in read_headers
-    SELECT FROM zmerp_r_purchaseorderitm AS itm
+    SELECT itm~*
+      FROM zmerp_r_purchaseorderitm AS itm
       INNER JOIN @it_document_keys AS keys ON itm~HeaderUUID = keys~DocumentUUID
-      FIELDS itm~*
       INTO TABLE @rt_items.
   ENDMETHOD.
 

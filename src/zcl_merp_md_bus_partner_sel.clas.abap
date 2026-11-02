@@ -40,9 +40,9 @@ CLASS zcl_merp_md_bus_partner_sel IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SELECT FROM zmerp_r_bus_partner AS bp
+    SELECT bp~*
+      FROM zmerp_r_bus_partner AS bp
       INNER JOIN @lt_clean_keys AS keys ON bp~PartnerCode = keys~PartnerCode
-      FIELDS bp~*
       INTO TABLE @rt_partners.
   ENDMETHOD.
 

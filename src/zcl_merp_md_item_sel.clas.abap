@@ -40,9 +40,9 @@ CLASS zcl_merp_md_item_sel IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SELECT FROM zmerp_r_item AS item
+    SELECT item~*
+      FROM zmerp_r_item AS item
       INNER JOIN @lt_clean_keys AS keys ON item~ItemCode = keys~ItemCode
-      FIELDS item~*
       INTO TABLE @rt_items.
   ENDMETHOD.
 
@@ -67,5 +67,4 @@ CLASS zcl_merp_md_item_sel IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-
 
