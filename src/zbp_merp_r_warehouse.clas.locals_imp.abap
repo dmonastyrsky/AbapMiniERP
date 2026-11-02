@@ -51,30 +51,16 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_instance_features.
-    TYPES: BEGIN OF ty_key,
-             warehousecode TYPE zmerp_warehouse_code,
-           END OF ty_key.
-
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY warehousecode.
-    DATA lt_used TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY warehousecode.
-
-    LOOP AT keys REFERENCE INTO DATA(lr_key) WHERE WarehouseCode IS NOT INITIAL.
-      INSERT VALUE #( warehousecode = lr_key->WarehouseCode ) INTO TABLE lt_keys.
-    ENDLOOP.
-
-    IF lt_keys IS NOT INITIAL.
-      SELECT DISTINCT usage~WarehouseCode AS warehousecode
-        FROM zmerp_i_warehouse_usage AS usage
-        INNER JOIN @lt_keys AS key ON usage~WarehouseCode = key~warehousecode
-        INTO TABLE @lt_used.
-    ENDIF.
+    " Codes in use keep their critical fields (one selection for all keys)
+    DATA(lt_usages) = NEW zcl_merp_md_warehouse_sel( )->zif_merp_md_warehouse_sel~read_usages(
+      VALUE #( FOR key IN keys ( WarehouseCode = key-WarehouseCode ) ) ).
 
     result = VALUE #(
       FOR key IN keys
       ( %tky               = key-%tky
-        %field-CompanyCode = COND #( WHEN line_exists( lt_used[ warehousecode = key-WarehouseCode ] )
-                                     THEN if_abap_behv=>fc-f-read_only
-                                     ELSE if_abap_behv=>fc-f-mandatory ) )
+        %field-CompanyCode = COND #( WHEN line_exists( lt_usages[ WarehouseCode = key-WarehouseCode ] )
+                                    THEN if_abap_behv=>fc-f-read_only
+                                    ELSE if_abap_behv=>fc-f-mandatory ) )
     ).
   ENDMETHOD.
 
@@ -252,71 +238,38 @@ CLASS lhc_zmerp_r_warehouse IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD precheck_delete.
-    IF keys IS INITIAL.
-      RETURN.
-    ENDIF.
+    " Usages of all keys in one selection (the selector skips initial keys)
+    DATA(lt_usages) = NEW zcl_merp_md_warehouse_sel( )->zif_merp_md_warehouse_sel~read_usages(
+      VALUE #( FOR key IN keys ( WarehouseCode = key-WarehouseCode ) ) ).
 
-    TYPES: BEGIN OF ty_key,
-             warehousecode TYPE zmerp_warehouse_code,
-           END OF ty_key.
-
-    TYPES: BEGIN OF ty_dependency,
-             warehousecode TYPE zmerp_warehouse_code,
-             usedinentity  TYPE zmerp_entity_name,
-           END OF ty_dependency.
-
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY warehousecode.
-    DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY warehousecode.
-    DATA lv_failed_added TYPE abap_bool.
-
-    " Collect unique non-initial keys for one bulk usage check
-    lt_keys = VALUE #( FOR key IN keys WHERE ( WarehouseCode IS NOT INITIAL ) ( warehousecode = key-WarehouseCode ) ).
-    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING warehousecode.
-
-    IF lt_keys IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    " Bulk check database dependencies for collected key set
-    SELECT DISTINCT
-           usage~WarehouseCode AS warehousecode,
-           usage~UsedInEntity  AS usedinentity
-      FROM zmerp_i_warehouse_usage AS usage
-      INNER JOIN @lt_keys AS key ON usage~WarehouseCode = key~warehousecode
-      INTO TABLE @lt_dependencies.
-
-    IF lt_dependencies IS INITIAL.
+    IF lt_usages IS INITIAL.
       RETURN.
     ENDIF.
 
     LOOP AT keys REFERENCE INTO DATA(lr_key).
-      lv_failed_added = abap_false.
+      IF NOT line_exists( lt_usages[ WarehouseCode = lr_key->WarehouseCode ] ).
+        CONTINUE.
+      ENDIF.
 
-      " Dependencies of this key (sorted table: WHERE uses the table key)
-      LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
-        WHERE warehousecode = lr_key->WarehouseCode.
+      APPEND VALUE #(
+        %tky        = lr_key->%tky
+        %fail-cause = if_abap_behv=>cause-dependency
+      ) TO failed-warehouse.
 
-        " Record entity failure state ONCE per key
-        IF lv_failed_added = abap_false.
-          APPEND VALUE #(
-            %tky        = lr_key->%tky
-            %fail-cause = if_abap_behv=>cause-dependency
-          ) TO failed-warehouse.
-          lv_failed_added = abap_true.
-        ENDIF.
-
-        " Report explicit dependency error message to UI
+      " One message per using entity (sorted table: WHERE uses the table key)
+      LOOP AT lt_usages REFERENCE INTO DATA(lr_usage) WHERE WarehouseCode = lr_key->WarehouseCode.
         APPEND VALUE #(
-          %tky                  = lr_key->%tky
+          %tky                   = lr_key->%tky
           %element-WarehouseCode = if_abap_behv=>mk-on
-          %msg                  = NEW zcx_merp_md(
-                                      textid   = zcx_merp_md=>warehouse_in_use
-                                      attr1    = CONV #( lr_dep->warehousecode )
-                                      attr2    = CONV #( lr_dep->usedinentity )
-                                      severity = if_abap_behv_message=>severity-error )
+          %msg                   = NEW zcx_merp_md(
+                                     textid   = zcx_merp_md=>warehouse_in_use
+                                     attr1    = CONV #( lr_usage->WarehouseCode )
+                                     attr2    = CONV #( lr_usage->UsedInEntity )
+                                     severity = if_abap_behv_message=>severity-error )
         ) TO reported-warehouse.
       ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.
+

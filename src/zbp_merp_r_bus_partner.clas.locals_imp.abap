@@ -202,71 +202,38 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD precheck_delete.
-    IF keys IS INITIAL.
-      RETURN.
-    ENDIF.
+    " Usages of all keys in one selection (the selector skips initial keys)
+    DATA(lt_usages) = NEW zcl_merp_md_bus_partner_sel( )->zif_merp_md_bus_partner_sel~read_usages(
+      VALUE #( FOR key IN keys ( PartnerCode = key-PartnerCode ) ) ).
 
-    TYPES: BEGIN OF ty_key,
-             partnercode TYPE zmerp_bus_part_code,
-           END OF ty_key.
-
-    TYPES: BEGIN OF ty_dependency,
-             partnercode  TYPE zmerp_bus_part_code,
-             usedinentity TYPE zmerp_entity_name,
-           END OF ty_dependency.
-
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY partnercode.
-    DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY partnercode.
-    DATA lv_failed_added TYPE abap_bool.
-
-    " Collect unique non-initial keys for one bulk usage check
-    lt_keys = VALUE #( FOR key IN keys WHERE ( PartnerCode IS NOT INITIAL ) ( partnercode = key-PartnerCode ) ).
-    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING partnercode.
-
-    IF lt_keys IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    " Bulk check database dependencies for collected key set
-    SELECT DISTINCT
-           usage~PartnerCode  AS partnercode,
-           usage~UsedInEntity AS usedinentity
-      FROM zmerp_i_bus_partner_usage AS usage
-      INNER JOIN @lt_keys AS key ON usage~PartnerCode = key~partnercode
-      INTO TABLE @lt_dependencies.
-
-    IF lt_dependencies IS INITIAL.
+    IF lt_usages IS INITIAL.
       RETURN.
     ENDIF.
 
     LOOP AT keys REFERENCE INTO DATA(lr_key).
-      lv_failed_added = abap_false.
+      IF NOT line_exists( lt_usages[ PartnerCode = lr_key->PartnerCode ] ).
+        CONTINUE.
+      ENDIF.
 
-      " Dependencies of this key (sorted table: WHERE uses the table key)
-      LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
-        WHERE partnercode = lr_key->PartnerCode.
+      APPEND VALUE #(
+        %tky        = lr_key->%tky
+        %fail-cause = if_abap_behv=>cause-dependency
+      ) TO failed-businesspartner.
 
-        " Record entity failure state ONCE per key
-        IF lv_failed_added = abap_false.
-          APPEND VALUE #(
-            %tky        = lr_key->%tky
-            %fail-cause = if_abap_behv=>cause-dependency
-          ) TO failed-businesspartner.
-          lv_failed_added = abap_true.
-        ENDIF.
-
-        " Report explicit dependency error message to UI
+      " One message per using entity (sorted table: WHERE uses the table key)
+      LOOP AT lt_usages REFERENCE INTO DATA(lr_usage) WHERE PartnerCode = lr_key->PartnerCode.
         APPEND VALUE #(
           %tky                 = lr_key->%tky
           %element-PartnerCode = if_abap_behv=>mk-on
           %msg                 = NEW zcx_merp_md(
-                                     textid   = zcx_merp_md=>business_partner_in_use
-                                     attr1    = CONV #( lr_dep->partnercode )
-                                     attr2    = CONV #( lr_dep->usedinentity )
-                                     severity = if_abap_behv_message=>severity-error )
+                                   textid   = zcx_merp_md=>business_partner_in_use
+                                   attr1    = CONV #( lr_usage->PartnerCode )
+                                   attr2    = CONV #( lr_usage->UsedInEntity )
+                                   severity = if_abap_behv_message=>severity-error )
         ) TO reported-businesspartner.
       ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.
+

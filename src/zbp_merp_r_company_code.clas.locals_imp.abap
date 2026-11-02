@@ -77,27 +77,13 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_instance_features.
-    TYPES: BEGIN OF ty_key,
-             companycode TYPE zmerp_company_code,
-           END OF ty_key.
-
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY companycode.
-    DATA lt_used TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY companycode.
-
-    LOOP AT keys REFERENCE INTO DATA(lr_key) WHERE CompanyCode IS NOT INITIAL.
-      INSERT VALUE #( companycode = lr_key->CompanyCode ) INTO TABLE lt_keys.
-    ENDLOOP.
-
-    IF lt_keys IS NOT INITIAL.
-      SELECT DISTINCT usage~CompanyCode AS companycode
-        FROM zmerp_i_company_code_usage AS usage
-        INNER JOIN @lt_keys AS key ON usage~CompanyCode = key~companycode
-        INTO TABLE @lt_used.
-    ENDIF.
+    " Codes in use keep their critical fields (one selection for all keys)
+    DATA(lt_usages) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_usages(
+      VALUE #( FOR key IN keys ( CompanyCode = key-CompanyCode ) ) ).
 
     result = VALUE #(
       FOR key IN keys
-      LET lv_control = COND #( WHEN line_exists( lt_used[ companycode = key-CompanyCode ] )
+      LET lv_control = COND #( WHEN line_exists( lt_usages[ CompanyCode = key-CompanyCode ] )
                                THEN if_abap_behv=>fc-f-read_only
                                ELSE if_abap_behv=>fc-f-mandatory ) IN
       ( %tky                 = key-%tky
@@ -334,68 +320,34 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD precheck_delete.
-    IF keys IS INITIAL.
-      RETURN.
-    ENDIF.
+    " Usages of all keys in one selection (the selector skips initial keys)
+    DATA(lt_usages) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_usages(
+      VALUE #( FOR key IN keys ( CompanyCode = key-CompanyCode ) ) ).
 
-    TYPES: BEGIN OF ty_key,
-             companycode TYPE zmerp_company_code,
-           END OF ty_key.
-
-    TYPES: BEGIN OF ty_dependency,
-             companycode  TYPE zmerp_company_code,
-             usedinentity TYPE zmerp_entity_name,
-           END OF ty_dependency.
-
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY companycode.
-    DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY companycode.
-    DATA lv_failed_added TYPE abap_bool.
-
-    " Collect unique non-initial keys for one bulk usage check
-    lt_keys = VALUE #( FOR key IN keys WHERE ( CompanyCode IS NOT INITIAL ) ( companycode = key-CompanyCode ) ).
-    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING companycode.
-
-    IF lt_keys IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    " Bulk check database dependencies for collected key set
-    SELECT DISTINCT
-           usage~CompanyCode  AS companycode,
-           usage~UsedInEntity AS usedinentity
-      FROM zmerp_i_company_code_usage AS usage
-      INNER JOIN @lt_keys AS key ON usage~CompanyCode = key~companycode
-      INTO TABLE @lt_dependencies.
-
-    IF lt_dependencies IS INITIAL.
+    IF lt_usages IS INITIAL.
       RETURN.
     ENDIF.
 
     LOOP AT keys REFERENCE INTO DATA(lr_key).
-      lv_failed_added = abap_false.
+      IF NOT line_exists( lt_usages[ CompanyCode = lr_key->CompanyCode ] ).
+        CONTINUE.
+      ENDIF.
 
-      " Dependencies of this key (sorted table: WHERE uses the table key)
-      LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
-        WHERE companycode = lr_key->CompanyCode.
+      APPEND VALUE #(
+        %tky        = lr_key->%tky
+        %fail-cause = if_abap_behv=>cause-dependency
+      ) TO failed-companycode.
 
-        " Record entity failure state ONCE per key
-        IF lv_failed_added = abap_false.
-          APPEND VALUE #(
-            %tky        = lr_key->%tky
-            %fail-cause = if_abap_behv=>cause-dependency
-          ) TO failed-companycode.
-          lv_failed_added = abap_true.
-        ENDIF.
-
-        " Report explicit dependency error message to UI
+      " One message per using entity (sorted table: WHERE uses the table key)
+      LOOP AT lt_usages REFERENCE INTO DATA(lr_usage) WHERE CompanyCode = lr_key->CompanyCode.
         APPEND VALUE #(
           %tky                 = lr_key->%tky
           %element-CompanyCode = if_abap_behv=>mk-on
-          %msg                  = NEW zcx_merp_md(
-                                      textid   = zcx_merp_md=>company_code_in_use
-                                      attr1    = CONV #( lr_dep->companycode )
-                                      attr2    = CONV #( lr_dep->usedinentity )
-                                      severity = if_abap_behv_message=>severity-error )
+          %msg                 = NEW zcx_merp_md(
+                                   textid   = zcx_merp_md=>company_code_in_use
+                                   attr1    = CONV #( lr_usage->CompanyCode )
+                                   attr2    = CONV #( lr_usage->UsedInEntity )
+                                   severity = if_abap_behv_message=>severity-error )
         ) TO reported-companycode.
       ENDLOOP.
     ENDLOOP.
@@ -437,3 +389,4 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+

@@ -59,27 +59,13 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_instance_features.
-    TYPES: BEGIN OF ty_key,
-             itemcode TYPE zmerp_item_code,
-           END OF ty_key.
-
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY itemcode.
-    DATA lt_used TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY itemcode.
-
-    LOOP AT keys REFERENCE INTO DATA(lr_key) WHERE ItemCode IS NOT INITIAL.
-      INSERT VALUE #( itemcode = lr_key->ItemCode ) INTO TABLE lt_keys.
-    ENDLOOP.
-
-    IF lt_keys IS NOT INITIAL.
-      SELECT DISTINCT usage~ItemCode AS itemcode
-        FROM zmerp_i_item_usage AS usage
-        INNER JOIN @lt_keys AS key ON usage~ItemCode = key~itemcode
-        INTO TABLE @lt_used.
-    ENDIF.
+    " Codes in use keep their critical fields (one selection for all keys)
+    DATA(lt_usages) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_usages(
+      VALUE #( FOR key IN keys ( ItemCode = key-ItemCode ) ) ).
 
     result = VALUE #(
       FOR key IN keys
-      LET lv_control = COND #( WHEN line_exists( lt_used[ itemcode = key-ItemCode ] )
+      LET lv_control = COND #( WHEN line_exists( lt_usages[ ItemCode = key-ItemCode ] )
                                THEN if_abap_behv=>fc-f-read_only
                                ELSE if_abap_behv=>fc-f-mandatory ) IN
       ( %tky                     = key-%tky
@@ -342,68 +328,34 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD precheck_delete.
-    IF keys IS INITIAL.
-      RETURN.
-    ENDIF.
+    " Usages of all keys in one selection (the selector skips initial keys)
+    DATA(lt_usages) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_usages(
+      VALUE #( FOR key IN keys ( ItemCode = key-ItemCode ) ) ).
 
-    TYPES: BEGIN OF ty_key,
-             itemcode TYPE zmerp_item_code,
-           END OF ty_key.
-
-    TYPES: BEGIN OF ty_dependency,
-             itemcode     TYPE zmerp_item_code,
-             usedinentity TYPE zmerp_entity_name,
-           END OF ty_dependency.
-
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY itemcode.
-    DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY itemcode.
-    DATA lv_failed_added TYPE abap_bool.
-
-    " Collect unique non-initial keys for one bulk usage check
-    lt_keys = VALUE #( FOR key IN keys WHERE ( ItemCode IS NOT INITIAL ) ( itemcode = key-ItemCode ) ).
-    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING itemcode.
-
-    IF lt_keys IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    " Bulk check database dependencies for collected key set
-    SELECT DISTINCT
-           usage~ItemCode     AS itemcode,
-           usage~UsedInEntity AS usedinentity
-      FROM zmerp_i_item_usage AS usage
-      INNER JOIN @lt_keys AS key ON usage~ItemCode = key~itemcode
-      INTO TABLE @lt_dependencies.
-
-    IF lt_dependencies IS INITIAL.
+    IF lt_usages IS INITIAL.
       RETURN.
     ENDIF.
 
     LOOP AT keys REFERENCE INTO DATA(lr_key).
-      lv_failed_added = abap_false.
+      IF NOT line_exists( lt_usages[ ItemCode = lr_key->ItemCode ] ).
+        CONTINUE.
+      ENDIF.
 
-      " Dependencies of this key (sorted table: WHERE uses the table key)
-      LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
-        WHERE itemcode = lr_key->ItemCode.
+      APPEND VALUE #(
+        %tky        = lr_key->%tky
+        %fail-cause = if_abap_behv=>cause-dependency
+      ) TO failed-item.
 
-        " Record entity failure state ONCE per key
-        IF lv_failed_added = abap_false.
-          APPEND VALUE #(
-            %tky        = lr_key->%tky
-            %fail-cause = if_abap_behv=>cause-dependency
-          ) TO failed-item.
-          lv_failed_added = abap_true.
-        ENDIF.
-
-        " Report explicit dependency error message to UI
+      " One message per using entity (sorted table: WHERE uses the table key)
+      LOOP AT lt_usages REFERENCE INTO DATA(lr_usage) WHERE ItemCode = lr_key->ItemCode.
         APPEND VALUE #(
-          %tky             = lr_key->%tky
+          %tky              = lr_key->%tky
           %element-ItemCode = if_abap_behv=>mk-on
-          %msg             = NEW zcx_merp_md(
-                                 textid   = zcx_merp_md=>item_in_use
-                                 attr1    = CONV #( lr_dep->itemcode )
-                                 attr2    = CONV #( lr_dep->usedinentity )
-                                 severity = if_abap_behv_message=>severity-error )
+          %msg              = NEW zcx_merp_md(
+                                textid   = zcx_merp_md=>item_in_use
+                                attr1    = CONV #( lr_usage->ItemCode )
+                                attr2    = CONV #( lr_usage->UsedInEntity )
+                                severity = if_abap_behv_message=>severity-error )
         ) TO reported-item.
       ENDLOOP.
     ENDLOOP.
@@ -457,3 +409,4 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+

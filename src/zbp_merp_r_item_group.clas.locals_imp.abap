@@ -220,72 +220,38 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD precheck_delete.
-    IF keys IS INITIAL.
-      RETURN.
-    ENDIF.
+    " Usages of all keys in one selection (the selector skips initial keys)
+    DATA(lt_usages) = NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_usages(
+      VALUE #( FOR key IN keys ( ItemGroupCode = key-ItemGroupCode ) ) ).
 
-    TYPES: BEGIN OF ty_key,
-             itemgroupcode TYPE zmerp_item_group_code,
-           END OF ty_key.
-
-    TYPES: BEGIN OF ty_dependency,
-             itemgroupcode TYPE zmerp_item_group_code,
-             usedinentity  TYPE zmerp_entity_name,
-           END OF ty_dependency.
-
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY itemgroupcode.
-    DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY itemgroupcode.
-    DATA lv_failed_added TYPE abap_bool.
-
-    " Collect unique non-initial keys for one bulk usage check
-    lt_keys = VALUE #( FOR key IN keys WHERE ( ItemGroupCode IS NOT INITIAL ) ( itemgroupcode = key-ItemGroupCode ) ).
-    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING itemgroupcode.
-
-    IF lt_keys IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    " Bulk check database dependencies for collected key set
-    SELECT DISTINCT
-           usage~ItemGroupCode AS itemgroupcode,
-           usage~UsedInEntity  AS usedinentity
-      FROM zmerp_i_item_group_usage AS usage
-      INNER JOIN @lt_keys AS key ON usage~ItemGroupCode = key~itemgroupcode
-      INTO TABLE @lt_dependencies.
-
-    IF lt_dependencies IS INITIAL.
+    IF lt_usages IS INITIAL.
       RETURN.
     ENDIF.
 
     LOOP AT keys REFERENCE INTO DATA(lr_key).
-      lv_failed_added = abap_false.
+      IF NOT line_exists( lt_usages[ ItemGroupCode = lr_key->ItemGroupCode ] ).
+        CONTINUE.
+      ENDIF.
 
-      " Dependencies of this key (sorted table: WHERE uses the table key)
-      LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
-        WHERE itemgroupcode = lr_key->ItemGroupCode.
+      APPEND VALUE #(
+        %tky        = lr_key->%tky
+        %fail-cause = if_abap_behv=>cause-dependency
+      ) TO failed-itemgroup.
 
-        " Record entity failure state ONCE per key
-        IF lv_failed_added = abap_false.
-          APPEND VALUE #(
-            %tky        = lr_key->%tky
-            %fail-cause = if_abap_behv=>cause-dependency
-          ) TO failed-itemgroup.
-          lv_failed_added = abap_true.
-        ENDIF.
-
-        " Report explicit dependency error message to UI
+      " One message per using entity (sorted table: WHERE uses the table key)
+      LOOP AT lt_usages REFERENCE INTO DATA(lr_usage) WHERE ItemGroupCode = lr_key->ItemGroupCode.
         APPEND VALUE #(
           %tky                   = lr_key->%tky
           %element-ItemGroupCode = if_abap_behv=>mk-on
           %msg                   = NEW zcx_merp_md(
-                                      textid   = zcx_merp_md=>item_group_in_use
-                                      attr1    = CONV #( lr_dep->itemgroupcode )
-                                      attr2    = CONV #( lr_dep->usedinentity )
-                                      severity = if_abap_behv_message=>severity-error )
+                                     textid   = zcx_merp_md=>item_group_in_use
+                                     attr1    = CONV #( lr_usage->ItemGroupCode )
+                                     attr2    = CONV #( lr_usage->UsedInEntity )
+                                     severity = if_abap_behv_message=>severity-error )
         ) TO reported-itemgroup.
       ENDLOOP.
     ENDLOOP.
-
   ENDMETHOD.
 
 ENDCLASS.
+

@@ -57,30 +57,16 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_instance_features.
-    TYPES: BEGIN OF ty_key,
-             vatcode TYPE zmerp_vat_code,
-           END OF ty_key.
-
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY vatcode.
-    DATA lt_used TYPE SORTED TABLE OF ty_key WITH UNIQUE KEY vatcode.
-
-    LOOP AT keys REFERENCE INTO DATA(lr_key) WHERE VatCode IS NOT INITIAL.
-      INSERT VALUE #( vatcode = lr_key->VatCode ) INTO TABLE lt_keys.
-    ENDLOOP.
-
-    IF lt_keys IS NOT INITIAL.
-      SELECT DISTINCT usage~VatCode AS vatcode
-        FROM zmerp_i_vat_rate_usage AS usage
-        INNER JOIN @lt_keys AS key ON usage~VatCode = key~vatcode
-        INTO TABLE @lt_used.
-    ENDIF.
+    " Codes in use keep their critical fields (one selection for all keys)
+    DATA(lt_usages) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_usages(
+      VALUE #( FOR key IN keys ( VatCode = key-VatCode ) ) ).
 
     result = VALUE #(
       FOR key IN keys
       ( %tky              = key-%tky
-        %field-Percentage = COND #( WHEN line_exists( lt_used[ vatcode = key-VatCode ] )
-                                    THEN if_abap_behv=>fc-f-read_only
-                                    ELSE if_abap_behv=>fc-f-mandatory ) )
+        %field-Percentage = COND #( WHEN line_exists( lt_usages[ VatCode = key-VatCode ] )
+                                   THEN if_abap_behv=>fc-f-read_only
+                                   ELSE if_abap_behv=>fc-f-mandatory ) )
     ).
   ENDMETHOD.
 
@@ -270,71 +256,38 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD precheck_delete.
-    IF keys IS INITIAL.
-      RETURN.
-    ENDIF.
+    " Usages of all keys in one selection (the selector skips initial keys)
+    DATA(lt_usages) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_usages(
+      VALUE #( FOR key IN keys ( VatCode = key-VatCode ) ) ).
 
-    TYPES: BEGIN OF ty_key,
-             vatcode TYPE zmerp_vat_code,
-           END OF ty_key.
-
-    TYPES: BEGIN OF ty_dependency,
-             vatcode      TYPE zmerp_vat_code,
-             usedinentity TYPE zmerp_entity_name,
-           END OF ty_dependency.
-
-    DATA lt_keys TYPE SORTED TABLE OF ty_key WITH NON-UNIQUE KEY vatcode.
-    DATA lt_dependencies TYPE SORTED TABLE OF ty_dependency WITH NON-UNIQUE KEY vatcode.
-    DATA lv_failed_added TYPE abap_bool.
-
-    " Collect unique non-initial keys for one bulk usage check
-    lt_keys = VALUE #( FOR key IN keys WHERE ( VatCode IS NOT INITIAL ) ( vatcode = key-VatCode ) ).
-    DELETE ADJACENT DUPLICATES FROM lt_keys COMPARING vatcode.
-
-    IF lt_keys IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    " Bulk check database dependencies for collected key set
-    SELECT DISTINCT
-           usage~VatCode      AS vatcode,
-           usage~UsedInEntity AS usedinentity
-      FROM zmerp_i_vat_rate_usage AS usage
-      INNER JOIN @lt_keys AS key ON usage~VatCode = key~vatcode
-      INTO TABLE @lt_dependencies.
-
-    IF lt_dependencies IS INITIAL.
+    IF lt_usages IS INITIAL.
       RETURN.
     ENDIF.
 
     LOOP AT keys REFERENCE INTO DATA(lr_key).
-      lv_failed_added = abap_false.
+      IF NOT line_exists( lt_usages[ VatCode = lr_key->VatCode ] ).
+        CONTINUE.
+      ENDIF.
 
-      " Dependencies of this key (sorted table: WHERE uses the table key)
-      LOOP AT lt_dependencies REFERENCE INTO DATA(lr_dep)
-        WHERE vatcode = lr_key->VatCode.
+      APPEND VALUE #(
+        %tky        = lr_key->%tky
+        %fail-cause = if_abap_behv=>cause-dependency
+      ) TO failed-vatrate.
 
-        " Record entity failure state ONCE per key
-        IF lv_failed_added = abap_false.
-          APPEND VALUE #(
-            %tky        = lr_key->%tky
-            %fail-cause = if_abap_behv=>cause-dependency
-          ) TO failed-vatrate.
-          lv_failed_added = abap_true.
-        ENDIF.
-
-        " Report explicit dependency error message to UI
+      " One message per using entity (sorted table: WHERE uses the table key)
+      LOOP AT lt_usages REFERENCE INTO DATA(lr_usage) WHERE VatCode = lr_key->VatCode.
         APPEND VALUE #(
           %tky             = lr_key->%tky
           %element-VatCode = if_abap_behv=>mk-on
           %msg             = NEW zcx_merp_md(
-                                  textid   = zcx_merp_md=>vat_rate_in_use
-                                  attr1    = CONV #( lr_dep->vatcode )
-                                  attr2    = CONV #( lr_dep->usedinentity )
-                                  severity = if_abap_behv_message=>severity-error )
+                               textid   = zcx_merp_md=>vat_rate_in_use
+                               attr1    = CONV #( lr_usage->VatCode )
+                               attr2    = CONV #( lr_usage->UsedInEntity )
+                               severity = if_abap_behv_message=>severity-error )
         ) TO reported-vatrate.
       ENDLOOP.
     ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.
+
