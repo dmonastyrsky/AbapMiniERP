@@ -41,15 +41,6 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF select_vat_code,
 
-      BEGIN OF select_item_group,
-        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
-        msgno TYPE symsgno VALUE '004',
-        attr1 TYPE scx_attrname VALUE '',
-        attr2 TYPE scx_attrname VALUE '',
-        attr3 TYPE scx_attrname VALUE '',
-        attr4 TYPE scx_attrname VALUE '',
-      END OF select_item_group,
-
       BEGIN OF select_item,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '005',
@@ -189,15 +180,6 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF price_must_be_positive,
 
-      BEGIN OF quantity_exceeds_ordered,
-        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
-        msgno TYPE symsgno VALUE '105',
-        attr1 TYPE scx_attrname VALUE '',
-        attr2 TYPE scx_attrname VALUE '',
-        attr3 TYPE scx_attrname VALUE '',
-        attr4 TYPE scx_attrname VALUE '',
-      END OF quantity_exceeds_ordered,
-
       BEGIN OF document_empty_items_invalid,
         msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
         msgno TYPE symsgno VALUE '106',
@@ -327,3 +309,4 @@ ENDCLASS.
 
 CLASS zcx_merp_doc IMPLEMENTATION.
 ENDCLASS.
+

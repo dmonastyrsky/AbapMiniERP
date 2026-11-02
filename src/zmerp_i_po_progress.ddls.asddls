@@ -85,8 +85,8 @@ define view entity ZMERP_I_PO_PROGRESS
       /* ---------- Receipt status: N = not received, P = partial, C = complete, O = over-received ---------- */
       cast( case
               when rec.PoItemUUID is null              then 'N'
-              when rec.ReceivedQuantity < poi.Quantity then 'P'
-              when rec.ReceivedQuantity = poi.Quantity then 'C'
+              when rec.ReceivedQuantity < cast( poi.Quantity as abap.dec( 23, 3 ) ) then 'P'
+              when rec.ReceivedQuantity = cast( poi.Quantity as abap.dec( 23, 3 ) ) then 'C'
               else 'O'
             end as abap.char( 1 ) )       as ReceiptStatus,
 

@@ -17,24 +17,6 @@ CLASS zcx_merp_md DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF select_company,
 
-      BEGIN OF select_warehouse,
-        msgid TYPE symsgid VALUE 'ZMC_MERP_MD',
-        msgno TYPE symsgno VALUE '002',
-        attr1 TYPE scx_attrname VALUE '',
-        attr2 TYPE scx_attrname VALUE '',
-        attr3 TYPE scx_attrname VALUE '',
-        attr4 TYPE scx_attrname VALUE '',
-      END OF select_warehouse,
-
-      BEGIN OF select_vat_code,
-        msgid TYPE symsgid VALUE 'ZMC_MERP_MD',
-        msgno TYPE symsgno VALUE '003',
-        attr1 TYPE scx_attrname VALUE '',
-        attr2 TYPE scx_attrname VALUE '',
-        attr3 TYPE scx_attrname VALUE '',
-        attr4 TYPE scx_attrname VALUE '',
-      END OF select_vat_code,
-
       BEGIN OF select_item_group,
         msgid TYPE symsgid VALUE 'ZMC_MERP_MD',
         msgno TYPE symsgno VALUE '004',
@@ -43,24 +25,6 @@ CLASS zcx_merp_md DEFINITION
         attr3 TYPE scx_attrname VALUE '',
         attr4 TYPE scx_attrname VALUE '',
       END OF select_item_group,
-
-      BEGIN OF select_item,
-        msgid TYPE symsgid VALUE 'ZMC_MERP_MD',
-        msgno TYPE symsgno VALUE '005',
-        attr1 TYPE scx_attrname VALUE '',
-        attr2 TYPE scx_attrname VALUE '',
-        attr3 TYPE scx_attrname VALUE '',
-        attr4 TYPE scx_attrname VALUE '',
-      END OF select_item,
-
-      BEGIN OF select_business_partner,
-        msgid TYPE symsgid VALUE 'ZMC_MERP_MD',
-        msgno TYPE symsgno VALUE '006',
-        attr1 TYPE scx_attrname VALUE '',
-        attr2 TYPE scx_attrname VALUE '',
-        attr3 TYPE scx_attrname VALUE '',
-        attr4 TYPE scx_attrname VALUE '',
-      END OF select_business_partner,
 
       BEGIN OF select_country,
         msgid TYPE symsgid VALUE 'ZMC_MERP_MD',
@@ -389,3 +353,4 @@ ENDCLASS.
 
 CLASS zcx_merp_md IMPLEMENTATION.
 ENDCLASS.
+
