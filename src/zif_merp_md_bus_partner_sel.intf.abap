@@ -9,6 +9,12 @@ INTERFACE zif_merp_md_bus_partner_sel
          END OF ty_partner_key,
          tt_partner_keys TYPE STANDARD TABLE OF ty_partner_key WITH EMPTY KEY.
 
+  TYPES: BEGIN OF ty_usage,
+           PartnerCode  TYPE zmerp_r_bus_partner-PartnerCode,
+           UsedInEntity TYPE zmerp_entity_name,
+         END OF ty_usage,
+         tt_usages TYPE SORTED TABLE OF ty_usage WITH UNIQUE KEY PartnerCode UsedInEntity.
+
   "! Reads master data for a single business partner
   "! @parameter iv_partner_code    | Requested business partner key
   "! @parameter rs_partner         | Returned business partner data structure
@@ -25,11 +31,12 @@ INTERFACE zif_merp_md_bus_partner_sel
     IMPORTING it_partner_keys TYPE tt_partner_keys
     RETURNING VALUE(rt_partners) TYPE tt_partners.
 
-  "! Validates business partner codes and returns missing/invalid keys
-  "! @parameter it_partner_keys | Table of business partner keys to validate
-  "! @parameter rt_invalid_keys | Table containing only keys that do not exist in DB
-  METHODS validate_partners
-    IMPORTING it_partner_keys        TYPE tt_partner_keys
-    RETURNING VALUE(rt_invalid_keys) TYPE tt_partner_keys.
+  "! Reads where the given business partners are used (usage view): one row per code and using entity.
+  "! Codes that are not used are not returned.
+  "! @parameter it_partner_keys | Keys to check
+  "! @parameter rt_usages       | Codes in use with the entity that uses them
+  METHODS read_usages
+    IMPORTING it_partner_keys TYPE tt_partner_keys
+    RETURNING VALUE(rt_usages) TYPE tt_usages.
 
 ENDINTERFACE.

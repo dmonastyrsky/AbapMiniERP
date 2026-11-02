@@ -23,12 +23,6 @@
      <LANGU>E</LANGU>
      <DESCRIPT>Reads master data for a list of business partners</DESCRIPT>
     </SEOCOMPOTX>
-    <SEOCOMPOTX>
-     <CLSNAME>ZIF_MERP_MD_BUS_PARTNER_SEL</CLSNAME>
-     <CMPNAME>VALIDATE_PARTNERS</CMPNAME>
-     <LANGU>E</LANGU>
-     <DESCRIPT>Validates business partner codes and returns missing/invalid</DESCRIPT>
-    </SEOCOMPOTX>
    </DESCRIPTIONS>
   </asx:values>
  </asx:abap>

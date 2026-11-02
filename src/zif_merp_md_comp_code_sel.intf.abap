@@ -9,6 +9,12 @@ INTERFACE zif_merp_md_comp_code_sel
          END OF ty_company_key,
          tt_company_keys TYPE STANDARD TABLE OF ty_company_key WITH EMPTY KEY.
 
+  TYPES: BEGIN OF ty_usage,
+           CompanyCode  TYPE zmerp_r_company_code-CompanyCode,
+           UsedInEntity TYPE zmerp_entity_name,
+         END OF ty_usage,
+         tt_usages TYPE SORTED TABLE OF ty_usage WITH UNIQUE KEY CompanyCode UsedInEntity.
+
   "! Reads master data for a single company code
   "! @parameter iv_company_code    | Requested company code key
   "! @parameter rs_company         | Returned master data structure
@@ -25,11 +31,12 @@ INTERFACE zif_merp_md_comp_code_sel
     IMPORTING it_company_keys TYPE tt_company_keys
     RETURNING VALUE(rt_companies) TYPE tt_companies.
 
-  "! Validates company codes and returns missing/invalid keys
-  "! @parameter it_company_keys | Table of company code keys to validate
-  "! @parameter rt_invalid_keys | Table containing only keys that do not exist in DB
-  METHODS validate_companies
-    IMPORTING it_company_keys        TYPE tt_company_keys
-    RETURNING VALUE(rt_invalid_keys) TYPE tt_company_keys.
+  "! Reads where the given company codes are used (usage view): one row per code and using entity.
+  "! Codes that are not used are not returned.
+  "! @parameter it_company_keys | Keys to check
+  "! @parameter rt_usages       | Codes in use with the entity that uses them
+  METHODS read_usages
+    IMPORTING it_company_keys TYPE tt_company_keys
+    RETURNING VALUE(rt_usages) TYPE tt_usages.
 
 ENDINTERFACE.

@@ -23,12 +23,6 @@
      <LANGU>E</LANGU>
      <DESCRIPT>Reads master data for a list of VAT rates</DESCRIPT>
     </SEOCOMPOTX>
-    <SEOCOMPOTX>
-     <CLSNAME>ZIF_MERP_MD_VAT_RATE_SEL</CLSNAME>
-     <CMPNAME>VALIDATE_VAT_RATES</CMPNAME>
-     <LANGU>E</LANGU>
-     <DESCRIPT>Validates VAT codes and returns missing/invalid keys</DESCRIPT>
-    </SEOCOMPOTX>
    </DESCRIPTIONS>
   </asx:values>
  </asx:abap>

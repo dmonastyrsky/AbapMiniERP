@@ -7,9 +7,6 @@ CLASS zcl_merp_md_bus_partner_sel DEFINITION
     INTERFACES zif_merp_md_bus_partner_sel.
 
   PRIVATE SECTION.
-    TYPES tt_partner_keys_unique TYPE HASHED TABLE OF zif_merp_md_bus_partner_sel=>ty_partner_key
-                                      WITH UNIQUE KEY PartnerCode.
-
     "! Cleanses, sorts and removes duplicates from input keys
     "! @parameter it_keys | Raw table of keys
     "! @parameter rt_keys | Processed clean table of keys
@@ -37,7 +34,6 @@ CLASS zcl_merp_md_bus_partner_sel IMPLEMENTATION.
     ENDTRY.
   ENDMETHOD.
 
-
   METHOD zif_merp_md_bus_partner_sel~read_partners.
     DATA(lt_clean_keys) = prepare_keys( it_partner_keys ).
     IF lt_clean_keys IS INITIAL.
@@ -50,24 +46,17 @@ CLASS zcl_merp_md_bus_partner_sel IMPLEMENTATION.
       INTO TABLE @rt_partners.
   ENDMETHOD.
 
-  METHOD zif_merp_md_bus_partner_sel~validate_partners.
-    DATA lt_existing_keys TYPE tt_partner_keys_unique.
-
+  METHOD zif_merp_md_bus_partner_sel~read_usages.
     DATA(lt_clean_keys) = prepare_keys( it_partner_keys ).
     IF lt_clean_keys IS INITIAL.
       RETURN.
     ENDIF.
 
-    SELECT bp~PartnerCode
-      FROM zmerp_r_bus_partner AS bp
-      INNER JOIN @lt_clean_keys AS keys ON bp~PartnerCode = keys~PartnerCode
-      INTO TABLE @lt_existing_keys.
-
-    LOOP AT lt_clean_keys ASSIGNING FIELD-SYMBOL(<ls_key>).
-      IF NOT line_exists( lt_existing_keys[ PartnerCode = <ls_key>-PartnerCode ] ).
-        INSERT <ls_key> INTO TABLE rt_invalid_keys.
-      ENDIF.
-    ENDLOOP.
+    " DISTINCT: one row per code and using entity, however many documents use the code
+    SELECT DISTINCT usage~PartnerCode, usage~UsedInEntity
+      FROM zmerp_i_bus_partner_usage AS usage
+      INNER JOIN @lt_clean_keys AS keys ON usage~PartnerCode = keys~PartnerCode
+      INTO CORRESPONDING FIELDS OF TABLE @rt_usages.
   ENDMETHOD.
 
   METHOD prepare_keys.

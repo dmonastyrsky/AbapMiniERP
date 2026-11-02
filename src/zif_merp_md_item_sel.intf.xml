@@ -23,12 +23,6 @@
      <LANGU>E</LANGU>
      <DESCRIPT>Reads master data for a list of items</DESCRIPT>
     </SEOCOMPOTX>
-    <SEOCOMPOTX>
-     <CLSNAME>ZIF_MERP_MD_ITEM_SEL</CLSNAME>
-     <CMPNAME>VALIDATE_ITEMS</CMPNAME>
-     <LANGU>E</LANGU>
-     <DESCRIPT>Validates item codes and returns missing/invalid keys</DESCRIPT>
-    </SEOCOMPOTX>
    </DESCRIPTIONS>
   </asx:values>
  </asx:abap>

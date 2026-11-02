@@ -7,9 +7,6 @@ CLASS zcl_merp_md_warehouse_sel DEFINITION
     INTERFACES zif_merp_md_warehouse_sel.
 
   PRIVATE SECTION.
-    TYPES tt_warehouse_keys_unique TYPE HASHED TABLE OF zif_merp_md_warehouse_sel=>ty_warehouse_key
-                                        WITH UNIQUE KEY WarehouseCode.
-
     "! Cleanses, sorts and removes duplicates from input keys
     "! @parameter it_keys | Raw table of keys
     "! @parameter rt_keys | Processed clean table of keys
@@ -49,24 +46,17 @@ CLASS zcl_merp_md_warehouse_sel IMPLEMENTATION.
       INTO TABLE @rt_warehouses.
   ENDMETHOD.
 
-  METHOD zif_merp_md_warehouse_sel~validate_warehouses.
-    DATA lt_existing_keys TYPE tt_warehouse_keys_unique.
-
+  METHOD zif_merp_md_warehouse_sel~read_usages.
     DATA(lt_clean_keys) = prepare_keys( it_warehouse_keys ).
     IF lt_clean_keys IS INITIAL.
       RETURN.
     ENDIF.
 
-    SELECT wh~WarehouseCode
-      FROM zmerp_r_warehouse AS wh
-      INNER JOIN @lt_clean_keys AS keys ON wh~WarehouseCode = keys~WarehouseCode
-      INTO TABLE @lt_existing_keys.
-
-    LOOP AT lt_clean_keys ASSIGNING FIELD-SYMBOL(<ls_key>).
-      IF NOT line_exists( lt_existing_keys[ WarehouseCode = <ls_key>-WarehouseCode ] ).
-        INSERT <ls_key> INTO TABLE rt_invalid_keys.
-      ENDIF.
-    ENDLOOP.
+    " DISTINCT: one row per code and using entity, however many documents use the code
+    SELECT DISTINCT usage~WarehouseCode, usage~UsedInEntity
+      FROM zmerp_i_warehouse_usage AS usage
+      INNER JOIN @lt_clean_keys AS keys ON usage~WarehouseCode = keys~WarehouseCode
+      INTO CORRESPONDING FIELDS OF TABLE @rt_usages.
   ENDMETHOD.
 
   METHOD prepare_keys.

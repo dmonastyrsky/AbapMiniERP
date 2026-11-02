@@ -7,9 +7,6 @@ CLASS zcl_merp_md_item_group_sel DEFINITION
     INTERFACES zif_merp_md_item_group_sel.
 
   PRIVATE SECTION.
-    TYPES tt_item_group_keys_unique TYPE HASHED TABLE OF zif_merp_md_item_group_sel=>ty_item_group_key
-                                       WITH UNIQUE KEY ItemGroupCode.
-
     "! Cleanses, sorts and removes duplicates from input keys
     "! @parameter it_keys | Raw table of keys
     "! @parameter rt_keys | Processed clean table of keys
@@ -49,24 +46,17 @@ CLASS zcl_merp_md_item_group_sel IMPLEMENTATION.
       INTO TABLE @rt_item_groups.
   ENDMETHOD.
 
-  METHOD zif_merp_md_item_group_sel~validate_item_groups.
-    DATA lt_existing_keys TYPE tt_item_group_keys_unique.
-
+  METHOD zif_merp_md_item_group_sel~read_usages.
     DATA(lt_clean_keys) = prepare_keys( it_item_group_keys ).
     IF lt_clean_keys IS INITIAL.
       RETURN.
     ENDIF.
 
-    SELECT grp~ItemGroupCode
-      FROM zmerp_r_item_group AS grp
-      INNER JOIN @lt_clean_keys AS keys ON grp~ItemGroupCode = keys~ItemGroupCode
-      INTO TABLE @lt_existing_keys.
-
-    LOOP AT lt_clean_keys ASSIGNING FIELD-SYMBOL(<ls_key>).
-      IF NOT line_exists( lt_existing_keys[ ItemGroupCode = <ls_key>-ItemGroupCode ] ).
-        INSERT <ls_key> INTO TABLE rt_invalid_keys.
-      ENDIF.
-    ENDLOOP.
+    " DISTINCT: one row per code and using entity, however many documents use the code
+    SELECT DISTINCT usage~ItemGroupCode, usage~UsedInEntity
+      FROM zmerp_i_item_group_usage AS usage
+      INNER JOIN @lt_clean_keys AS keys ON usage~ItemGroupCode = keys~ItemGroupCode
+      INTO CORRESPONDING FIELDS OF TABLE @rt_usages.
   ENDMETHOD.
 
   METHOD prepare_keys.

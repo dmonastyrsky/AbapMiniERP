@@ -9,6 +9,12 @@ INTERFACE zif_merp_md_vat_rate_sel
          END OF ty_vat_rate_key,
          tt_vat_rate_keys TYPE STANDARD TABLE OF ty_vat_rate_key WITH EMPTY KEY.
 
+  TYPES: BEGIN OF ty_usage,
+           VatCode      TYPE zmerp_r_vat_rate-VatCode,
+           UsedInEntity TYPE zmerp_entity_name,
+         END OF ty_usage,
+         tt_usages TYPE SORTED TABLE OF ty_usage WITH UNIQUE KEY VatCode UsedInEntity.
+
   "! Reads master data for a single VAT rate
   "! @parameter iv_vat_code        | Requested VAT rate key
   "! @parameter rs_vat_rate        | Returned VAT rate data structure
@@ -25,11 +31,12 @@ INTERFACE zif_merp_md_vat_rate_sel
     IMPORTING it_vat_rate_keys TYPE tt_vat_rate_keys
     RETURNING VALUE(rt_vat_rates) TYPE tt_vat_rates.
 
-  "! Validates VAT codes and returns missing/invalid keys
-  "! @parameter it_vat_rate_keys | Table of VAT rate keys to validate
-  "! @parameter rt_invalid_keys  | Table containing only keys that do not exist in DB
-  METHODS validate_vat_rates
-    IMPORTING it_vat_rate_keys      TYPE tt_vat_rate_keys
-    RETURNING VALUE(rt_invalid_keys) TYPE tt_vat_rate_keys.
+  "! Reads where the given VAT codes are used (usage view): one row per code and using entity.
+  "! Codes that are not used are not returned.
+  "! @parameter it_vat_rate_keys | Keys to check
+  "! @parameter rt_usages        | Codes in use with the entity that uses them
+  METHODS read_usages
+    IMPORTING it_vat_rate_keys TYPE tt_vat_rate_keys
+    RETURNING VALUE(rt_usages) TYPE tt_usages.
 
 ENDINTERFACE.

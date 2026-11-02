@@ -23,12 +23,6 @@
      <LANGU>E</LANGU>
      <DESCRIPT>Reads master data for a list of warehouses</DESCRIPT>
     </SEOCOMPOTX>
-    <SEOCOMPOTX>
-     <CLSNAME>ZIF_MERP_MD_WAREHOUSE_SEL</CLSNAME>
-     <CMPNAME>VALIDATE_WAREHOUSES</CMPNAME>
-     <LANGU>E</LANGU>
-     <DESCRIPT>Validates warehouse codes and returns missing/invalid keys</DESCRIPT>
-    </SEOCOMPOTX>
    </DESCRIPTIONS>
   </asx:values>
  </asx:abap>

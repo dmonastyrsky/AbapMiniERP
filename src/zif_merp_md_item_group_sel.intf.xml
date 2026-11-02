@@ -23,12 +23,6 @@
      <LANGU>E</LANGU>
      <DESCRIPT>Reads master data for a list of item groups</DESCRIPT>
     </SEOCOMPOTX>
-    <SEOCOMPOTX>
-     <CLSNAME>ZIF_MERP_MD_ITEM_GROUP_SEL</CLSNAME>
-     <CMPNAME>VALIDATE_ITEM_GROUPS</CMPNAME>
-     <LANGU>E</LANGU>
-     <DESCRIPT>Validates item group codes and returns missing/invalid keys</DESCRIPT>
-    </SEOCOMPOTX>
    </DESCRIPTIONS>
   </asx:values>
  </asx:abap>

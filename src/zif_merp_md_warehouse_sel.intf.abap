@@ -9,6 +9,12 @@ INTERFACE zif_merp_md_warehouse_sel
          END OF ty_warehouse_key,
          tt_warehouse_keys TYPE STANDARD TABLE OF ty_warehouse_key WITH EMPTY KEY.
 
+  TYPES: BEGIN OF ty_usage,
+           WarehouseCode TYPE zmerp_r_warehouse-WarehouseCode,
+           UsedInEntity  TYPE zmerp_entity_name,
+         END OF ty_usage,
+         tt_usages TYPE SORTED TABLE OF ty_usage WITH UNIQUE KEY WarehouseCode UsedInEntity.
+
   "! Reads master data for a single warehouse
   "! @parameter iv_warehouse_code  | Requested warehouse key
   "! @parameter rs_warehouse       | Returned warehouse data structure
@@ -25,11 +31,12 @@ INTERFACE zif_merp_md_warehouse_sel
     IMPORTING it_warehouse_keys TYPE tt_warehouse_keys
     RETURNING VALUE(rt_warehouses) TYPE tt_warehouses.
 
-  "! Validates warehouse codes and returns missing/invalid keys
-  "! @parameter it_warehouse_keys | Table of warehouse keys to validate
-  "! @parameter rt_invalid_keys   | Table containing only keys that do not exist in DB
-  METHODS validate_warehouses
-    IMPORTING it_warehouse_keys     TYPE tt_warehouse_keys
-    RETURNING VALUE(rt_invalid_keys) TYPE tt_warehouse_keys.
+  "! Reads where the given warehouses are used (usage view): one row per code and using entity.
+  "! Codes that are not used are not returned.
+  "! @parameter it_warehouse_keys | Keys to check
+  "! @parameter rt_usages         | Codes in use with the entity that uses them
+  METHODS read_usages
+    IMPORTING it_warehouse_keys TYPE tt_warehouse_keys
+    RETURNING VALUE(rt_usages) TYPE tt_usages.
 
 ENDINTERFACE.

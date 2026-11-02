@@ -29,23 +29,21 @@ CLASS ltcl_md_comp_code_sel DEFINITION FINAL FOR TESTING
     "! Tests bulk reading with empty input table
     METHODS test_read_bulk_empty       FOR TESTING RAISING cx_static_check.
 
-    "! Tests validation returning missing company keys
-    METHODS test_validate_mix          FOR TESTING RAISING cx_static_check.
+    "! Tests reading usages: one row per code and using entity, unused codes are not returned
+    METHODS test_read_usages           FOR TESTING RAISING cx_static_check.
 
-    "! Tests validation when all provided keys are valid
-    METHODS test_validate_all_valid    FOR TESTING RAISING cx_static_check.
-
-    "! Tests validation with empty input table
-    METHODS test_validate_empty        FOR TESTING RAISING cx_static_check.
+    "! Tests reading usages with empty input table
+    METHODS test_read_usages_empty     FOR TESTING RAISING cx_static_check.
 ENDCLASS.
 
 
 CLASS ltcl_md_comp_code_sel IMPLEMENTATION.
 
   METHOD class_setup.
-    " Initialize SQL double framework for CDS view zmerp_r_company_code
+    " Initialize SQL double framework for the company code view and its usage view
     mo_sql_env = cl_osql_test_environment=>create(
-      i_dependency_list = VALUE #( ( 'ZMERP_R_COMPANY_CODE' ) )
+      i_dependency_list = VALUE #( ( 'ZMERP_R_COMPANY_CODE' )
+                                   ( 'ZMERP_I_COMPANY_CODE_USAGE' ) )
     ).
   ENDMETHOD.
 
@@ -164,62 +162,45 @@ CLASS ltcl_md_comp_code_sel IMPLEMENTATION.
     ).
   ENDMETHOD.
 
-  METHOD test_validate_mix.
-    " Prepare mock data
-    DATA lt_mock TYPE STANDARD TABLE OF zmerp_r_company_code WITH EMPTY KEY.
-    lt_mock = VALUE #( ( companycode = '1000' ) ( companycode = '2000' ) ).
+  METHOD test_read_usages.
+    " Company 1000 is used by two warehouses and one purchase order, company 2000 is not used
+    DATA lt_mock TYPE STANDARD TABLE OF zmerp_i_company_code_usage WITH EMPTY KEY.
+    lt_mock = VALUE #(
+      ( CompanyCode = '1000' RefEntityKey = 'WH001' UsedInEntity = 'Warehouse' )
+      ( CompanyCode = '1000' RefEntityKey = 'WH002' UsedInEntity = 'Warehouse' )
+      ( CompanyCode = '1000' RefEntityKey = 'PO0001' UsedInEntity = 'Purchase Order' )
+    ).
     mo_sql_env->insert_test_data( lt_mock ).
 
-    " Input with 1 existing, 1 missing, 1 duplicate missing
     DATA lt_keys TYPE zif_merp_md_comp_code_sel=>tt_company_keys.
-    lt_keys = VALUE #(
-      ( CompanyCode = '1000' )
-      ( CompanyCode = '9999' )
-      ( CompanyCode = '9999' )
-    ).
+    lt_keys = VALUE #( ( CompanyCode = '1000' ) ( CompanyCode = '2000' ) ).
 
     " Execute
-    DATA(lt_invalid) = mo_cut->validate_companies( lt_keys ).
+    DATA(lt_act) = mo_cut->read_usages( lt_keys ).
 
-    " Assert
+    " Assert: one row per using entity, unused company not returned
     cl_abap_unit_assert=>assert_equals(
-      act = lines( lt_invalid )
-      exp = 1
-      msg = 'Exactly one unique company code should be flagged as invalid.'
+      act = lines( lt_act )
+      exp = 2
+      msg = 'Company 1000 should be returned once per using entity (Warehouse, Purchase Order).'
     ).
 
-    cl_abap_unit_assert=>assert_equals(
-      act = lt_invalid[ 1 ]-CompanyCode
-      exp = '9999'
-      msg = 'Key 9999 should be identified as invalid.'
+    cl_abap_unit_assert=>assert_false(
+      act = xsdbool( line_exists( lt_act[ CompanyCode = '2000' ] ) )
+      msg = 'Unused company 2000 must not be returned.'
     ).
   ENDMETHOD.
 
-  METHOD test_validate_all_valid.
-    DATA lt_mock TYPE STANDARD TABLE OF zmerp_r_company_code WITH EMPTY KEY.
-    lt_mock = VALUE #( ( companycode = '1000' ) ).
-    mo_sql_env->insert_test_data( lt_mock ).
-
-    DATA lt_keys TYPE zif_merp_md_comp_code_sel=>tt_company_keys.
-    lt_keys = VALUE #( ( CompanyCode = '1000' ) ).
-
-    DATA(lt_invalid) = mo_cut->validate_companies( lt_keys ).
-
-    cl_abap_unit_assert=>assert_initial(
-      act = lt_invalid
-      msg = 'All keys exist, so invalid result table must be empty.'
-    ).
-  ENDMETHOD.
-
-  METHOD test_validate_empty.
+  METHOD test_read_usages_empty.
     DATA lt_keys TYPE zif_merp_md_comp_code_sel=>tt_company_keys.
 
-    DATA(lt_invalid) = mo_cut->validate_companies( lt_keys ).
+    DATA(lt_act) = mo_cut->read_usages( lt_keys ).
 
     cl_abap_unit_assert=>assert_initial(
-      act = lt_invalid
-      msg = 'Empty input should return empty invalid table.'
+      act = lt_act
+      msg = 'Empty input should return empty usage table.'
     ).
   ENDMETHOD.
 
 ENDCLASS.
+

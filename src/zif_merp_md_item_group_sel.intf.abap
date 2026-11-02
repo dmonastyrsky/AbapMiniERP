@@ -9,6 +9,12 @@ INTERFACE zif_merp_md_item_group_sel
          END OF ty_item_group_key,
          tt_item_group_keys TYPE STANDARD TABLE OF ty_item_group_key WITH EMPTY KEY.
 
+  TYPES: BEGIN OF ty_usage,
+           ItemGroupCode TYPE zmerp_r_item_group-ItemGroupCode,
+           UsedInEntity  TYPE zmerp_entity_name,
+         END OF ty_usage,
+         tt_usages TYPE SORTED TABLE OF ty_usage WITH UNIQUE KEY ItemGroupCode UsedInEntity.
+
   "! Reads master data for a single item group
   "! @parameter iv_item_group_code | Requested item group key
   "! @parameter rs_item_group      | Returned item group data structure
@@ -25,11 +31,12 @@ INTERFACE zif_merp_md_item_group_sel
     IMPORTING it_item_group_keys TYPE tt_item_group_keys
     RETURNING VALUE(rt_item_groups) TYPE tt_item_groups.
 
-  "! Validates item group codes and returns missing/invalid keys
-  "! @parameter it_item_group_keys | Table of item group keys to validate
-  "! @parameter rt_invalid_keys    | Table containing only keys that do not exist in DB
-  METHODS validate_item_groups
-    IMPORTING it_item_group_keys    TYPE tt_item_group_keys
-    RETURNING VALUE(rt_invalid_keys) TYPE tt_item_group_keys.
+  "! Reads where the given item groups are used (usage view): one row per code and using entity.
+  "! Codes that are not used are not returned.
+  "! @parameter it_item_group_keys | Keys to check
+  "! @parameter rt_usages          | Codes in use with the entity that uses them
+  METHODS read_usages
+    IMPORTING it_item_group_keys TYPE tt_item_group_keys
+    RETURNING VALUE(rt_usages) TYPE tt_usages.
 
 ENDINTERFACE.

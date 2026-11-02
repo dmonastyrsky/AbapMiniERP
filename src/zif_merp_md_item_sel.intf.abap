@@ -9,6 +9,12 @@ INTERFACE zif_merp_md_item_sel
          END OF ty_item_key,
          tt_item_keys TYPE STANDARD TABLE OF ty_item_key WITH EMPTY KEY.
 
+  TYPES: BEGIN OF ty_usage,
+           ItemCode     TYPE zmerp_r_item-ItemCode,
+           UsedInEntity TYPE zmerp_entity_name,
+         END OF ty_usage,
+         tt_usages TYPE SORTED TABLE OF ty_usage WITH UNIQUE KEY ItemCode UsedInEntity.
+
   "! Reads master data for a single item
   "! @parameter iv_item_code       | Requested item key
   "! @parameter rs_item            | Returned item data structure
@@ -25,11 +31,12 @@ INTERFACE zif_merp_md_item_sel
     IMPORTING it_item_keys TYPE tt_item_keys
     RETURNING VALUE(rt_items) TYPE tt_items.
 
-  "! Validates item codes and returns missing/invalid keys
-  "! @parameter it_item_keys     | Table of item keys to validate
-  "! @parameter rt_invalid_keys  | Table containing only keys that do not exist in DB
-  METHODS validate_items
-    IMPORTING it_item_keys        TYPE tt_item_keys
-    RETURNING VALUE(rt_invalid_keys) TYPE tt_item_keys.
+  "! Reads where the given items are used (usage view): one row per code and using entity.
+  "! Codes that are not used are not returned.
+  "! @parameter it_item_keys | Keys to check
+  "! @parameter rt_usages    | Codes in use with the entity that uses them
+  METHODS read_usages
+    IMPORTING it_item_keys TYPE tt_item_keys
+    RETURNING VALUE(rt_usages) TYPE tt_usages.
 
 ENDINTERFACE.
