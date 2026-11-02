@@ -53,7 +53,7 @@ CLASS zcl_merp_md_vat_rate_sel IMPLEMENTATION.
     ENDIF.
 
     " DISTINCT: one row per code and using entity, however many documents use the code
-    SELECT DISTINCT usage~VatCode, usage~UsedInEntity
+    SELECT DISTINCT usage~VatCode, usage~UsedInEntity, usage~IsDocument
       FROM zmerp_i_vat_rate_usage AS usage
       INNER JOIN @lt_clean_keys AS keys ON usage~VatCode = keys~VatCode
       INTO CORRESPONDING FIELDS OF TABLE @rt_usages.
@@ -67,4 +67,3 @@ CLASS zcl_merp_md_vat_rate_sel IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-

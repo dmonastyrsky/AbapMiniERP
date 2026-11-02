@@ -77,13 +77,15 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_instance_features.
-    " Codes in use keep their critical fields (one selection for all keys)
+    " Codes used in documents keep their critical fields (one selection for all keys):
+    " prefix and currency matter for documents only, a warehouse does not lock them
     DATA(lt_usages) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_usages(
       VALUE #( FOR key IN keys ( CompanyCode = key-CompanyCode ) ) ).
 
     result = VALUE #(
       FOR key IN keys
-      LET lv_control = COND #( WHEN line_exists( lt_usages[ CompanyCode = key-CompanyCode ] )
+      LET lv_control = COND #( WHEN line_exists( lt_usages[ CompanyCode = key-CompanyCode
+                                                            IsDocument  = abap_true ] )
                                THEN if_abap_behv=>fc-f-read_only
                                ELSE if_abap_behv=>fc-f-mandatory ) IN
       ( %tky                 = key-%tky

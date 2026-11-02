@@ -57,14 +57,16 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_instance_features.
-    " Codes in use keep their critical fields (one selection for all keys)
+    " Codes used in documents keep their critical fields (one selection for all keys):
+    " documents copy the VAT amount, item groups and items only reference the code
     DATA(lt_usages) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_usages(
       VALUE #( FOR key IN keys ( VatCode = key-VatCode ) ) ).
 
     result = VALUE #(
       FOR key IN keys
       ( %tky              = key-%tky
-        %field-Percentage = COND #( WHEN line_exists( lt_usages[ VatCode = key-VatCode ] )
+        %field-Percentage = COND #( WHEN line_exists( lt_usages[ VatCode    = key-VatCode
+                                                                 IsDocument = abap_true ] )
                                    THEN if_abap_behv=>fc-f-read_only
                                    ELSE if_abap_behv=>fc-f-mandatory ) )
     ).

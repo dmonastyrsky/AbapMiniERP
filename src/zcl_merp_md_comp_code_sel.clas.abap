@@ -53,7 +53,7 @@ CLASS zcl_merp_md_comp_code_sel IMPLEMENTATION.
     ENDIF.
 
     " DISTINCT: one row per code and using entity, however many documents use the code
-    SELECT DISTINCT usage~CompanyCode, usage~UsedInEntity
+    SELECT DISTINCT usage~CompanyCode, usage~UsedInEntity, usage~IsDocument
       FROM zmerp_i_company_code_usage AS usage
       INNER JOIN @lt_clean_keys AS keys ON usage~CompanyCode = keys~CompanyCode
       INTO CORRESPONDING FIELDS OF TABLE @rt_usages.
@@ -67,5 +67,3 @@ CLASS zcl_merp_md_comp_code_sel IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-
-

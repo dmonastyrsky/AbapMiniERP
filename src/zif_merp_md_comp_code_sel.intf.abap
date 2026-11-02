@@ -12,6 +12,7 @@ INTERFACE zif_merp_md_comp_code_sel
   TYPES: BEGIN OF ty_usage,
            CompanyCode  TYPE zmerp_r_company_code-CompanyCode,
            UsedInEntity TYPE zmerp_entity_name,
+           IsDocument   TYPE abap_boolean,
          END OF ty_usage,
          tt_usages TYPE SORTED TABLE OF ty_usage WITH UNIQUE KEY CompanyCode UsedInEntity.
 
@@ -32,7 +33,8 @@ INTERFACE zif_merp_md_comp_code_sel
     RETURNING VALUE(rt_companies) TYPE tt_companies.
 
   "! Reads where the given company codes are used (usage view): one row per code and using entity.
-  "! Codes that are not used are not returned.
+  "! Codes that are not used are not returned. IsDocument marks usage in documents (critical fields);
+  "! any usage blocks delete.
   "! @parameter it_company_keys | Keys to check
   "! @parameter rt_usages       | Codes in use with the entity that uses them
   METHODS read_usages

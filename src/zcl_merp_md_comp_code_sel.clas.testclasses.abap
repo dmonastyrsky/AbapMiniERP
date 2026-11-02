@@ -168,7 +168,7 @@ CLASS ltcl_md_comp_code_sel IMPLEMENTATION.
     lt_mock = VALUE #(
       ( CompanyCode = '1000' RefEntityKey = 'WH001' UsedInEntity = 'Warehouse' )
       ( CompanyCode = '1000' RefEntityKey = 'WH002' UsedInEntity = 'Warehouse' )
-      ( CompanyCode = '1000' RefEntityKey = 'PO0001' UsedInEntity = 'Purchase Order' )
+      ( CompanyCode = '1000' RefEntityKey = 'PO0001' UsedInEntity = 'Purchase Order' IsDocument = abap_true )
     ).
     mo_sql_env->insert_test_data( lt_mock ).
 
@@ -188,6 +188,11 @@ CLASS ltcl_md_comp_code_sel IMPLEMENTATION.
     cl_abap_unit_assert=>assert_false(
       act = xsdbool( line_exists( lt_act[ CompanyCode = '2000' ] ) )
       msg = 'Unused company 2000 must not be returned.'
+    ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = xsdbool( line_exists( lt_act[ CompanyCode = '1000' UsedInEntity = 'Purchase Order' IsDocument = abap_true ] ) )
+      msg = 'Usage in a document must be marked IsDocument.'
     ).
   ENDMETHOD.
 
