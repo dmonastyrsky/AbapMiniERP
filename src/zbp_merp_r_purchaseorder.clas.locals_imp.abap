@@ -1120,71 +1120,46 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD assignDocumentNumber.
-    IF keys IS INITIAL.
-      RETURN.
-    ENDIF.
+    DATA lt_company_headers TYPE TABLE FOR READ RESULT zmerp_r_purchaseorder.
+    DATA lt_codes           TYPE string_table.
+    DATA lt_po_update       TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
 
-    DATA lt_codes     TYPE string_table.
-    DATA lt_po_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
-
-    " 1. Only documents without a number
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       FIELDS ( DocumentNumber CompanyCode )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_headers).
 
-    DELETE lt_headers WHERE DocumentNumber IS NOT INITIAL.
-    IF lt_headers IS INITIAL.
-      RETURN.
-    ENDIF.
+    " Only documents without a number; without a company no number can be drawn
+    " (that case is reported by validateHeaderFields)
+    DELETE lt_headers WHERE DocumentNumber IS NOT INITIAL OR CompanyCode IS INITIAL.
 
-    " 2. Numbers are drawn per company (the company is the number range subobject)
-    DATA(lt_companies) = lt_headers.
-    SORT lt_companies BY CompanyCode.
-    DELETE ADJACENT DUPLICATES FROM lt_companies COMPARING CompanyCode.
+    " Numbers are drawn per company (the company is the number range subobject)
+    LOOP AT lt_headers INTO DATA(ls_header)
+         GROUP BY ( company_code = ls_header-CompanyCode )
+         INTO DATA(lg_company).
 
-    LOOP AT lt_companies REFERENCE INTO DATA(lr_company) WHERE CompanyCode IS NOT INITIAL.
-
-      DATA(lv_needed_count) = REDUCE i( INIT count = 0
-                                         FOR header IN lt_headers
-                                         WHERE ( CompanyCode = lr_company->CompanyCode )
-                                         NEXT count += 1 ).
-      IF lv_needed_count = 0.
-        CONTINUE.
-      ENDIF.
+      lt_company_headers = VALUE #( FOR member IN GROUP lg_company ( member ) ).
 
       " An NRO error leaves the documents of this company without a number
-      CLEAR lt_codes.
       TRY.
           lt_codes = zcl_merp_num_range_util=>get_next_po_numbers_nro(
-            iv_company_code = lr_company->CompanyCode
-            iv_count        = lv_needed_count ).
+            iv_company_code = lg_company-company_code
+            iv_count        = lines( lt_company_headers ) ).
         CATCH cx_number_ranges.
           CLEAR lt_codes.
       ENDTRY.
 
-      DATA(lv_index) = 1.
-
-      " Numbers are assigned in the order of the documents
-      LOOP AT lt_headers REFERENCE INTO DATA(lr_hdr) WHERE CompanyCode = lr_company->CompanyCode.
-        READ TABLE lt_codes INDEX lv_index ASSIGNING FIELD-SYMBOL(<lv_code>).
-
-        IF sy-subrc = 0 AND <lv_code> IS NOT INITIAL.
-          APPEND VALUE #(
-            %tky           = lr_hdr->%tky
-            DocumentNumber = CONV #( <lv_code> )
-          ) TO lt_po_update.
-
-          lv_index += 1.
-        ELSE.
-          " No number: validateDocumentNumber rejects the save
-          CONTINUE.
+      " Numbers in the order of the documents; a document without a number is rejected by validateDocumentNumber
+      LOOP AT lt_company_headers REFERENCE INTO DATA(lr_header).
+        DATA(lv_code) = VALUE string( lt_codes[ sy-tabix ] OPTIONAL ).
+        IF lv_code IS NOT INITIAL.
+          APPEND VALUE #( %tky           = lr_header->%tky
+                          DocumentNumber = CONV #( lv_code ) ) TO lt_po_update.
         ENDIF.
       ENDLOOP.
     ENDLOOP.
 
-    " 3. Write the numbers
     IF lt_po_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrder
@@ -1876,5 +1851,4 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-
 
