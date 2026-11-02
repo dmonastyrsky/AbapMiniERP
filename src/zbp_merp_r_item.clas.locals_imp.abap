@@ -361,7 +361,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD setDefaultVatCode.
+    METHOD setDefaultVatCode.
     " Read entity fields in local mode
     READ ENTITIES OF zmerp_r_item IN LOCAL MODE
       ENTITY Item
@@ -382,6 +382,11 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    " Read the default VAT codes of these groups: a blocked (obsolete) VAT code is not proposed
+    DATA(lt_vat_rates) = NEW zcl_merp_md_vat_rate_sel( )->zif_merp_md_vat_rate_sel~read_vat_rates(
+      VALUE #( FOR group IN lt_item_groups ( VatCode = group-DefaultVatCode ) )
+    ).
+
     DATA lt_update TYPE TABLE FOR UPDATE zmerp_r_item.
 
     " Map default VAT code from item groups back to items (overwrite only if values differ)
@@ -390,7 +395,9 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
 
       IF sy-subrc = 0
          AND <ls_item_group>-DefaultVatCode IS NOT INITIAL
-         AND lr_item->DefaultVatCode <> <ls_item_group>-DefaultVatCode.
+         AND lr_item->DefaultVatCode <> <ls_item_group>-DefaultVatCode
+         AND line_exists( lt_vat_rates[ VatCode   = <ls_item_group>-DefaultVatCode
+                                        IsBlocked = abap_false ] ).
 
         APPEND VALUE #(
           %tky           = lr_item->%tky

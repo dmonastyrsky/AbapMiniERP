@@ -266,9 +266,9 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD sync_doc_intervals_from_db.
+    " All companies, also blocked ones: their documents still exist and keep their numbering
     SELECT company_code
       FROM zmerp_comp_code
-      WHERE is_blocked = @abap_false
       INTO TABLE @DATA(lt_companies).
 
     LOOP AT lt_companies ASSIGNING FIELD-SYMBOL(<ls_company>).

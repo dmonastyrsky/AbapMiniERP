@@ -107,7 +107,7 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-   METHOD clearMessagesForFilledFields.
+  METHOD clearMessagesForFilledFields.
     IF keys IS INITIAL.
       RETURN.
     ENDIF.

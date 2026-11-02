@@ -232,6 +232,11 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
       VALUE #( FOR item IN it_items ( ItemCode = item-ItemCode ) )
     ).
 
+    " Default VAT codes of these items: a blocked (obsolete) VAT code is not proposed
+    DATA(lt_vat_rates) = mo_vat_selector->read_vat_rates(
+      VALUE #( FOR master IN lt_items_master ( VatCode = master-DefaultVatCode ) )
+    ).
+
     LOOP AT it_items INTO DATA(ls_original).
       DATA(ls_item) = ls_original.
 
@@ -258,12 +263,16 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
       ENDIF.
 
       " UoM and VAT code are taken from the item master data (overwriting current values) if the item exists;
-      " items copied from a purchase order keep the UoM and VAT code of the order item
+      " items copied from a purchase order keep the UoM and VAT code of the order item.
+      " A blocked VAT code of the item is not proposed: the field is cleared, so the user selects a current one
+      " (a VAT code of the previously selected item must not stay on the line)
       IF ls_item-ItemCode IS NOT INITIAL AND ls_item-PoItemReferenceUUID IS INITIAL.
         ASSIGN lt_items_master[ ItemCode = ls_item-ItemCode ] TO FIELD-SYMBOL(<master>).
         IF sy-subrc = 0.
           ls_item-UnitOfMeasure = <master>-BaseUnitOfMeasure.
-          ls_item-VatCode       = <master>-DefaultVatCode.
+          ls_item-VatCode       = COND #( WHEN line_exists( lt_vat_rates[ VatCode   = <master>-DefaultVatCode
+                                                                          IsBlocked = abap_false ] )
+                                          THEN <master>-DefaultVatCode ).
         ENDIF.
       ENDIF.
 

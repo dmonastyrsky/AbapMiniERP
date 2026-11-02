@@ -98,9 +98,9 @@ CLASS zcl_merp_nro_admin_util IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD reset_doc_intervals.
+    " All companies, also blocked ones: otherwise their intervals keep an old level after clearing data
     SELECT company_code
       FROM zmerp_comp_code
-      WHERE is_blocked = @abap_false
       INTO TABLE @DATA(lt_companies).
 
     IF lt_companies IS INITIAL.
