@@ -390,4 +390,23 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
 
 ENDCLASS.
 
+"! Saver for Company Code: a new company gets its document number range intervals (purchase orders,
+"! goods receipts) in the same save, so its documents are numbered by NRO from the first one
+"! and not by the database maximum (fallback, not protected against parallel saves).
+CLASS lsc_zmerp_r_company_code DEFINITION INHERITING FROM cl_abap_behavior_saver.
+  PROTECTED SECTION.
+    METHODS save_modified REDEFINITION.
+ENDCLASS.
+
+CLASS lsc_zmerp_r_company_code IMPLEMENTATION.
+
+  METHOD save_modified.
+    " Same synchronization as in the seed: the level follows the documents of the company (none yet)
+    LOOP AT create-companycode REFERENCE INTO DATA(lr_company).
+      zcl_merp_num_range_util=>sync_po_interval_from_db( iv_company_code = lr_company->CompanyCode ).
+      zcl_merp_num_range_util=>sync_gr_interval_from_db( iv_company_code = lr_company->CompanyCode ).
+    ENDLOOP.
+  ENDMETHOD.
+
+ENDCLASS.
 

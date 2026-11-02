@@ -102,6 +102,7 @@ authorization dependent by _PurchaseOrder
   field ( readonly ) HeaderUUID;
 
   field ( readonly ) ItemNo, UnitOfMeasure;
+  field ( readonly ) CurrencyCode;  // always the header currency (setItemDefaults, syncItemCurrency)
   field ( readonly ) NetAmount, VatAmount, GrossAmount;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
 

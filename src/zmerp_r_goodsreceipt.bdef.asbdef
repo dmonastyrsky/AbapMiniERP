@@ -101,6 +101,7 @@ authorization dependent by _GoodsReceipt
   field ( readonly ) PoItemReferenceUUID;
 
   field ( readonly ) ItemNo, UnitOfMeasure;
+  field ( readonly ) CurrencyCode;  // always the header currency (from the purchase order, syncItemCurrency)
   field ( readonly ) NetAmount, VatAmount, GrossAmount;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
 

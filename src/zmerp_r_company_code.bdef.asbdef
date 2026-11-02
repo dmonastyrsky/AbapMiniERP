@@ -1,4 +1,4 @@
-managed implementation in class ZBP_MERP_R_COMPANY_CODE unique;
+managed with additional save implementation in class ZBP_MERP_R_COMPANY_CODE unique;
 strict ( 2 );
 with draft;
 extensible;

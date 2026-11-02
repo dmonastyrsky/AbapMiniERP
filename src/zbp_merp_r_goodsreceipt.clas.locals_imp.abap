@@ -347,9 +347,9 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                         %element-WarehouseCode = if_abap_behv=>mk-on ) TO reported-goodsreceipt.
       ENDIF.
 
-      " 5. Currency: mandatory (taken from the purchase order)
+      " 5. Currency: mandatory (taken from the purchase order; without an order only the order is reported)
       lo_message = COND #(
-        WHEN lr_header->CurrencyCode IS INITIAL
+        WHEN lr_header->CurrencyCode IS INITIAL AND lr_header->PoReferenceUUID IS NOT INITIAL
           THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>select_currency
                                  severity = if_abap_behv_message=>severity-error ) ).
 
@@ -2275,5 +2275,4 @@ CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-
 

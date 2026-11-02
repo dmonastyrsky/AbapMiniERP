@@ -34,10 +34,13 @@ side effects
         field SupplierReference, field TotalNetAmount, field TotalGrossAmount, field PoDocumentNumber,
         entity _Items, messages;
 
-    field CompanyCode affects field WarehouseCode, field PoReferenceUUID, field PoDocumentNumber,
+    // A changed company, partner or warehouse clears the purchase order and with it the currency
+    field CompanyCode affects field WarehouseCode, field PoReferenceUUID, field PoDocumentNumber, field CurrencyCode,
         field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
-    field BusinessPartnerCode affects field PoReferenceUUID, field PoDocumentNumber, field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
-    field WarehouseCode affects field PoReferenceUUID, field PoDocumentNumber, field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
+    field BusinessPartnerCode affects field PoReferenceUUID, field PoDocumentNumber, field CurrencyCode,
+        field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
+    field WarehouseCode affects field PoReferenceUUID, field PoDocumentNumber, field CurrencyCode,
+        field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
 
     entity _Items affects field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
 
