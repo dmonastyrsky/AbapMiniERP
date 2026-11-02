@@ -7,7 +7,10 @@
 define root view entity ZMERP_R_STOCK_MOVEMENT
   as select from zmerp_stock_mov
 
-  association [0..1] to ZMERP_R_GOODSRECEIPT as _GoodsReceipt on $projection.DocumentUUID = _GoodsReceipt.DocumentUUID
+  association [0..1] to ZMERP_R_COMPANY_CODE as _CompanyCode  on $projection.CompanyCode   = _CompanyCode.CompanyCode
+  association [0..1] to ZMERP_R_WAREHOUSE    as _Warehouse    on $projection.WarehouseCode = _Warehouse.WarehouseCode
+  association [0..1] to ZMERP_R_ITEM         as _Item         on $projection.ItemCode      = _Item.ItemCode
+  association [0..1] to ZMERP_R_GOODSRECEIPT as _GoodsReceipt on $projection.DocumentUUID  = _GoodsReceipt.DocumentUUID
 {
   key movement_uuid   as MovementUUID,
 
@@ -37,5 +40,9 @@ define root view entity ZMERP_R_STOCK_MOVEMENT
       @EndUserText.label: 'Value'
       @Semantics.amount.currencyCode: 'CurrencyCode'
       amount          as StockValue,
-      currency_code   as CurrencyCode
+      currency_code   as CurrencyCode,
+
+      _CompanyCode,
+      _Warehouse,
+      _Item
 }
