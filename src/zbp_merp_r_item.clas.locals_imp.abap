@@ -77,7 +77,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
   METHOD validateMandatoryFields.
     DATA lv_has_error TYPE abap_bool.
 
-    " Clear previous validation messages for this state area to prevent duplicate errors in UI
+    " Clear the messages of the previous validation run
     reported-item = VALUE #(
       BASE reported-item
       FOR key IN keys
@@ -93,7 +93,6 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
         %state_area = c_val_uom )
     ).
 
-    " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_item IN LOCAL MODE
       ENTITY Item
       FIELDS ( Description ItemTypeCode ItemGroupCode DefaultVatCode BaseUnitOfMeasure )
@@ -117,7 +116,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       lv_has_error = abap_false.
 
-      " 1. Description Mandatory Validation
+      " 1. Description: mandatory
       IF lr_item->Description IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -130,7 +129,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
         ) TO reported-item.
       ENDIF.
 
-      " 2. Item Type Mandatory & Allowed Value Validation
+      " 2. Item type: mandatory, P or S
       "    (the item type decides whether goods receipts create stock movements)
       IF lr_item->ItemTypeCode IS INITIAL.
         lv_has_error = abap_true.
@@ -156,7 +155,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
         ) TO reported-item.
       ENDIF.
 
-      " 3. Item Group Mandatory & Existence Validation
+      " 3. Item group: mandatory, exists
       IF lr_item->ItemGroupCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -180,7 +179,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
         ) TO reported-item.
       ENDIF.
 
-      " 4. Default VAT Code Mandatory & Existence Validation
+      " 4. Default VAT code: mandatory, exists
       IF lr_item->DefaultVatCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -204,7 +203,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
         ) TO reported-item.
       ENDIF.
 
-      " 5. Base Unit of Measure Mandatory Validation
+      " 5. Base unit of measure: mandatory
       IF lr_item->BaseUnitOfMeasure IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -217,7 +216,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
         ) TO reported-item.
       ENDIF.
 
-      " If any business validation failed, prevent transaction save state
+      " Any error fails the instance
       IF lv_has_error = abap_true.
         APPEND VALUE #(
           %tky        = lr_item->%tky
@@ -289,7 +288,6 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
         READ TABLE lt_codes INDEX lv_index ASSIGNING FIELD-SYMBOL(<lv_code>).
 
         IF sy-subrc = 0 AND <lv_code> IS NOT INITIAL.
-          " Map successfully generated key
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
@@ -299,7 +297,6 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
           " Increment index ONLY after processing an auto-numbered entity
           lv_index += 1.
         ELSE.
-          " Mark entity failure
           APPEND VALUE #(
             %cid        = lr_entity->%cid
             %is_draft   = lr_entity->%is_draft
@@ -362,7 +359,6 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setDefaultVatCode.
-    " Read entity fields in local mode
     READ ENTITIES OF zmerp_r_item IN LOCAL MODE
       ENTITY Item
       FIELDS ( ItemGroupCode DefaultVatCode )
@@ -406,7 +402,6 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " Perform mass local update on RAP business object only if changes exist
     IF lt_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_item IN LOCAL MODE
         ENTITY Item
@@ -416,4 +411,5 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 

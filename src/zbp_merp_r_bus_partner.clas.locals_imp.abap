@@ -85,7 +85,7 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
   METHOD validateMandatoryFields.
     DATA lv_has_error TYPE abap_bool.
 
-    " Clear previous validation messages for this state area to prevent duplicate errors in UI
+    " Clear the messages of the previous validation run
     reported-businesspartner = VALUE #(
       BASE reported-businesspartner
       FOR key IN keys
@@ -95,7 +95,6 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
         %state_area = c_val_role )
     ).
 
-    " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_bus_partner IN LOCAL MODE
       ENTITY BusinessPartner
       FIELDS ( PartnerName IsCustomer IsSupplier )
@@ -109,7 +108,7 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
     LOOP AT lt_partners REFERENCE INTO DATA(lr_partner).
       lv_has_error = abap_false.
 
-      " 1. Business Partner Name Mandatory Validation
+      " 1. Name: mandatory
       IF lr_partner->PartnerName IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -122,7 +121,7 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
         ) TO reported-businesspartner.
       ENDIF.
 
-      " 2. Partner Roles Validation (At least one role must be selected)
+      " 2. Roles: at least one of customer and supplier
       IF lr_partner->IsCustomer IS INITIAL AND lr_partner->IsSupplier IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -137,7 +136,7 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
       ENDIF.
 
       IF lv_has_error = abap_true.
-        " Mark entity instance as failed to prevent transaction commit
+        " Any error fails the instance
         APPEND VALUE #(
           %tky        = lr_partner->%tky
           %fail-cause = if_abap_behv=>cause-unspecific
@@ -151,7 +150,6 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Read entity state in local mode
     READ ENTITIES OF zmerp_r_bus_partner IN LOCAL MODE
       ENTITY BusinessPartner
       FIELDS ( PartnerName IsCustomer IsSupplier )
@@ -202,7 +200,6 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
         READ TABLE lt_codes INDEX lv_index ASSIGNING FIELD-SYMBOL(<lv_code>).
 
         IF sy-subrc = 0 AND <lv_code> IS NOT INITIAL.
-          " Map successfully generated key
           APPEND VALUE #(
             %cid        = lr_entity->%cid
             %is_draft   = lr_entity->%is_draft
@@ -212,7 +209,6 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
           " Increment index ONLY after processing an auto-numbered entity
           lv_index += 1.
         ELSE.
-          " Mark entity failure
           APPEND VALUE #(
             %cid        = lr_entity->%cid
             %is_draft   = lr_entity->%is_draft
@@ -275,5 +271,6 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 
 

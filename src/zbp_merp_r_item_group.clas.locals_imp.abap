@@ -48,7 +48,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
   METHOD validateMandatoryFields.
     DATA lv_has_error TYPE abap_bool.
 
-    " Clear previous validation messages for individual state areas to prevent duplicate errors in UI
+    " Clear the messages of the previous validation run
     reported-itemgroup = VALUE #(
       BASE reported-itemgroup
       FOR key IN keys
@@ -58,7 +58,6 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
         %state_area = c_val_vat )
     ).
 
-    " Read entity fields in local mode
     READ ENTITIES OF zmerp_r_item_group IN LOCAL MODE
       ENTITY ItemGroup
       FIELDS ( Description DefaultVatCode )
@@ -78,7 +77,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
     LOOP AT lt_groups REFERENCE INTO DATA(lr_group).
       lv_has_error = abap_false.
 
-      " 1. Item Group Description Mandatory Validation
+      " 1. Description: mandatory
       IF lr_group->Description IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -91,7 +90,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
         ) TO reported-itemgroup.
       ENDIF.
 
-      " 2. Default VAT Code Mandatory & Existence Validation
+      " 2. Default VAT code: mandatory, exists
       IF lr_group->DefaultVatCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -115,7 +114,7 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
         ) TO reported-itemgroup.
       ENDIF.
 
-      " If any business validation failed, prevent transaction commit
+      " Any error fails the instance
       IF lv_has_error = abap_true.
         APPEND VALUE #(
           %tky        = lr_group->%tky
@@ -130,7 +129,6 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Read entity state in local mode
     READ ENTITIES OF zmerp_r_item_group IN LOCAL MODE
       ENTITY ItemGroup
       FIELDS ( Description DefaultVatCode )
@@ -181,7 +179,6 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
         READ TABLE lt_codes INDEX lv_index ASSIGNING FIELD-SYMBOL(<lv_code>).
 
         IF sy-subrc = 0 AND <lv_code> IS NOT INITIAL.
-          " Map successfully generated key
           APPEND VALUE #(
             %cid          = lr_entity->%cid
             %is_draft     = lr_entity->%is_draft
@@ -191,7 +188,6 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
           " Increment index ONLY after processing an auto-numbered entity
           lv_index += 1.
         ELSE.
-          " Mark entity failure
           APPEND VALUE #(
             %cid        = lr_entity->%cid
             %is_draft   = lr_entity->%is_draft
@@ -254,4 +250,5 @@ CLASS lhc_zmerp_r_item_group IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 

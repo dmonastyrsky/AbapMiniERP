@@ -97,7 +97,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
   METHOD validateMandatoryFields.
     DATA lv_has_error TYPE abap_bool.
 
-    " Clear previous validation messages for individual state areas to prevent duplicate errors in UI
+    " Clear the messages of the previous validation run
     reported-companycode = VALUE #(
       BASE reported-companycode
       FOR key IN keys
@@ -111,7 +111,6 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         %state_area = c_val_cntr )
     ).
 
-    " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_company_code IN LOCAL MODE
       ENTITY CompanyCode
       FIELDS ( CompanyName CompanyPrefix CurrencyCode Country )
@@ -131,7 +130,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
     LOOP AT lt_comp_codes REFERENCE INTO DATA(lr_comp_code).
       lv_has_error = abap_false.
 
-      " 1. Company Name Mandatory Validation
+      " 1. Name: mandatory
       IF lr_comp_code->CompanyName IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -144,7 +143,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         ) TO reported-companycode.
       ENDIF.
 
-      " 2. Company Prefix Mandatory, Length & Uniqueness Validation
+      " 2. Prefix: mandatory, exactly 2 characters, unique
       IF lr_comp_code->CompanyPrefix IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -182,7 +181,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         ENDIF.
       ENDIF.
 
-      " 3. Currency Code Mandatory Validation
+      " 3. Currency: mandatory
       IF lr_comp_code->CurrencyCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -195,7 +194,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         ) TO reported-companycode.
       ENDIF.
 
-      " 4. Country Mandatory Validation
+      " 4. Country: mandatory
       IF lr_comp_code->Country IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -209,7 +208,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
       ENDIF.
 
       IF lv_has_error = abap_true.
-        " Mark entity instance as failed to prevent transaction commit
+        " Any error fails the instance
         APPEND VALUE #(
           %tky        = lr_comp_code->%tky
           %fail-cause = if_abap_behv=>cause-unspecific
@@ -223,7 +222,6 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Read entity state in local mode
     READ ENTITIES OF zmerp_r_company_code IN LOCAL MODE
       ENTITY CompanyCode
       FIELDS ( CompanyName CurrencyCode Country )
@@ -391,4 +389,5 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 

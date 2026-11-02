@@ -75,7 +75,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
   METHOD validateMandatoryFields.
     DATA lv_has_error TYPE abap_bool.
 
-    " Clear previous validation messages for individual state areas to prevent duplicate errors in UI
+    " Clear the messages of the previous validation run
     reported-vatrate = VALUE #(
       BASE reported-vatrate
       FOR key IN keys
@@ -85,7 +85,6 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
         %state_area = c_val_perc )
     ).
 
-    " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_vat_rate IN LOCAL MODE
       ENTITY VatRate
       FIELDS ( Description Percentage )
@@ -99,7 +98,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
     LOOP AT lt_vat_rates REFERENCE INTO DATA(lr_vat).
       lv_has_error = abap_false.
 
-      " 1. VAT Rate Description Mandatory Validation
+      " 1. Description: mandatory
       IF lr_vat->Description IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -112,7 +111,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
         ) TO reported-vatrate.
       ENDIF.
 
-      " 2. VAT Percentage Mandatory & Business Range Validation
+      " 2. Percentage: 0 to 100
       IF zcl_merp_md_validator=>is_vat_percentage_valid( lr_vat->Percentage ) = abap_false.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -126,7 +125,7 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       ENDIF.
 
       IF lv_has_error = abap_true.
-        " Mark entity instance as failed to prevent transaction commit
+        " Any error fails the instance
         APPEND VALUE #(
           %tky        = lr_vat->%tky
           %fail-cause = if_abap_behv=>cause-unspecific
@@ -140,7 +139,6 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Read current percentage value from draft instance
     READ ENTITIES OF zmerp_r_vat_rate IN LOCAL MODE
       ENTITY VatRate
       FIELDS ( Percentage )
@@ -173,7 +171,6 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Read entity state in local mode
     READ ENTITIES OF zmerp_r_vat_rate IN LOCAL MODE
       ENTITY VatRate
       FIELDS ( Description )
@@ -219,7 +216,6 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
         READ TABLE lt_codes INDEX lv_index ASSIGNING FIELD-SYMBOL(<lv_code>).
 
         IF sy-subrc = 0 AND <lv_code> IS NOT INITIAL.
-          " Map successfully generated key
           APPEND VALUE #(
             %cid      = lr_entity->%cid
             %is_draft = lr_entity->%is_draft
@@ -229,7 +225,6 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
           " Increment index ONLY after processing an auto-numbered entity
           lv_index += 1.
         ELSE.
-          " Mark entity failure
           APPEND VALUE #(
             %cid        = lr_entity->%cid
             %is_draft   = lr_entity->%is_draft
@@ -292,4 +287,5 @@ CLASS lhc_zmerp_r_vat_rate IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 
