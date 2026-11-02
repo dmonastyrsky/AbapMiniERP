@@ -68,7 +68,8 @@ annotate view ZMERP_C_GOODSRECEIPTITM with
   /* ---------- Column 1: General Information ---------- */
   @UI.lineItem: [
     { position: 10, importance: #HIGH },
-    { type: #FOR_ACTION, dataAction: 'fillOpenQuantity', label: 'Fill Open Quantity' }
+    // All selected rows in one call: one result and one refresh of the table
+    { type: #FOR_ACTION, dataAction: 'fillOpenQuantity', label: 'Fill Open Quantity', invocationGrouping: #CHANGE_SET }
   ]
   ItemNo;
 

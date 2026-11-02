@@ -62,7 +62,9 @@ use etag
 
   side effects
   {
-    action fillOpenQuantity affects $self, field _GoodsReceipt.TotalNetAmount, field _GoodsReceipt.TotalGrossAmount, messages;
+    // Changed fields named explicitly: with $self the selected table rows were not refreshed in the UI
+    action fillOpenQuantity affects field Quantity, field NetAmount, field VatAmount, field GrossAmount,
+        field _GoodsReceipt.TotalNetAmount, field _GoodsReceipt.TotalGrossAmount, messages;
 
     field ItemCode affects field UnitOfMeasure, field VatCode, field VatAmount, field GrossAmount, messages;
     field Quantity affects field NetAmount, field VatAmount, field GrossAmount, messages;
