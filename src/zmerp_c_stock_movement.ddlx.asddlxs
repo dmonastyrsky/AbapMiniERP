@@ -1,0 +1,55 @@
+@Metadata.layer: #CUSTOMER
+
+@UI.headerInfo: {
+  typeName: 'Stock Movement',
+  typeNamePlural: 'Stock Movements',
+  title: { value: 'DocumentNumber' },
+  description: { value: 'Direction' }
+}
+
+@UI.presentationVariant: [{
+  sortOrder: [{ by: 'PostingDate', direction: #DESC }]
+}]
+
+annotate view ZMERP_C_STOCK_MOVEMENT with
+{
+  @UI.hidden: true
+  MovementUUID;
+
+  @UI.lineItem: [{ position: 10, importance: #HIGH }]
+  PostingDate;
+
+  @UI.lineItem: [{ position: 20, importance: #HIGH }]
+  Direction;
+
+  @UI.lineItem: [{ position: 30, importance: #HIGH }]
+  DocumentNumber;
+
+  @UI.lineItem: [{ position: 40, importance: #HIGH }]
+  Quantity;
+
+  @UI.lineItem: [{ position: 50, importance: #HIGH }]
+  StockValue;
+
+  /* ---------- Keys of the balance row and technical fields ---------- */
+  @UI.hidden: true
+  CompanyCode;
+
+  @UI.hidden: true
+  WarehouseCode;
+
+  @UI.hidden: true
+  ItemCode;
+
+  @UI.hidden: true
+  DocumentType;
+
+  @UI.hidden: true
+  DocumentUUID;
+
+  @UI.hidden: true
+  UnitOfMeasure;
+
+  @UI.hidden: true
+  CurrencyCode;
+}

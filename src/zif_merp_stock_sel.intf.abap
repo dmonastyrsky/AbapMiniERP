@@ -1,4 +1,4 @@
-"! Stock selector. Balances are read from the movement journal (ZMERP_I_STOCK_BALANCE):
+"! Stock selector. Balances are read from the movement journal (ZMERP_R_STOCK_BALANCE):
 "! only posted documents have movements, so drafts and unsaved changes are not visible.
 INTERFACE zif_merp_stock_sel
   PUBLIC.

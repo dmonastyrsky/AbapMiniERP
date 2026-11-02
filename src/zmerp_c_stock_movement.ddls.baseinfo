@@ -3,7 +3,7 @@
 {
 "FROM":
 [
-"ZMERP_STOCK_MOV"
+"ZMERP_R_STOCK_MOVEMENT"
 ],
 "ASSOCIATED":
 [],

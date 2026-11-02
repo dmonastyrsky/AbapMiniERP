@@ -29,7 +29,7 @@ CLASS zcl_merp_stock_sel IMPLEMENTATION.
     " The balance view also groups by currency: SUM gives one row per key
     SELECT bal~CompanyCode, bal~WarehouseCode, bal~ItemCode, bal~UnitOfMeasure,
            SUM( bal~Quantity ) AS Quantity
-      FROM zmerp_i_stock_balance AS bal
+      FROM zmerp_r_stock_balance AS bal
       INNER JOIN @lt_keys AS key ON  bal~CompanyCode   = key~CompanyCode
                                  AND bal~WarehouseCode = key~WarehouseCode
                                  AND bal~ItemCode      = key~ItemCode
@@ -39,4 +39,3 @@ CLASS zcl_merp_stock_sel IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-
