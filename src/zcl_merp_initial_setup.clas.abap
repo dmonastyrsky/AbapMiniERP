@@ -476,7 +476,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
         article              = 'ACC-DESC-50'
         item_type            = zif_merp_constants=>c_item_type-product
         item_group_code      = lv_grp4
-        base_unit_of_measure = 'BOT' )
+        base_unit_of_measure = 'EA' )
 
       " Group 5: Installation & Support Services
       ( item_code            = zcl_merp_format_util=>format_item_code( 13 )
@@ -687,12 +687,14 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD setup_documents.
-    " All prices are round (exact VAT at 19% / 7%), except the TV in PO 1:
-    " it is the only line with rounding, so the closing of cents is easy to see.
+    " Readable amounts: every line (also of a partial receipt) has a net amount that is a multiple of 100,
+    " so VAT (19% / 7%) and gross amounts have no cents. The only exception is the TV in PO 1:
+    " it shows how the last receipt closes the rounding cents of a purchase order item.
     "   PO line 3 x 1199.99 at 19% VAT = 3599.97 net, VAT 683.9943 -> 683.99
     "   GR 1:  2 TVs                   = 2399.98 net, VAT 455.9962 -> 456.00
     "   GR 2:  last TV                 = 1199.99 net, VAT 227.9981 -> 228.00 by calculation,
     "                                    but takes the open VAT 683.99 - 456.00 = 227.99 -> PO item closed to 0.00
+    " Units: EA for goods, H for services charged by the hour (units of the SAP standard).
 
     " PO 1 (1000, Samsung): received completely by two goods receipts -> 'Completed'
     DATA(lv_po1) = create_purchase_order(
@@ -702,8 +704,8 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
                        remarks      = 'TV season stock'
                        release      = abap_true
                        lines        = VALUE #( ( item_no = 7  quantity = 3  price = '1199.99' )
-                                               ( item_no = 10 quantity = 10 price = '15.00' )
-                                               ( item_no = 14 quantity = 3  price = '80.00' ) ) )
+                                               ( item_no = 10 quantity = 10 price = '10.00' )
+                                               ( item_no = 14 quantity = 3  price = '100.00' ) ) )
       out   = out ).
 
     create_goods_receipt(
@@ -724,7 +726,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
                        post        = abap_true )
       out   = out ).
 
-    " PO 2 (1000, Bosch): partially received -> 'In Delivery' (2 washing machines and 3 h installation open)
+    " PO 2 (1000, Bosch): partially received -> 'In Delivery' (2 washing machines and 2 h installation open)
     DATA(lv_po2) = create_purchase_order(
       is_po = VALUE #( company_code = '1000' warehouse_no = 2 partner_no = 1
                        days_ago     = 2      delivery_in  = 5
@@ -734,30 +736,39 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
                        lines        = VALUE #( ( item_no = 1  quantity = 5  price = '500.00' )
                                                ( item_no = 2  quantity = 2  price = '800.00' )
                                                ( item_no = 11 quantity = 10 price = '10.00' )
-                                               ( item_no = 13 quantity = 5  price = '60.00' ) ) )
+                                               ( item_no = 13 quantity = 4  price = '50.00' ) ) )
       out   = out ).
 
     create_goods_receipt(
       is_gr = VALUE #( po_uuid     = lv_po2
                        days_ago    = 0
                        responsible = 'MUELLER_M'
-                       remarks     = 'Partial delivery: 2 washing machines and 3 h installation open'
+                       remarks     = 'Partial delivery: 2 washing machines and 2 h installation open'
                        post        = abap_true
                        lines       = VALUE #( ( item_no = 1  quantity = 3 )
                                               ( item_no = 13 quantity = 2 ) ) )
       out   = out ).
 
-    " PO 3 (1000, DeLonghi): released, nothing received -> 'Approved'
-    create_purchase_order(
+    " PO 3 (1000, DeLonghi): released; the goods receipt is prepared but not posted yet
+    "   -> purchase order 'Approved', goods receipt 'New'
+    DATA(lv_po3) = create_purchase_order(
       is_po = VALUE #( company_code = '1000' warehouse_no = 1 partner_no = 3
                        days_ago     = 1      delivery_in  = 4
                        responsible  = 'MUELLER_M'
                        remarks      = 'Coffee machines and supplies'
                        release      = abap_true
-                       lines        = VALUE #( ( item_no = 4  quantity = 4 price = '400.00' )
-                                               ( item_no = 12 quantity = 6 price = '10.00' )
-                                               ( item_no = 5  quantity = 6 price = '30.00' )
-                                               ( item_no = 16 quantity = 1 price = '50.00' ) ) )
+                       lines        = VALUE #( ( item_no = 4  quantity = 4  price = '400.00' )
+                                               ( item_no = 12 quantity = 10 price = '10.00' )
+                                               ( item_no = 5  quantity = 10 price = '30.00' )
+                                               ( item_no = 16 quantity = 1  price = '100.00' ) ) )
+      out   = out ).
+
+    create_goods_receipt(
+      is_gr = VALUE #( po_uuid     = lv_po3
+                       days_ago    = 0
+                       responsible = 'MUELLER_M'
+                       remarks     = 'Goods arrived, receipt to be checked and posted'
+                       post        = abap_false )
       out   = out ).
 
     " PO 4 (2000, Conrad): released, nothing received -> 'Approved'
@@ -768,20 +779,39 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
                        remarks      = 'Audio assortment for Hamburg'
                        release      = abap_true
                        lines        = VALUE #( ( item_no = 9  quantity = 10 price = '300.00' )
-                                               ( item_no = 8  quantity = 5  price = '250.00' )
-                                               ( item_no = 10 quantity = 15 price = '15.00' )
-                                               ( item_no = 16 quantity = 1  price = '50.00' ) ) )
+                                               ( item_no = 8  quantity = 4  price = '250.00' )
+                                               ( item_no = 10 quantity = 20 price = '10.00' )
+                                               ( item_no = 16 quantity = 1  price = '100.00' ) ) )
       out   = out ).
 
-    " PO 5 (3000, ElectronicPartner): not released -> 'New'
+    " PO 5 (2000, Sony): received completely by one goods receipt -> 'Completed' (stock in Munich)
+    DATA(lv_po5) = create_purchase_order(
+      is_po = VALUE #( company_code = '2000' warehouse_no = 7 partner_no = 5
+                       days_ago     = 4      delivery_in  = 1
+                       responsible  = 'FISCHER_K'
+                       remarks      = 'Audio stock for Munich'
+                       release      = abap_true
+                       lines        = VALUE #( ( item_no = 8 quantity = 6 price = '250.00' )
+                                               ( item_no = 9 quantity = 5 price = '300.00' ) ) )
+      out   = out ).
+
+    create_goods_receipt(
+      is_gr = VALUE #( po_uuid     = lv_po5
+                       days_ago    = 1
+                       responsible = 'FISCHER_K'
+                       remarks     = 'Complete delivery'
+                       post        = abap_true )
+      out   = out ).
+
+    " PO 6 (3000, ElectronicPartner): not released -> 'New'
     create_purchase_order(
       is_po = VALUE #( company_code = '3000' warehouse_no = 9 partner_no = 11
                        days_ago     = 1      delivery_in  = 7
                        responsible  = 'WEBER_J'
                        remarks      = 'Modevi starter set, waiting for approval'
                        release      = abap_false
-                       lines        = VALUE #( ( item_no = 6 quantity = 8 price = '40.00' )
-                                               ( item_no = 5 quantity = 8 price = '30.00' ) ) )
+                       lines        = VALUE #( ( item_no = 6 quantity = 10 price = '40.00' )
+                                               ( item_no = 5 quantity = 10 price = '30.00' ) ) )
       out   = out ).
 
     " Summary: resulting purchase order statuses
@@ -968,3 +998,4 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
