@@ -202,7 +202,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
   METHOD validateHeaderFields.
     DATA lv_has_error TYPE abap_bool.
 
-    " Clear previous validation messages for this state area to prevent duplicate errors in UI
+    " Clear the messages of the previous validation run
     reported-purchaseorder = VALUE #(
       BASE reported-purchaseorder
       FOR key IN keys
@@ -216,7 +216,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         %state_area = c_val_currency )
     ).
 
-    " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       FIELDS ( CompanyCode BusinessPartnerCode WarehouseCode CurrencyCode )
@@ -227,7 +226,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Execute optimized bulk selection via Master Data Selector interface regardless of user restrictions
+    " Referenced master data in one selection each
     DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
       VALUE #( FOR header IN lt_headers ( CompanyCode = header-CompanyCode ) )
     ).
@@ -243,7 +242,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       lv_has_error = abap_false.
 
-      " 1. Company Code Mandatory & Existence Validation
+      " 1. Company: mandatory, exists
       IF lr_header->CompanyCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -267,7 +266,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         ) TO reported-purchaseorder.
       ENDIF.
 
-      " 2. Business Partner / Supplier Mandatory & Existence Validation
+      " 2. Partner: mandatory, exists, is a supplier
       IF lr_header->BusinessPartnerCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -303,7 +302,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         ) TO reported-purchaseorder.
       ENDIF.
 
-      " 3. Warehouse Mandatory, Existence & Cross-check Validation
+      " 3. Warehouse: mandatory, exists, belongs to the company
       IF lr_header->WarehouseCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -339,7 +338,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         ) TO reported-purchaseorder.
       ENDIF.
 
-      " 4. Currency Code Mandatory & Company Currency Validation
+      " 4. Currency: mandatory, equals the company currency
       IF lr_header->CurrencyCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -368,7 +367,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         ) TO reported-purchaseorder.
       ENDIF.
 
-      " If any validation failed, prevent transaction commit
+      " Any error fails the instance
       IF lv_has_error = abap_true.
         APPEND VALUE #(
           %tky        = lr_header->%tky
@@ -381,7 +380,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
   METHOD validateDates.
     DATA lv_has_error TYPE abap_bool.
 
-    " Clear previous validation messages for individual date fields
+    " Clear the messages of the previous validation run
     reported-purchaseorder = VALUE #(
       BASE reported-purchaseorder
       FOR key IN keys
@@ -393,7 +392,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         %state_area = c_val_deliv_date )
     ).
 
-    " Read date fields and status in local mode
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       FIELDS ( DocumentDate PostingDate DeliveryDate Status )
@@ -409,7 +407,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       lv_has_error = abap_false.
 
-      " 1. Document Date Validations
+      " 1. Document date: mandatory, not in the future
       IF lr_header->DocumentDate IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -433,7 +431,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         ) TO reported-purchaseorder.
       ENDIF.
 
-      " 2. Posting Date Validations
+      " 2. Posting date: mandatory, not in the future, not before the document date
       IF lr_header->PostingDate IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -469,9 +467,8 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         ) TO reported-purchaseorder.
       ENDIF.
 
-      " 3. Delivery Date Validations
+      " 3. Delivery date (optional): not in the past while New, not before the document date
       IF lr_header->DeliveryDate IS NOT INITIAL.
-        " Past delivery date check holds only for active validation during New status creation phase
         IF zcl_merp_doc_po_lifecycle=>is_delivery_date_actual( iv_status    = lr_header->Status
                                                            iv_delivery_date = lr_header->DeliveryDate
                                                            iv_today         = lv_today ) = abap_false.
@@ -486,7 +483,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
           ) TO reported-purchaseorder.
         ENDIF.
 
-        " Validate chronology between core document date and logistical delivery date
         IF lr_header->DocumentDate IS NOT INITIAL
            AND zcl_merp_doc_validator=>is_delivery_date_valid( iv_doc_date = lr_header->DocumentDate
                                                                iv_deliv_date = lr_header->DeliveryDate ) = abap_false.
@@ -502,7 +498,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         ENDIF.
       ENDIF.
 
-      " Enforce failed state mapping to reject database modification sequence if any rule triggers failure
+      " Any error fails the instance
       IF lv_has_error = abap_true.
         APPEND VALUE #(
           %tky        = lr_header->%tky
@@ -547,7 +543,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Read actual state directly from transactional buffer
+    " A message is cleared only when the date passes the checks of validateDates
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       FIELDS ( DocumentDate PostingDate DeliveryDate Status )
@@ -558,21 +554,23 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
 
-      " 1. Clear Document Date message area
+      " 1. Document date
       IF lr_header->DocumentDate IS NOT INITIAL
          AND zcl_merp_doc_validator=>is_document_date_valid( iv_doc_date = lr_header->DocumentDate
                                                              iv_today    = lv_today ) = abap_true.
         APPEND VALUE #( %tky = lr_header->%tky %state_area = c_val_doc_date ) TO reported-purchaseorder.
       ENDIF.
 
-      " 2. Clear Posting Date message area
+      " 2. Posting date
       IF lr_header->PostingDate IS NOT INITIAL AND lr_header->DocumentDate IS NOT INITIAL
+         AND zcl_merp_doc_validator=>is_posting_date_not_future( iv_post_date = lr_header->PostingDate
+                                                                 iv_today     = lv_today ) = abap_true
          AND zcl_merp_doc_validator=>is_posting_date_valid( iv_doc_date  = lr_header->DocumentDate
                                                             iv_post_date = lr_header->PostingDate ) = abap_true.
         APPEND VALUE #( %tky = lr_header->%tky %state_area = c_val_post_date ) TO reported-purchaseorder.
       ENDIF.
 
-            " 3. Clear Delivery Date message area
+      " 3. Delivery date
       IF lr_header->DeliveryDate IS NOT INITIAL AND lr_header->DocumentDate IS NOT INITIAL.
         DATA(lv_del_valid) = zcl_merp_doc_validator=>is_delivery_date_valid( iv_doc_date   = lr_header->DocumentDate
                                                                              iv_deliv_date = lr_header->DeliveryDate ).
@@ -595,7 +593,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
     DATA lt_update  TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
     DATA lo_message TYPE REF TO zcx_merp_pur.
 
-    " Bulk read headers and linked items to minimize database roundtrips
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
         FIELDS ( Status  DocumentNumber )
@@ -621,7 +618,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
                             severity = if_abap_behv_message=>severity-error ).
       ENDIF.
 
-      " Handle validation results
       IF lo_message IS BOUND.
         APPEND VALUE #( %tky        = lr_header->%tky
                         %fail-cause = if_abap_behv=>cause-conflict ) TO failed-purchaseorder.
@@ -635,7 +631,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " Perform bulk update for successful documents in transactional buffer
     IF lt_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrder
@@ -644,7 +639,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         FAILED DATA(lt_mod_failed)
         REPORTED DATA(lt_mod_reported).
 
-      " Forward buffer failure exceptions directly to the UI layer
+      " Errors of the update are returned to the caller
       IF lt_mod_failed IS NOT INITIAL.
         failed-purchaseorder   = CORRESPONDING #( BASE ( failed-purchaseorder ) lt_mod_failed-purchaseorder ).
         reported-purchaseorder = CORRESPONDING #( BASE ( reported-purchaseorder ) lt_mod_reported-purchaseorder ).
@@ -652,7 +647,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ENDIF.
     ENDIF.
 
-    " Read the latest state from buffer to return requested action parameters
+    " Action result: current state of the documents
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       ALL FIELDS
@@ -667,7 +662,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
     DATA lo_message       TYPE REF TO zcx_merp_pur.
     DATA lv_delivery_date TYPE zmerp_delivery_date.
 
-    " Bulk read headers to check current status and the baseline document date
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       FIELDS ( Status DocumentNumber DocumentDate )
@@ -698,7 +692,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
                             severity = if_abap_behv_message=>severity-error ).
       ENDIF.
 
-      " Handle validation results
       IF lo_message IS BOUND.
         APPEND VALUE #( %tky        = lr_header->%tky
                         %fail-cause = if_abap_behv=>cause-conflict ) TO failed-purchaseorder.
@@ -713,7 +706,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " Perform bulk update for successful documents in transactional buffer
     IF lt_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrder
@@ -722,7 +714,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         FAILED DATA(lt_mod_failed)
         REPORTED DATA(lt_mod_reported).
 
-      " Forward buffer failure exceptions directly to the UI layer
+      " Errors of the update are returned to the caller
       IF lt_mod_failed IS NOT INITIAL.
         failed-purchaseorder   = CORRESPONDING #( BASE ( failed-purchaseorder ) lt_mod_failed-purchaseorder ).
         reported-purchaseorder = CORRESPONDING #( BASE ( reported-purchaseorder ) lt_mod_reported-purchaseorder ).
@@ -730,7 +722,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ENDIF.
     ENDIF.
 
-    " Read the latest state from buffer to return requested action parameters
+    " Action result: current state of the documents
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       ALL FIELDS
@@ -759,7 +751,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
     DATA lt_update  TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
     DATA lo_message TYPE REF TO zcx_merp_pur.
 
-    " Bulk read headers to check current document status
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       FIELDS ( Status DocumentNumber )
@@ -786,7 +777,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
       ENDIF.
 
-      " Handle validation results
       IF lo_message IS BOUND.
         APPEND VALUE #( %tky        = lr_header->%tky
                         %fail-cause = if_abap_behv=>cause-conflict ) TO failed-purchaseorder.
@@ -800,7 +790,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " Perform bulk update for successful documents in transactional buffer
     IF lt_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrder
@@ -809,7 +798,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         FAILED DATA(lt_mod_failed)
         REPORTED DATA(lt_mod_reported).
 
-      " Forward buffer failure exceptions directly to the UI layer
+      " Errors of the update are returned to the caller
       IF lt_mod_failed IS NOT INITIAL.
         failed-purchaseorder   = CORRESPONDING #( BASE ( failed-purchaseorder ) lt_mod_failed-purchaseorder ).
         reported-purchaseorder = CORRESPONDING #( BASE ( reported-purchaseorder ) lt_mod_reported-purchaseorder ).
@@ -817,7 +806,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ENDIF.
     ENDIF.
 
-    " Read the latest state from buffer to return requested action parameters
+    " Action result: current state of the documents
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       ALL FIELDS
@@ -847,7 +836,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
       ENDIF.
 
-      " Handle validation results
       IF lo_message IS BOUND.
         APPEND VALUE #( %tky        = lr_header->%tky
                         %fail-cause = if_abap_behv=>cause-conflict ) TO failed-purchaseorder.
@@ -861,7 +849,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " Perform bulk update for successful documents in transactional buffer
     IF lt_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrder
@@ -870,7 +857,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         FAILED DATA(lt_mod_failed)
         REPORTED DATA(lt_mod_reported).
 
-      " Forward buffer failure exceptions directly to the UI layer
+      " Errors of the update are returned to the caller
       IF lt_mod_failed IS NOT INITIAL.
         failed-purchaseorder   = CORRESPONDING #( BASE ( failed-purchaseorder ) lt_mod_failed-purchaseorder ).
         reported-purchaseorder = CORRESPONDING #( BASE ( reported-purchaseorder ) lt_mod_reported-purchaseorder ).
@@ -878,7 +865,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ENDIF.
     ENDIF.
 
-    " Read the latest state from buffer to return requested action parameters
+    " Action result: current state of the documents
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       ALL FIELDS
@@ -952,7 +939,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
   METHOD setHeaderDefaults.
     DATA lt_header_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
 
-    " Bulk read to check current dates and status of the new document
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       FIELDS ( DocumentDate PostingDate Status )
@@ -980,13 +966,12 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         ls_header-Status = zcl_merp_doc_po_lifecycle=>c_status_new.
       ENDIF.
 
-      " Collect changes only if fields were actually initialized
+      " Only changed headers are updated
       IF ls_header <> lr_header->*.
         APPEND CORRESPONDING #( ls_header ) TO lt_header_update.
       ENDIF.
     ENDLOOP.
 
-    " Apply generic defaults to the transactional buffer
     IF lt_header_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrder
@@ -998,7 +983,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
   METHOD deriveHeaderOnCompanyCode.
     DATA lt_header_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
 
-    " Bulk read fields related strictly to the company code mutation
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       FIELDS ( CompanyCode CurrencyCode WarehouseCode )
@@ -1009,7 +993,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Perform independent bulk master data selections directly via inline value generation
+    " Company and warehouse master data in one selection each
     DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
       VALUE #( FOR header IN lt_headers ( CompanyCode = header-CompanyCode ) )
     ).
@@ -1022,13 +1006,13 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       DATA(ls_header) = lr_header->*.
 
       IF ls_header-CompanyCode IS NOT INITIAL.
-        " Automatically align document currency with the company code currency
+        " The currency follows the company currency
         ASSIGN lt_companies[ CompanyCode = ls_header-CompanyCode ] TO FIELD-SYMBOL(<ls_company>).
         IF sy-subrc = 0 AND <ls_company>-CurrencyCode IS NOT INITIAL.
           ls_header-CurrencyCode = <ls_company>-CurrencyCode.
         ENDIF.
 
-        " Validate and reset warehouse if it does not belong to the selected company
+        " A warehouse of another company is cleared
         IF ls_header-WarehouseCode IS NOT INITIAL.
           ASSIGN lt_warehouses[ WarehouseCode = ls_header-WarehouseCode ] TO FIELD-SYMBOL(<ls_warehouse>).
           IF sy-subrc <> 0 OR <ls_warehouse>-CompanyCode <> ls_header-CompanyCode.
@@ -1037,13 +1021,12 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         ENDIF.
       ENDIF.
 
-      " Collect updates if master data alignment changed the header state
+      " Only changed headers are updated
       IF ls_header <> lr_header->*.
         APPEND CORRESPONDING #( ls_header ) TO lt_header_update.
       ENDIF.
     ENDLOOP.
 
-    " Apply master data alignment back to the transactional buffer
     IF lt_header_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrder
@@ -1055,7 +1038,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
   METHOD deriveDatesOnDocumentDate.
     DATA lt_header_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
 
-    " Bulk read fields related strictly to the document date mutation
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       FIELDS ( DocumentDate PostingDate DeliveryDate )
@@ -1070,14 +1052,14 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       DATA(ls_header) = lr_header->*.
 
       IF ls_header-DocumentDate IS NOT INITIAL.
-        " Automatically align posting date if it violates the validation rules
+        " A posting date before the new document date is moved to it
         IF ls_header-PostingDate IS NOT INITIAL
            AND zcl_merp_doc_validator=>is_posting_date_valid( iv_doc_date  = ls_header-DocumentDate
                                                               iv_post_date = ls_header-PostingDate ) = abap_false.
           ls_header-PostingDate = ls_header-DocumentDate.
         ENDIF.
 
-        " Automatically align delivery date if it violates the chronological rules
+        " A delivery date before the new document date is moved to it
         IF ls_header-DeliveryDate IS NOT INITIAL
            AND zcl_merp_doc_validator=>is_delivery_date_valid( iv_doc_date = ls_header-DocumentDate
                                                                iv_deliv_date = ls_header-DeliveryDate ) = abap_false.
@@ -1085,13 +1067,12 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         ENDIF.
       ENDIF.
 
-      " Collect updates if master data alignment changed the header state
+      " Only changed headers are updated
       IF ls_header <> lr_header->*.
         APPEND CORRESPONDING #( ls_header ) TO lt_header_update.
       ENDIF.
     ENDLOOP.
 
-    " Apply master data alignment back to the transactional buffer
     IF lt_header_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrder
@@ -1103,7 +1084,6 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
   METHOD syncItemCurrency.
     DATA lt_items_to_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder\\PurchaseOrderItem.
 
-    " Bulk read parent headers and child items to check for currency mismatches
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
         FIELDS ( CurrencyCode )
@@ -1122,7 +1102,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID
                          %is_draft    = lr_item->%is_draft ] TO FIELD-SYMBOL(<ls_header>).
 
-      " Align item currency with the parent document currency if they differ
+      " Item currency follows the header currency
       IF sy-subrc = 0 AND lr_item->CurrencyCode <> <ls_header>-CurrencyCode.
         APPEND VALUE #(
           %tky         = lr_item->%tky
@@ -1147,7 +1127,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
     DATA lt_codes     TYPE string_table.
     DATA lt_po_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
 
-    " Step 1: Bulk read targets that lack a document number along with their CompanyCode context
+    " 1. Only documents without a number
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
       FIELDS ( DocumentNumber CompanyCode )
@@ -1159,14 +1139,13 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Step 2: Group by Company Code to perform bulk allocation safely per number range subobject
+    " 2. Numbers are drawn per company (the company is the number range subobject)
     DATA(lt_companies) = lt_headers.
     SORT lt_companies BY CompanyCode.
     DELETE ADJACENT DUPLICATES FROM lt_companies COMPARING CompanyCode.
 
     LOOP AT lt_companies REFERENCE INTO DATA(lr_company) WHERE CompanyCode IS NOT INITIAL.
 
-      " Count entities requiring key generation for this specific company code context
       DATA(lv_needed_count) = REDUCE i( INIT count = 0
                                          FOR header IN lt_headers
                                          WHERE ( CompanyCode = lr_company->CompanyCode )
@@ -1175,7 +1154,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         CONTINUE.
       ENDIF.
 
-      " Bulk allocation via NRO utility with company subobject context and exception capture
+      " An NRO error leaves the documents of this company without a number
       CLEAR lt_codes.
       TRY.
           lt_codes = zcl_merp_num_range_util=>get_next_po_numbers_nro(
@@ -1187,12 +1166,11 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 
       DATA(lv_index) = 1.
 
-      " Map zcl_merp_num_range_util results back to the master data sequence
+      " Numbers are assigned in the order of the documents
       LOOP AT lt_headers REFERENCE INTO DATA(lr_hdr) WHERE CompanyCode = lr_company->CompanyCode.
         READ TABLE lt_codes INDEX lv_index ASSIGNING FIELD-SYMBOL(<lv_code>).
 
         IF sy-subrc = 0 AND <lv_code> IS NOT INITIAL.
-          " Pack successfully generated code for global bulk local modify operation
           APPEND VALUE #(
             %tky           = lr_hdr->%tky
             DocumentNumber = CONV #( <lv_code> )
@@ -1206,7 +1184,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       ENDLOOP.
     ENDLOOP.
 
-    " Step 3: Write generated human-readable sequential keys back to the transactional buffer
+    " 3. Write the numbers
     IF lt_po_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrder
@@ -1265,7 +1243,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
     LOOP AT lt_headers REFERENCE INTO DATA(lr_hdr).
       lv_failed_added = abap_false.
 
-      " Lifecycle status check: allow deletion only for new or cancelled documents
+      " Delete only in status New or Cancelled
       IF zcl_merp_doc_po_lifecycle=>can_delete( lr_hdr->Status ) = abap_false.
         APPEND VALUE #(
           %tky        = lr_hdr->%tky
@@ -1377,7 +1355,6 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
   METHOD validateItemFields.
     DATA lv_has_error TYPE abap_bool.
 
-    " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrderItem
       FIELDS ( HeaderUUID ItemCode Quantity Price UnitOfMeasure VatCode )
@@ -1388,7 +1365,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Clear previous validation messages for individual field state areas to prevent duplicate errors in UI
+    " Clear the messages of the previous validation run
     DATA(lt_state_areas) = VALUE string_table(
       ( c_val_item_code )
       ( c_val_quantity )
@@ -1406,7 +1383,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         %state_area = area )
     ).
 
-    " Gather header keys to read full document context for duplicate evaluation
+    " Documents of the checked items: duplicates are searched among all their items
     DATA lt_header_keys TYPE TABLE FOR READ IMPORT zmerp_r_purchaseorder.
     lt_header_keys = VALUE #(
       FOR GROUPS of <g> IN lt_items GROUP BY ( HeaderUUID = <g>-HeaderUUID
@@ -1415,19 +1392,17 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         %is_draft         = <g>-%is_draft )
     ).
 
-    " Read ALL items belonging to the affected headers to correctly evaluate duplicates
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder BY \_Items
       FIELDS ( HeaderUUID ItemCode )
       WITH CORRESPONDING #( lt_header_keys )
       RESULT DATA(lt_all_document_items).
 
-    " Identify unique combinations of HeaderUUID and ItemCode that appear multiple times
     DATA(lt_duplicates) = zcl_merp_doc_validator=>get_duplicate_item_codes(
       CORRESPONDING zcl_merp_doc_validator=>tt_item_fields( lt_all_document_items )
     ).
 
-    " Execute optimized bulk selections via Master Data Selector interfaces directly inline
+    " Referenced master data in one selection each
     DATA(lt_items_master) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items(
       VALUE #( FOR item IN lt_items ( ItemCode = item-ItemCode ) )
     ).
@@ -1439,7 +1414,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       lv_has_error = abap_false.
 
-      " 1. Mandatory, Master Data & Duplicate Validation: Item Code
+      " 1. Item: mandatory, exists, not twice in the document
       IF lr_item->ItemCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -1481,7 +1456,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         ) TO reported-purchaseorderitem.
       ENDIF.
 
-      " 2. Business Logic Validation: Positive Quantity via Class Validator
+      " 2. Quantity: greater than zero
       IF zcl_merp_doc_validator=>is_item_quantity_valid( lr_item->Quantity ) = abap_false.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -1496,7 +1471,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         ) TO reported-purchaseorderitem.
       ENDIF.
 
-      " 3. Business Logic Validation: Positive Price via Class Validator
+      " 3. Price: greater than zero
       IF zcl_merp_doc_validator=>is_item_price_valid( lr_item->Price ) = abap_false.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -1511,7 +1486,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         ) TO reported-purchaseorderitem.
       ENDIF.
 
-      " 4. Mandatory Validation: Unit of Measure
+      " 4. Unit of measure: mandatory
       IF lr_item->UnitOfMeasure IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -1526,7 +1501,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         ) TO reported-purchaseorderitem.
       ENDIF.
 
-      " 5. Mandatory Validation: VAT Code
+      " 5. VAT code: mandatory, exists
       IF lr_item->VatCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -1554,7 +1529,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         ) TO reported-purchaseorderitem.
       ENDIF.
 
-      " If any business validation failed, prevent transaction commit
+      " Any error fails the instance
       IF lv_has_error = abap_true.
         APPEND VALUE #(
           %tky        = lr_item->%tky
@@ -1565,7 +1540,6 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD handleMessagesOnItemModify.
-    " Read modified items from local transactional buffer
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrderItem
       FIELDS ( HeaderUUID ItemCode )
@@ -1576,10 +1550,9 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Use correct implicit RAP type for root entity read operations
     DATA lt_header_keys TYPE TABLE FOR READ IMPORT zmerp_r_purchaseorder.
 
-    " Group modified items by HeaderUUID and propagate draft state context correctly
+    " Documents of the changed items
     lt_header_keys = VALUE #(
       FOR GROUPS of <g> IN lt_items GROUP BY ( HeaderUUID = <g>-HeaderUUID
                                                is_draft   = <g>-%is_draft )
@@ -1587,14 +1560,14 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         %is_draft         = <g>-%is_draft )
     ).
 
-    " Read ALL items belonging to the affected headers to evaluate full document context
+    " All items of these documents: a changed item can create or remove a duplicate on another item
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder BY \_Items
       FIELDS ( HeaderUUID ItemCode )
       WITH CORRESPONDING #( lt_header_keys )
       RESULT DATA(lt_all_document_items).
 
-    " UI FIX: Clear message state areas for ALL items within the document context
+    " Duplicate messages of all items are evaluated again
     reported-purchaseorderitem = VALUE #(
       BASE reported-purchaseorderitem
       FOR ls_all_item IN lt_all_document_items
@@ -1604,7 +1577,6 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
         %state_area = c_val_item_code )
     ).
 
-    " Get hash table of duplicate combinations using optimized validator method
     DATA(lt_duplicates) = zcl_merp_doc_validator=>get_duplicate_item_codes(
       CORRESPONDING zcl_merp_doc_validator=>tt_item_fields( lt_all_document_items )
     ).
@@ -1613,15 +1585,14 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Report duplicate errors back to the RAP framework for ALL lines currently involved in duplication
+    " Every item that is part of a duplicate gets the message
     LOOP AT lt_all_document_items REFERENCE INTO DATA(lr_doc_item) WHERE ItemCode IS NOT INITIAL.
 
-      " Check if this specific document line is part of the duplicates found in the full context
       IF line_exists( lt_duplicates[ HeaderUUID = lr_doc_item->HeaderUUID
                                      ItemCode   = lr_doc_item->ItemCode ] ).
 
         APPEND VALUE #(
-          %tky              = lr_doc_item->%tky " Primes the error exactly on each duplicate row
+          %tky              = lr_doc_item->%tky
           %path             = VALUE #( PurchaseOrder-%is_draft    = lr_doc_item->%is_draft
                                        PurchaseOrder-DocumentUUID = lr_doc_item->HeaderUUID )
           %state_area       = c_val_item_code
@@ -1640,7 +1611,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Read actual state directly from transactional buffer for modified items
+    " A message is cleared once the field is valid or filled
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrderItem
       FIELDS ( HeaderUUID Quantity Price UnitOfMeasure VatCode )
@@ -1653,7 +1624,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
 
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
 
-      " 1. Clear Quantity message area if value is valid via class validator
+      " 1. Quantity
       IF zcl_merp_doc_validator=>is_item_quantity_valid( lr_item->Quantity ) = abap_true.
         APPEND VALUE #( %tky        = lr_item->%tky
                         %path       = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
@@ -1661,7 +1632,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
                         %state_area = c_val_quantity ) TO reported-purchaseorderitem.
       ENDIF.
 
-      " 2. Clear Price message area if value is valid via class validator
+      " 2. Price
       IF zcl_merp_doc_validator=>is_item_price_valid( lr_item->Price ) = abap_true.
         APPEND VALUE #( %tky        = lr_item->%tky
                         %path       = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
@@ -1669,7 +1640,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
                         %state_area = c_val_price ) TO reported-purchaseorderitem.
       ENDIF.
 
-      " 3. Clear Unit of Measure message area if field is filled
+      " 3. Unit of measure
       IF lr_item->UnitOfMeasure IS NOT INITIAL.
         APPEND VALUE #( %tky        = lr_item->%tky
                         %path       = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
@@ -1677,7 +1648,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
                         %state_area = c_val_uom ) TO reported-purchaseorderitem.
       ENDIF.
 
-      " 4. Clear VAT Code message area if field is filled
+      " 4. VAT code
       IF lr_item->VatCode IS NOT INITIAL.
         APPEND VALUE #( %tky        = lr_item->%tky
                         %path       = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
@@ -1707,14 +1678,14 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Cleanse input headers table to eliminate duplicates and prevent duplicate key updates in RAP buffer
+    " Each header once (several items of one document)
     SORT lt_headers BY DocumentUUID %is_draft.
     DELETE ADJACENT DUPLICATES FROM lt_headers COMPARING DocumentUUID %is_draft.
 
     " Read all items of those headers in one call to pass into the shared item logic
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder BY \_Items
-      FIELDS ( HeaderUUID NetAmount VatAmount GrossAmount ) " Fetch all calculated financial components
+      FIELDS ( HeaderUUID NetAmount VatAmount GrossAmount )
       WITH CORRESPONDING #( lt_headers )
       RESULT DATA(lt_items).
 
@@ -1727,7 +1698,6 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
 
     DATA lt_po_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder.
 
-    " Pack the calculated totals directly into the transactional modification buffer
     LOOP AT lt_totals REFERENCE INTO DATA(lr_total).
       ASSIGN lt_headers[ DocumentUUID = lr_total->HeaderUUID
                          %is_draft    = lr_total->IsDraft ] TO FIELD-SYMBOL(<ls_header>).
@@ -1743,7 +1713,6 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " Update header totals in the transactional buffer
     IF lt_po_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrder
@@ -1810,7 +1779,6 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD calcAmountsOnQtyPrice.
-    " Bulk read modified items from the transactional buffer (Quantity and Price changes)
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrderItem
       FIELDS ( HeaderUUID ItemCode Quantity Price VatCode NetAmount VatAmount GrossAmount )
@@ -1845,7 +1813,6 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " Apply mass calculated amounts back to the RAP transactional buffer
     IF lt_items_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrderItem
@@ -1855,7 +1822,6 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD calcAmountsOnVatCode.
-    " Bulk read modified items upon VAT code change mutation
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrderItem
       FIELDS ( HeaderUUID VatCode NetAmount VatAmount GrossAmount )
@@ -1888,7 +1854,6 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " Write back synchronized values to transactional buffer state
     IF lt_items_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrderItem
@@ -1904,11 +1869,12 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_items).
 
-    " Bulk insert into static buffer without procedural loop
+    " Parents of the deleted items, for calcHeaderTotals
     gt_deleted_headers = VALUE #( BASE gt_deleted_headers
       FOR item IN lt_items ( document_uuid = item-HeaderUUID
                              is_draft      = item-%is_draft ) ).
   ENDMETHOD.
 
 ENDCLASS.
+
 

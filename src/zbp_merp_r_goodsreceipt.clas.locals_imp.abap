@@ -255,7 +255,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       lv_has_error = abap_false.
 
-      " 1. Purchase Order Reference Validation
+      " 1. Purchase order: mandatory, exists, same company
       IF lr_header->PoReferenceUUID IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -294,7 +294,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         ) TO reported-goodsreceipt.
       ENDIF.
 
-      " 2. Company Code Validation
+      " 2. Company: mandatory, exists
       IF lr_header->CompanyCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -318,7 +318,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         ) TO reported-goodsreceipt.
       ENDIF.
 
-      " 3. Business Partner Validation
+      " 3. Partner: mandatory, exists, is a supplier
       IF lr_header->BusinessPartnerCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -354,7 +354,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         ) TO reported-goodsreceipt.
       ENDIF.
 
-      " 4. Warehouse Validation
+      " 4. Warehouse: mandatory, exists, belongs to the company
       IF lr_header->WarehouseCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -390,7 +390,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         ) TO reported-goodsreceipt.
       ENDIF.
 
-      " 5. Currency Code Validation
+      " 5. Currency: mandatory (taken from the purchase order)
       IF lr_header->CurrencyCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -557,6 +557,8 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       ENDIF.
 
       IF lr_header->PostingDate IS NOT INITIAL AND lr_header->DocumentDate IS NOT INITIAL
+         AND zcl_merp_doc_validator=>is_posting_date_not_future( iv_post_date = lr_header->PostingDate
+                                                                 iv_today     = lv_today ) = abap_true
          AND zcl_merp_doc_validator=>is_posting_date_valid( iv_doc_date  = lr_header->DocumentDate
                                                             iv_post_date = lr_header->PostingDate ) = abap_true.
         APPEND VALUE #( %tky = lr_header->%tky %state_area = c_val_post_date ) TO reported-goodsreceipt.
@@ -1035,7 +1037,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Perform independent bulk master data selections directly via inline value generation
+    " Warehouse master data in one selection
     DATA(lt_warehouses) = NEW zcl_merp_md_warehouse_sel( )->zif_merp_md_warehouse_sel~read_warehouses(
       VALUE #( FOR header IN lt_headers ( WarehouseCode = header-WarehouseCode ) )
     ).
@@ -1044,7 +1046,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       DATA(ls_header) = lr_header->*.
 
       IF ls_header-CompanyCode IS NOT INITIAL.
-        " Validate and reset warehouse if it does not belong to the selected company
+        " A warehouse of another company is cleared
         IF ls_header-WarehouseCode IS NOT INITIAL.
           ASSIGN lt_warehouses[ WarehouseCode = ls_header-WarehouseCode ] TO FIELD-SYMBOL(<ls_warehouse>).
           IF sy-subrc <> 0 OR <ls_warehouse>-CompanyCode <> ls_header-CompanyCode.
@@ -1053,13 +1055,12 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         ENDIF.
       ENDIF.
 
-      " Collect updates if master data alignment changed the header state
+      " Only changed headers are updated
       IF ls_header <> lr_header->*.
         APPEND CORRESPONDING #( ls_header ) TO lt_header_update.
       ENDIF.
     ENDLOOP.
 
-    " Apply master data alignment back to the transactional buffer
     IF lt_header_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceipt
@@ -1730,7 +1731,6 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
   METHOD validateItemFields.
     DATA lv_has_error TYPE abap_bool.
 
-    " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceiptItem
       FIELDS ( HeaderUUID ItemCode Quantity Price UnitOfMeasure VatCode PoItemReferenceUUID )
@@ -1741,7 +1741,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Clear previous validation messages for individual field state areas to prevent duplicate errors in UI
+    " Clear the messages of the previous validation run
     DATA(lt_state_areas) = VALUE string_table(
       ( c_val_item_code )
       ( c_val_quantity )
@@ -1759,7 +1759,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
         %state_area = area )
     ).
 
-    " Gather header keys to read full document context for duplicate evaluation
+    " Documents of the checked items: duplicates are searched among all their items
     DATA lt_header_keys TYPE TABLE FOR READ IMPORT zmerp_r_goodsreceipt.
     lt_header_keys = VALUE #(
       FOR GROUPS of <g> IN lt_items GROUP BY ( HeaderUUID = <g>-HeaderUUID
@@ -1768,7 +1768,6 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
         %is_draft         = <g>-%is_draft )
     ).
 
-    " Read ALL items belonging to the affected headers to correctly evaluate duplicates
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt BY \_Items
       FIELDS ( HeaderUUID ItemCode PoItemReferenceUUID )
@@ -1783,7 +1782,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
                  ItemCode   = doc_item-ItemCode ) )
     ).
 
-    " Execute optimized bulk selections via Master Data Selector interfaces directly inline
+    " Referenced master data in one selection each
     DATA(lt_items_master) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items(
       VALUE #( FOR item IN lt_items ( ItemCode = item-ItemCode ) )
     ).
@@ -1795,7 +1794,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       lv_has_error = abap_false.
 
-      " 1. Mandatory, Master Data & Duplicate Validation: Item Code
+      " 1. Item: mandatory, exists, not twice among manual lines
       IF lr_item->ItemCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -1838,7 +1837,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
         ) TO reported-goodsreceiptitem.
       ENDIF.
 
-      " 2. Business Logic Validation: Positive Quantity via Class Validator
+      " 2. Quantity: greater than zero
       IF zcl_merp_doc_validator=>is_item_quantity_valid( lr_item->Quantity ) = abap_false.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -1853,7 +1852,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
         ) TO reported-goodsreceiptitem.
       ENDIF.
 
-      " 3. Business Logic Validation: Positive Price via Class Validator
+      " 3. Price: greater than zero
       IF zcl_merp_doc_validator=>is_item_price_valid( lr_item->Price ) = abap_false.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -1868,7 +1867,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
         ) TO reported-goodsreceiptitem.
       ENDIF.
 
-      " 4. Mandatory Validation: Unit of Measure
+      " 4. Unit of measure: mandatory
       IF lr_item->UnitOfMeasure IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -1883,7 +1882,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
         ) TO reported-goodsreceiptitem.
       ENDIF.
 
-      " 5. Mandatory Validation: VAT Code
+      " 5. VAT code: mandatory, exists
       IF lr_item->VatCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -1911,7 +1910,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
         ) TO reported-goodsreceiptitem.
       ENDIF.
 
-      " If any business validation failed, prevent transaction commit
+      " Any error fails the instance
       IF lv_has_error = abap_true.
         APPEND VALUE #(
           %tky        = lr_item->%tky
@@ -1922,7 +1921,6 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD handleMessagesOnItemModify.
-    " Read modified items from local transactional buffer
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceiptItem
       FIELDS ( HeaderUUID ItemCode )
@@ -1933,10 +1931,9 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Use correct implicit RAP type for root entity read operations
     DATA lt_header_keys TYPE TABLE FOR READ IMPORT zmerp_r_goodsreceipt.
 
-    " Group modified items by HeaderUUID and propagate draft state context correctly
+    " Documents of the changed items
     lt_header_keys = VALUE #(
       FOR GROUPS of <g> IN lt_items GROUP BY ( HeaderUUID = <g>-HeaderUUID
                                                is_draft   = <g>-%is_draft )
@@ -1944,14 +1941,14 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
         %is_draft         = <g>-%is_draft )
     ).
 
-    " Read ALL items belonging to the affected headers to evaluate full document context
+    " All items of these documents: a changed item can create or remove a duplicate on another item
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt BY \_Items
       FIELDS ( HeaderUUID ItemCode PoItemReferenceUUID )
       WITH CORRESPONDING #( lt_header_keys )
       RESULT DATA(lt_all_document_items).
 
-    " UI FIX: Clear message state areas for ALL items within the document context
+    " Duplicate messages of all items are evaluated again
     reported-goodsreceiptitem = VALUE #(
       BASE reported-goodsreceiptitem
       FOR ls_all_item IN lt_all_document_items
@@ -1972,16 +1969,15 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Report duplicate errors back to the RAP framework for ALL lines currently involved in duplication
+    " Every item that is part of a duplicate gets the message
     LOOP AT lt_all_document_items REFERENCE INTO DATA(lr_doc_item) WHERE ItemCode            IS NOT INITIAL
                                                                      AND PoItemReferenceUUID IS INITIAL.
 
-      " Check if this specific document line is part of the duplicates found in the full context
       IF line_exists( lt_duplicates[ HeaderUUID = lr_doc_item->HeaderUUID
                                      ItemCode   = lr_doc_item->ItemCode ] ).
 
         APPEND VALUE #(
-          %tky              = lr_doc_item->%tky " Primes the error exactly on each duplicate row
+          %tky              = lr_doc_item->%tky
           %path             = VALUE #( GoodsReceipt-%is_draft    = lr_doc_item->%is_draft
                                        GoodsReceipt-DocumentUUID = lr_doc_item->HeaderUUID )
           %state_area       = c_val_item_code
@@ -2000,7 +1996,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Read actual state directly from transactional buffer for modified items
+    " A message is cleared once the field is valid or filled
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceiptItem
       FIELDS ( HeaderUUID Quantity Price UnitOfMeasure VatCode )
@@ -2013,7 +2009,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
 
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
 
-      " 1. Clear Quantity message area if value is valid via class validator
+      " 1. Quantity
       IF zcl_merp_doc_validator=>is_item_quantity_valid( lr_item->Quantity ) = abap_true.
         APPEND VALUE #( %tky        = lr_item->%tky
                         %path       = VALUE #( GoodsReceipt-%is_draft    = lr_item->%is_draft
@@ -2021,7 +2017,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
                         %state_area = c_val_quantity ) TO reported-goodsreceiptitem.
       ENDIF.
 
-      " 2. Clear Price message area if value is valid via class validator
+      " 2. Price
       IF zcl_merp_doc_validator=>is_item_price_valid( lr_item->Price ) = abap_true.
         APPEND VALUE #( %tky        = lr_item->%tky
                         %path       = VALUE #( GoodsReceipt-%is_draft    = lr_item->%is_draft
@@ -2029,7 +2025,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
                         %state_area = c_val_price ) TO reported-goodsreceiptitem.
       ENDIF.
 
-      " 3. Clear Unit of Measure message area if field is filled
+      " 3. Unit of measure
       IF lr_item->UnitOfMeasure IS NOT INITIAL.
         APPEND VALUE #( %tky        = lr_item->%tky
                         %path       = VALUE #( GoodsReceipt-%is_draft    = lr_item->%is_draft
@@ -2037,7 +2033,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
                         %state_area = c_val_uom ) TO reported-goodsreceiptitem.
       ENDIF.
 
-      " 4. Clear VAT Code message area if field is filled
+      " 4. VAT code
       IF lr_item->VatCode IS NOT INITIAL.
         APPEND VALUE #( %tky        = lr_item->%tky
                         %path       = VALUE #( GoodsReceipt-%is_draft    = lr_item->%is_draft
@@ -2067,14 +2063,14 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Cleanse input headers table to eliminate duplicates and prevent duplicate key updates in RAP buffer
+    " Each header once (several items of one document)
     SORT lt_headers BY DocumentUUID %is_draft.
     DELETE ADJACENT DUPLICATES FROM lt_headers COMPARING DocumentUUID %is_draft.
 
     " Read all items of those headers in one call to pass into the shared item logic
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt BY \_Items
-      FIELDS ( HeaderUUID NetAmount VatAmount GrossAmount ) " Fetch all calculated financial components
+      FIELDS ( HeaderUUID NetAmount VatAmount GrossAmount )
       WITH CORRESPONDING #( lt_headers )
       RESULT DATA(lt_items).
 
@@ -2087,7 +2083,6 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
 
     DATA lt_gr_update TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt.
 
-    " Pack the calculated totals directly into the transactional modification buffer
     LOOP AT lt_totals REFERENCE INTO DATA(lr_total).
       ASSIGN lt_headers[ DocumentUUID = lr_total->HeaderUUID
                          %is_draft    = lr_total->IsDraft ] TO FIELD-SYMBOL(<ls_header>).
@@ -2103,7 +2098,6 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " Update header totals in the transactional buffer
     IF lt_gr_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceipt
@@ -2237,7 +2231,6 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " Apply mass calculated amounts back to the RAP transactional buffer
     IF lt_items_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceiptItem
@@ -2247,7 +2240,6 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD calcAmountsOnVatCode.
-    " Bulk read modified items upon VAT code change mutation
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceiptItem
       FIELDS ( HeaderUUID VatCode NetAmount VatAmount GrossAmount PoItemReferenceUUID )
@@ -2283,7 +2275,6 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " Write back synchronized values to transactional buffer state
     IF lt_items_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceiptItem
@@ -2299,7 +2290,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_items).
 
-    " Bulk insert into static buffer without procedural loop
+    " Parents of the deleted items, for calcHeaderTotals
     gt_deleted_headers = VALUE #( BASE gt_deleted_headers
       FOR item IN lt_items ( document_uuid = item-HeaderUUID
                              is_draft      = item-%is_draft ) ).
@@ -2403,5 +2394,6 @@ CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 
 
