@@ -165,7 +165,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt
-      FIELDS ( Status )
+      FIELDS ( Status DocumentNumber )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_headers).
 
@@ -200,7 +200,11 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                                          ELSE if_abap_behv=>fc-o-disabled )
         %action-cancelDocument = COND #( WHEN lv_cancel = abap_true
                                          THEN if_abap_behv=>fc-o-enabled
-                                         ELSE if_abap_behv=>fc-o-disabled ) )
+                                         ELSE if_abap_behv=>fc-o-disabled )
+        " The document number carries the company prefix, so the company is fixed once it is assigned
+        %field-CompanyCode     = COND #( WHEN header-DocumentNumber IS INITIAL
+                                         THEN if_abap_behv=>fc-f-mandatory
+                                         ELSE if_abap_behv=>fc-f-read_only ) )
     ).
   ENDMETHOD.
 
@@ -993,9 +997,10 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
   METHOD deriveHeaderOnCompanyCode.
     DATA lt_header_update TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt.
 
+    " The currency is not derived here: it always comes from the purchase order (deriveDocFromPurchaseOrder)
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt
-      FIELDS ( CompanyCode CurrencyCode WarehouseCode PoReferenceUUID )
+      FIELDS ( CompanyCode WarehouseCode )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_headers).
 
@@ -1003,31 +1008,14 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
-      VALUE #( FOR header IN lt_headers ( CompanyCode = header-CompanyCode ) )
-    ).
-
     DATA(lt_warehouses) = NEW zcl_merp_md_warehouse_sel( )->zif_merp_md_warehouse_sel~read_warehouses(
       VALUE #( FOR header IN lt_headers ( WarehouseCode = header-WarehouseCode ) )
-    ).
-
-    DATA(lt_po_headers) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_headers(
-      VALUE #( FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) )
     ).
 
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       DATA(ls_header) = lr_header->*.
 
       IF ls_header-CompanyCode IS NOT INITIAL.
-        " Currency of a document based on a purchase order of the same company comes from the order
-        DATA(lv_from_po) = xsdbool( line_exists( lt_po_headers[ DocumentUUID = ls_header-PoReferenceUUID
-                                                                CompanyCode  = ls_header-CompanyCode ] ) ).
-
-        ASSIGN lt_companies[ CompanyCode = ls_header-CompanyCode ] TO FIELD-SYMBOL(<company>).
-        IF sy-subrc = 0 AND <company>-CurrencyCode IS NOT INITIAL AND lv_from_po = abap_false.
-          ls_header-CurrencyCode = <company>-CurrencyCode.
-        ENDIF.
-
         IF ls_header-WarehouseCode IS NOT INITIAL.
           ASSIGN lt_warehouses[ WarehouseCode = ls_header-WarehouseCode ] TO FIELD-SYMBOL(<warehouse>).
           IF sy-subrc <> 0 OR <warehouse>-CompanyCode <> ls_header-CompanyCode.
@@ -1044,7 +1032,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
     IF lt_header_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceipt
-        UPDATE FIELDS ( CurrencyCode WarehouseCode )
+        UPDATE FIELDS ( WarehouseCode )
         WITH lt_header_update.
     ENDIF.
   ENDMETHOD.
@@ -1141,6 +1129,9 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         ls_header-BusinessPartnerCode = <po>-BusinessPartnerCode.
         ls_header-CurrencyCode        = <po>-CurrencyCode.
         ls_header-SupplierReference   = <po>-SupplierReference.
+      ELSE.
+        " The currency belongs to the purchase order: without an order there is none
+        CLEAR ls_header-CurrencyCode.
       ENDIF.
 
       ASSIGN lt_totals[ HeaderUUID = ls_header-DocumentUUID

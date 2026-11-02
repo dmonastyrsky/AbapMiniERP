@@ -25,7 +25,8 @@ authorization master ( global )
   field ( readonly ) CurrencyCode;  // taken from the purchase order (deriveDocFromPurchaseOrder)
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
 
-  field ( mandatory ) CompanyCode, WarehouseCode, BusinessPartnerCode, DocumentDate, PoReferenceUUID;
+  field ( mandatory ) WarehouseCode, BusinessPartnerCode, DocumentDate, PoReferenceUUID;
+  field ( features : instance ) CompanyCode;  // read-only once the document number (company prefix) is assigned
 
   action ( features : instance ) postDocument result [1] $self;
   action ( features : instance ) cancelDocument result [1] $self;

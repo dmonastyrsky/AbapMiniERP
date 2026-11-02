@@ -142,7 +142,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrder
-      FIELDS ( Status )
+      FIELDS ( Status DocumentNumber )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_headers).
 
@@ -191,7 +191,11 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
                                                 ELSE if_abap_behv=>fc-o-disabled )
         %action-cancelDocument        = COND #( WHEN lv_cancel = abap_true
                                                 THEN if_abap_behv=>fc-o-enabled
-                                                ELSE if_abap_behv=>fc-o-disabled ) )
+                                                ELSE if_abap_behv=>fc-o-disabled )
+        " The document number carries the company prefix, so the company is fixed once it is assigned
+        %field-CompanyCode            = COND #( WHEN header-DocumentNumber IS INITIAL
+                                                THEN if_abap_behv=>fc-f-mandatory
+                                                ELSE if_abap_behv=>fc-f-read_only ) )
     ).
   ENDMETHOD.
 

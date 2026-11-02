@@ -24,7 +24,8 @@ authorization master ( global )
   field ( readonly ) TotalNetAmount, TotalGrossAmount;
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
 
-  field ( mandatory ) CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode, DocumentDate;
+  field ( mandatory ) WarehouseCode, BusinessPartnerCode, CurrencyCode, DocumentDate;
+  field ( features : instance ) CompanyCode;  // read-only once the document number (company prefix) is assigned
 
   action ( features : instance ) releaseDocument result [1] $self;
   action ( features : instance ) setInDeliveryDocument parameter ZMERP_A_DOC_PO_SET_IN_DELIVERY result [1] $self
