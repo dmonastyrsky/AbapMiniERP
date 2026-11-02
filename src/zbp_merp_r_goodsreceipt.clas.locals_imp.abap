@@ -639,22 +639,22 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                AND PoItemReferenceUUID IS NOT INITIAL.
           CLEAR lo_item_message.
 
-          ASSIGN lt_open[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO FIELD-SYMBOL(<open>).
+          ASSIGN lt_open[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO FIELD-SYMBOL(<ls_open>).
           IF sy-subrc <> 0.
             " The referenced purchase order item does not exist (any more)
             lo_item_message = NEW #( textid   = zcx_merp_pur=>po_item_not_found
                                      severity = if_abap_behv_message=>severity-error
                                      attr1    = CONV #( lr_item->ItemNo ) ).
-          ELSEIF lr_item->Quantity > <open>-OpenQuantity.
+          ELSEIF lr_item->Quantity > <ls_open>-OpenQuantity.
             lo_item_message = NEW #( textid   = zcx_merp_pur=>po_open_quantity_exceeded
                                      severity = if_abap_behv_message=>severity-error
                                      attr1    = CONV #( lr_item->ItemNo )
-                                     attr2    = CONV #( <open>-OpenQuantity ) ).
+                                     attr2    = CONV #( <ls_open>-OpenQuantity ) ).
           " The whole open quantity must take exactly the open amounts, so the order item is closed to zero
-          ELSEIF lr_item->Quantity = <open>-OpenQuantity
-             AND ( lr_item->NetAmount   <> <open>-OpenNetAmount
-                OR lr_item->VatAmount   <> <open>-OpenVatAmount
-                OR lr_item->GrossAmount <> <open>-OpenGrossAmount ).
+          ELSEIF lr_item->Quantity = <ls_open>-OpenQuantity
+             AND ( lr_item->NetAmount   <> <ls_open>-OpenNetAmount
+                OR lr_item->VatAmount   <> <ls_open>-OpenVatAmount
+                OR lr_item->GrossAmount <> <ls_open>-OpenGrossAmount ).
             lo_item_message = NEW #( textid   = zcx_merp_pur=>po_open_amounts_changed
                                      severity = if_abap_behv_message=>severity-error
                                      attr1    = CONV #( lr_item->ItemNo ) ).
@@ -687,12 +687,12 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         LOOP AT lt_items REFERENCE INTO lr_item
              WHERE HeaderUUID          = lr_header->DocumentUUID
                AND PoItemReferenceUUID IS NOT INITIAL.
-          ASSIGN lt_open[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO <open>.
+          ASSIGN lt_open[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO <ls_open>.
           IF sy-subrc = 0.
-            <open>-OpenQuantity    -= lr_item->Quantity.
-            <open>-OpenNetAmount   -= lr_item->NetAmount.
-            <open>-OpenVatAmount   -= lr_item->VatAmount.
-            <open>-OpenGrossAmount -= lr_item->GrossAmount.
+            <ls_open>-OpenQuantity    -= lr_item->Quantity.
+            <ls_open>-OpenNetAmount   -= lr_item->NetAmount.
+            <ls_open>-OpenVatAmount   -= lr_item->VatAmount.
+            <ls_open>-OpenGrossAmount -= lr_item->GrossAmount.
           ENDIF.
         ENDLOOP.
       ENDIF.
@@ -787,10 +787,10 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
     " Current stock of the affected products (including the movements of the documents to be unposted)
     LOOP AT lt_stock_items REFERENCE INTO DATA(lr_item).
-      ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<header>).
+      ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<ls_header>).
       IF sy-subrc = 0.
-        INSERT VALUE #( CompanyCode   = <header>-CompanyCode
-                        WarehouseCode = <header>-WarehouseCode
+        INSERT VALUE #( CompanyCode   = <ls_header>-CompanyCode
+                        WarehouseCode = <ls_header>-WarehouseCode
                         ItemCode      = lr_item->ItemCode
                         UnitOfMeasure = lr_item->UnitOfMeasure ) INTO TABLE lt_stock_keys.
       ENDIF.
@@ -829,9 +829,9 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
           ASSIGN lt_stock[ CompanyCode   = lr_header->CompanyCode
                            WarehouseCode = lr_header->WarehouseCode
                            ItemCode      = lr_item->ItemCode
-                           UnitOfMeasure = lr_item->UnitOfMeasure ] TO FIELD-SYMBOL(<stock>).
+                           UnitOfMeasure = lr_item->UnitOfMeasure ] TO FIELD-SYMBOL(<ls_stock>).
 
-          IF sy-subrc <> 0 OR <stock>-Quantity < lr_item->Quantity.
+          IF sy-subrc <> 0 OR <ls_stock>-Quantity < lr_item->Quantity.
             lv_items_valid = abap_false.
             APPEND VALUE #( %tky              = lr_item->%tky
                             %path             = VALUE #( GoodsReceipt-%is_draft    = lr_item->%is_draft
@@ -861,9 +861,9 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
           ASSIGN lt_stock[ CompanyCode   = lr_header->CompanyCode
                            WarehouseCode = lr_header->WarehouseCode
                            ItemCode      = lr_item->ItemCode
-                           UnitOfMeasure = lr_item->UnitOfMeasure ] TO <stock>.
+                           UnitOfMeasure = lr_item->UnitOfMeasure ] TO <ls_stock>.
           IF sy-subrc = 0.
-            <stock>-Quantity -= lr_item->Quantity.
+            <ls_stock>-Quantity -= lr_item->Quantity.
           ENDIF.
         ENDLOOP.
 
@@ -1035,6 +1035,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    " Perform independent bulk master data selections directly via inline value generation
     DATA(lt_warehouses) = NEW zcl_merp_md_warehouse_sel( )->zif_merp_md_warehouse_sel~read_warehouses(
       VALUE #( FOR header IN lt_headers ( WarehouseCode = header-WarehouseCode ) )
     ).
@@ -1043,19 +1044,22 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       DATA(ls_header) = lr_header->*.
 
       IF ls_header-CompanyCode IS NOT INITIAL.
+        " Validate and reset warehouse if it does not belong to the selected company
         IF ls_header-WarehouseCode IS NOT INITIAL.
-          ASSIGN lt_warehouses[ WarehouseCode = ls_header-WarehouseCode ] TO FIELD-SYMBOL(<warehouse>).
-          IF sy-subrc <> 0 OR <warehouse>-CompanyCode <> ls_header-CompanyCode.
+          ASSIGN lt_warehouses[ WarehouseCode = ls_header-WarehouseCode ] TO FIELD-SYMBOL(<ls_warehouse>).
+          IF sy-subrc <> 0 OR <ls_warehouse>-CompanyCode <> ls_header-CompanyCode.
             CLEAR ls_header-WarehouseCode.
           ENDIF.
         ENDIF.
       ENDIF.
 
+      " Collect updates if master data alignment changed the header state
       IF ls_header <> lr_header->*.
         APPEND CORRESPONDING #( ls_header ) TO lt_header_update.
       ENDIF.
     ENDLOOP.
 
+    " Apply master data alignment back to the transactional buffer
     IF lt_header_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceipt
@@ -1102,17 +1106,17 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
     "    A numbered document keeps its company: an order of another company gives no items
     "    (rejected by validateHeaderFields)
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
-      ASSIGN lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ] TO FIELD-SYMBOL(<po>).
+      ASSIGN lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ] TO FIELD-SYMBOL(<ls_po>).
       IF sy-subrc <> 0
-         OR zcl_merp_doc_po_lifecycle=>can_receive_goods( <po>-Status ) = abap_false
-         OR ( lr_header->DocumentNumber IS NOT INITIAL AND <po>-CompanyCode <> lr_header->CompanyCode ).
+         OR zcl_merp_doc_po_lifecycle=>can_receive_goods( <ls_po>-Status ) = abap_false
+         OR ( lr_header->DocumentNumber IS NOT INITIAL AND <ls_po>-CompanyCode <> lr_header->CompanyCode ).
         CONTINUE.
       ENDIF.
 
       ls_item_create = VALUE #( %tky = lr_header->%tky ).
 
       LOOP AT lt_progress REFERENCE INTO DATA(lr_open) USING KEY ByHeader
-           WHERE PoHeaderUUID = <po>-DocumentUUID
+           WHERE PoHeaderUUID = <ls_po>-DocumentUUID
              AND OpenQuantity > 0.
         APPEND VALUE #(
           %cid                = |{ lr_header->DocumentUUID }{ lines( ls_item_create-%target ) + 1 }|
@@ -1153,24 +1157,24 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
     LOOP AT lt_headers REFERENCE INTO lr_header.
       DATA(ls_header) = lr_header->*.
 
-      ASSIGN lt_po_headers[ DocumentUUID = ls_header-PoReferenceUUID ] TO <po>.
+      ASSIGN lt_po_headers[ DocumentUUID = ls_header-PoReferenceUUID ] TO <ls_po>.
       IF sy-subrc <> 0.
         " The currency belongs to the purchase order: without an order there is none
         CLEAR ls_header-CurrencyCode.
-      ELSEIF ls_header-DocumentNumber IS INITIAL OR <po>-CompanyCode = ls_header-CompanyCode.
+      ELSEIF ls_header-DocumentNumber IS INITIAL OR <ls_po>-CompanyCode = ls_header-CompanyCode.
         " A numbered document keeps its company (the number carries the company prefix)
-        ls_header-CompanyCode         = <po>-CompanyCode.
-        ls_header-WarehouseCode       = <po>-WarehouseCode.
-        ls_header-BusinessPartnerCode = <po>-BusinessPartnerCode.
-        ls_header-CurrencyCode        = <po>-CurrencyCode.
-        ls_header-SupplierReference   = <po>-SupplierReference.
+        ls_header-CompanyCode         = <ls_po>-CompanyCode.
+        ls_header-WarehouseCode       = <ls_po>-WarehouseCode.
+        ls_header-BusinessPartnerCode = <ls_po>-BusinessPartnerCode.
+        ls_header-CurrencyCode        = <ls_po>-CurrencyCode.
+        ls_header-SupplierReference   = <ls_po>-SupplierReference.
       ENDIF.
 
       ASSIGN lt_totals[ HeaderUUID = ls_header-DocumentUUID
-                        IsDraft    = ls_header-%is_draft ] TO FIELD-SYMBOL(<total>).
+                        IsDraft    = ls_header-%is_draft ] TO FIELD-SYMBOL(<ls_total>).
       IF sy-subrc = 0.
-        ls_header-TotalNetAmount   = <total>-TotalNetAmount.
-        ls_header-TotalGrossAmount = <total>-TotalGrossAmount.
+        ls_header-TotalNetAmount   = <ls_total>-TotalNetAmount.
+        ls_header-TotalGrossAmount = <ls_total>-TotalGrossAmount.
       ENDIF.
 
       IF ls_header <> lr_header->*.
@@ -1262,11 +1266,11 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
       " Values taken over from the purchase order match it, so only a manual change clears the reference;
       " deriveDocFromPurchaseOrder then removes the items
-      ASSIGN lt_po_headers[ DocumentUUID = ls_header-PoReferenceUUID ] TO FIELD-SYMBOL(<po>).
+      ASSIGN lt_po_headers[ DocumentUUID = ls_header-PoReferenceUUID ] TO FIELD-SYMBOL(<ls_po>).
       IF sy-subrc <> 0
-         OR ls_header-CompanyCode         <> <po>-CompanyCode
-         OR ls_header-BusinessPartnerCode <> <po>-BusinessPartnerCode
-         OR ls_header-WarehouseCode       <> <po>-WarehouseCode.
+         OR ls_header-CompanyCode         <> <ls_po>-CompanyCode
+         OR ls_header-BusinessPartnerCode <> <ls_po>-BusinessPartnerCode
+         OR ls_header-WarehouseCode       <> <ls_po>-WarehouseCode.
         CLEAR ls_header-PoReferenceUUID.
       ENDIF.
 
@@ -1284,7 +1288,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD syncItemCurrency.
-    DATA items_to_update TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt\\GoodsReceiptItem.
+    DATA lt_items_to_update TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt\\GoodsReceiptItem.
 
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt
@@ -1302,21 +1306,21 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID
-                         %is_draft    = lr_item->%is_draft ] TO FIELD-SYMBOL(<header>).
+                         %is_draft    = lr_item->%is_draft ] TO FIELD-SYMBOL(<ls_header>).
 
-      IF sy-subrc = 0 AND lr_item->CurrencyCode <> <header>-CurrencyCode.
+      IF sy-subrc = 0 AND lr_item->CurrencyCode <> <ls_header>-CurrencyCode.
         APPEND VALUE #(
           %tky         = lr_item->%tky
-          CurrencyCode = <header>-CurrencyCode
-        ) TO items_to_update.
+          CurrencyCode = <ls_header>-CurrencyCode
+        ) TO lt_items_to_update.
       ENDIF.
     ENDLOOP.
 
-    IF items_to_update IS NOT INITIAL.
+    IF lt_items_to_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceiptItem
         UPDATE FIELDS ( CurrencyCode )
-        WITH items_to_update.
+        WITH lt_items_to_update.
     ENDIF.
   ENDMETHOD.
 
@@ -1650,7 +1654,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
                                            ELSE if_abap_behv=>fc-f-mandatory )
         %field-VatCode           = COND #( WHEN lv_from_po = abap_true
                                            THEN if_abap_behv=>fc-f-read_only
-                                           ELSE if_abap_behv=>fc-f-unrestricted )
+                                           ELSE if_abap_behv=>fc-f-mandatory )
         %action-fillOpenQuantity = COND #( WHEN lv_from_po = abap_true AND lv_draft = abap_true
                                            THEN if_abap_behv=>fc-o-enabled
                                            ELSE if_abap_behv=>fc-o-disabled ) )
@@ -1679,10 +1683,10 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
     LOOP AT lt_items REFERENCE INTO DATA(lr_item) WHERE PoItemReferenceUUID IS NOT INITIAL.
       DATA(ls_item) = lr_item->*.
 
-      ASSIGN lt_progress[ PoItemUUID = ls_item-PoItemReferenceUUID ] TO FIELD-SYMBOL(<open>).
+      ASSIGN lt_progress[ PoItemUUID = ls_item-PoItemReferenceUUID ] TO FIELD-SYMBOL(<ls_open>).
 
       " 1. Nothing left to receive for the order item: only reported
-      IF sy-subrc <> 0 OR <open>-OpenQuantity <= 0.
+      IF sy-subrc <> 0 OR <ls_open>-OpenQuantity <= 0.
         APPEND VALUE #(
           %tky  = ls_item-%tky
           %path = VALUE #( GoodsReceipt-%is_draft    = ls_item-%is_draft
@@ -1696,10 +1700,10 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       ENDIF.
 
       " 2. Quantity and amounts follow the current open values of the order item
-      ls_item-Quantity    = <open>-OpenQuantity.
-      ls_item-NetAmount   = <open>-OpenNetAmount.
-      ls_item-VatAmount   = <open>-OpenVatAmount.
-      ls_item-GrossAmount = <open>-OpenGrossAmount.
+      ls_item-Quantity    = <ls_open>-OpenQuantity.
+      ls_item-NetAmount   = <ls_open>-OpenNetAmount.
+      ls_item-VatAmount   = <ls_open>-OpenVatAmount.
+      ls_item-GrossAmount = <ls_open>-OpenGrossAmount.
 
       IF ls_item <> lr_item->*.
         APPEND CORRESPONDING #( ls_item ) TO lt_items_update.
@@ -2189,18 +2193,18 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       VALUE #( FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) ) ).
 
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
-      ASSIGN lt_progress[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO FIELD-SYMBOL(<open>).
+      ASSIGN lt_progress[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO FIELD-SYMBOL(<ls_open>).
 
       " Receiving the whole open quantity takes the open amounts, so the order item is closed to zero
-      IF sy-subrc = 0 AND lr_item->Quantity = <open>-OpenQuantity.
-        IF lr_item->NetAmount   <> <open>-OpenNetAmount OR
-           lr_item->VatAmount   <> <open>-OpenVatAmount OR
-           lr_item->GrossAmount <> <open>-OpenGrossAmount.
+      IF sy-subrc = 0 AND lr_item->Quantity = <ls_open>-OpenQuantity.
+        IF lr_item->NetAmount   <> <ls_open>-OpenNetAmount OR
+           lr_item->VatAmount   <> <ls_open>-OpenVatAmount OR
+           lr_item->GrossAmount <> <ls_open>-OpenGrossAmount.
           APPEND VALUE #(
             %tky                 = lr_item->%tky
-            NetAmount            = <open>-OpenNetAmount
-            VatAmount            = <open>-OpenVatAmount
-            GrossAmount          = <open>-OpenGrossAmount
+            NetAmount            = <ls_open>-OpenNetAmount
+            VatAmount            = <ls_open>-OpenVatAmount
+            GrossAmount          = <ls_open>-OpenGrossAmount
             %control-NetAmount   = if_abap_behv=>mk-on
             %control-VatAmount   = if_abap_behv=>mk-on
             %control-GrossAmount = if_abap_behv=>mk-on
@@ -2356,7 +2360,7 @@ CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
     " One incoming movement per goods receipt item: positive quantity, value = net amount
     " (the document currency equals the company currency, checked on posting)
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
-      ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<header>).
+      ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<ls_header>).
       IF sy-subrc <> 0.
         CONTINUE.
       ENDIF.
@@ -2369,14 +2373,14 @@ CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
       TRY.
           APPEND VALUE #(
             movement_uuid         = cl_system_uuid=>create_uuid_x16_static( )
-            company_code          = <header>-CompanyCode
-            warehouse_code        = <header>-WarehouseCode
+            company_code          = <ls_header>-CompanyCode
+            warehouse_code        = <ls_header>-WarehouseCode
             item_code             = lr_item->ItemCode
             quantity              = lr_item->Quantity
             unit_of_measure       = lr_item->UnitOfMeasure
             amount                = lr_item->NetAmount
-            currency_code         = <header>-CurrencyCode
-            posting_date          = <header>-PostingDate
+            currency_code         = <ls_header>-CurrencyCode
+            posting_date          = <ls_header>-PostingDate
             document_type         = c_document_type
             document_uuid         = lr_item->HeaderUUID
             document_item_uuid    = lr_item->ItemUUID
@@ -2399,4 +2403,5 @@ CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 

@@ -39,6 +39,9 @@ define view entity ZMERP_C_GOODSRECEIPTITM
       @Semantics.quantity.unitOfMeasure: 'UnitOfMeasure'
       _PoProgress.OpenQuantity as PoOpenQuantity,
 
+      // Empty for lines added manually (without purchase order item reference)
+      _PoProgress.PoDocumentNumber as PoDocumentNumber,
+
       /* zmerp_s_admin */
       CreatedBy,
       CreatedAt,

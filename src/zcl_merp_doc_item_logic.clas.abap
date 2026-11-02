@@ -216,14 +216,14 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
 
     " All items of the affected documents: highest used item number per document
     LOOP AT it_siblings REFERENCE INTO DATA(lr_sibling).
-      ASSIGN lt_counters[ header_uuid = lr_sibling->HeaderUUID ] TO FIELD-SYMBOL(<counter>).
+      ASSIGN lt_counters[ header_uuid = lr_sibling->HeaderUUID ] TO FIELD-SYMBOL(<ls_counter>).
       IF sy-subrc <> 0.
         INSERT VALUE #( header_uuid = lr_sibling->HeaderUUID )
-          INTO TABLE lt_counters ASSIGNING <counter>.
+          INTO TABLE lt_counters ASSIGNING <ls_counter>.
       ENDIF.
 
-      IF lr_sibling->ItemNo > <counter>-last_no.
-        <counter>-last_no = lr_sibling->ItemNo.
+      IF lr_sibling->ItemNo > <ls_counter>-last_no.
+        <ls_counter>-last_no = lr_sibling->ItemNo.
       ENDIF.
     ENDLOOP.
 
@@ -242,13 +242,13 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
 
       " Next free item number within the document
       IF ls_item-ItemNo IS INITIAL.
-        ASSIGN lt_counters[ header_uuid = ls_item-HeaderUUID ] TO <counter>.
+        ASSIGN lt_counters[ header_uuid = ls_item-HeaderUUID ] TO <ls_counter>.
         IF sy-subrc = 0.
-          <counter>-last_no += c_item_no_step.
-          ls_item-ItemNo     = <counter>-last_no.
+          <ls_counter>-last_no += c_item_no_step.
+          ls_item-ItemNo     = <ls_counter>-last_no.
         ELSE.
           INSERT VALUE #( header_uuid = ls_item-HeaderUUID last_no = c_item_no_step )
-            INTO TABLE lt_counters ASSIGNING <counter>.
+            INTO TABLE lt_counters ASSIGNING <ls_counter>.
           ls_item-ItemNo = c_item_no_step.
         ENDIF.
       ENDIF.
@@ -256,9 +256,9 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
       " Item currency follows the document currency (only if not yet set)
       IF ls_item-CurrencyCode IS INITIAL.
         ASSIGN it_header_currencies[ HeaderUUID = ls_item-HeaderUUID
-                                     IsDraft    = ls_item-IsDraft ] TO FIELD-SYMBOL(<header>).
+                                     IsDraft    = ls_item-IsDraft ] TO FIELD-SYMBOL(<ls_header>).
         IF sy-subrc = 0.
-          ls_item-CurrencyCode = <header>-CurrencyCode.
+          ls_item-CurrencyCode = <ls_header>-CurrencyCode.
         ENDIF.
       ENDIF.
 
@@ -267,12 +267,12 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
       " A blocked VAT code of the item is not proposed: the field is cleared, so the user selects a current one
       " (a VAT code of the previously selected item must not stay on the line)
       IF ls_item-ItemCode IS NOT INITIAL AND ls_item-PoItemReferenceUUID IS INITIAL.
-        ASSIGN lt_items_master[ ItemCode = ls_item-ItemCode ] TO FIELD-SYMBOL(<master>).
+        ASSIGN lt_items_master[ ItemCode = ls_item-ItemCode ] TO FIELD-SYMBOL(<ls_master>).
         IF sy-subrc = 0.
-          ls_item-UnitOfMeasure = <master>-BaseUnitOfMeasure.
-          ls_item-VatCode       = COND #( WHEN line_exists( lt_vat_rates[ VatCode   = <master>-DefaultVatCode
+          ls_item-UnitOfMeasure = <ls_master>-BaseUnitOfMeasure.
+          ls_item-VatCode       = COND #( WHEN line_exists( lt_vat_rates[ VatCode   = <ls_master>-DefaultVatCode
                                                                           IsBlocked = abap_false ] )
-                                          THEN <master>-DefaultVatCode ).
+                                          THEN <ls_master>-DefaultVatCode ).
         ENDIF.
       ENDIF.
 
@@ -314,10 +314,10 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
   METHOD sync_currency.
     LOOP AT it_items INTO DATA(ls_item).
       ASSIGN it_header_currencies[ HeaderUUID = ls_item-HeaderUUID
-                                   IsDraft    = ls_item-IsDraft ] TO FIELD-SYMBOL(<header>).
+                                   IsDraft    = ls_item-IsDraft ] TO FIELD-SYMBOL(<ls_header>).
 
-      IF sy-subrc = 0 AND ls_item-CurrencyCode <> <header>-CurrencyCode.
-        ls_item-CurrencyCode = <header>-CurrencyCode.
+      IF sy-subrc = 0 AND ls_item-CurrencyCode <> <ls_header>-CurrencyCode.
+        ls_item-CurrencyCode = <ls_header>-CurrencyCode.
         APPEND ls_item TO rt_changed.
       ENDIF.
     ENDLOOP.

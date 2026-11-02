@@ -1023,15 +1023,15 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 
       IF ls_header-CompanyCode IS NOT INITIAL.
         " Automatically align document currency with the company code currency
-        ASSIGN lt_companies[ CompanyCode = ls_header-CompanyCode ] TO FIELD-SYMBOL(<company>).
-        IF sy-subrc = 0 AND <company>-CurrencyCode IS NOT INITIAL.
-          ls_header-CurrencyCode = <company>-CurrencyCode.
+        ASSIGN lt_companies[ CompanyCode = ls_header-CompanyCode ] TO FIELD-SYMBOL(<ls_company>).
+        IF sy-subrc = 0 AND <ls_company>-CurrencyCode IS NOT INITIAL.
+          ls_header-CurrencyCode = <ls_company>-CurrencyCode.
         ENDIF.
 
         " Validate and reset warehouse if it does not belong to the selected company
         IF ls_header-WarehouseCode IS NOT INITIAL.
-          ASSIGN lt_warehouses[ WarehouseCode = ls_header-WarehouseCode ] TO FIELD-SYMBOL(<warehouse>).
-          IF sy-subrc <> 0 OR <warehouse>-CompanyCode <> ls_header-CompanyCode.
+          ASSIGN lt_warehouses[ WarehouseCode = ls_header-WarehouseCode ] TO FIELD-SYMBOL(<ls_warehouse>).
+          IF sy-subrc <> 0 OR <ls_warehouse>-CompanyCode <> ls_header-CompanyCode.
             CLEAR ls_header-WarehouseCode.
           ENDIF.
         ENDIF.
@@ -1101,7 +1101,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD syncItemCurrency.
-    DATA items_to_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder\\PurchaseOrderItem.
+    DATA lt_items_to_update TYPE TABLE FOR UPDATE zmerp_r_purchaseorder\\PurchaseOrderItem.
 
     " Bulk read parent headers and child items to check for currency mismatches
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
@@ -1120,22 +1120,22 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID
-                         %is_draft    = lr_item->%is_draft ] TO FIELD-SYMBOL(<header>).
+                         %is_draft    = lr_item->%is_draft ] TO FIELD-SYMBOL(<ls_header>).
 
       " Align item currency with the parent document currency if they differ
-      IF sy-subrc = 0 AND lr_item->CurrencyCode <> <header>-CurrencyCode.
+      IF sy-subrc = 0 AND lr_item->CurrencyCode <> <ls_header>-CurrencyCode.
         APPEND VALUE #(
           %tky         = lr_item->%tky
-          CurrencyCode = <header>-CurrencyCode
-        ) TO items_to_update.
+          CurrencyCode = <ls_header>-CurrencyCode
+        ) TO lt_items_to_update.
       ENDIF.
     ENDLOOP.
 
-    IF items_to_update IS NOT INITIAL.
+    IF lt_items_to_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
         ENTITY PurchaseOrderItem
         UPDATE FIELDS ( CurrencyCode )
-        WITH items_to_update.
+        WITH lt_items_to_update.
     ENDIF.
   ENDMETHOD.
 
