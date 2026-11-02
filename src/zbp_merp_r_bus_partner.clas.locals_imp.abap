@@ -61,20 +61,20 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
       ENTITY BusinessPartner
       FIELDS ( PartnerName IsCustomer IsSupplier )
       WITH CORRESPONDING #( keys )
-      RESULT DATA(lt_bp).
+      RESULT DATA(lt_partners).
 
-    IF lt_bp IS INITIAL.
+    IF lt_partners IS INITIAL.
       RETURN.
     ENDIF.
 
-    LOOP AT lt_bp REFERENCE INTO DATA(lr_bp).
+    LOOP AT lt_partners REFERENCE INTO DATA(lr_partner).
       lv_has_error = abap_false.
 
       " 1. Business Partner Name Mandatory Validation
-      IF lr_bp->PartnerName IS INITIAL.
+      IF lr_partner->PartnerName IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
-          %tky                 = lr_bp->%tky
+          %tky                 = lr_partner->%tky
           %state_area          = c_val_name
           %msg                 = NEW zcx_merp_md(
                                    textid   = zcx_merp_md=>enter_partner_name
@@ -84,10 +84,10 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
       ENDIF.
 
       " 2. Partner Roles Validation (At least one role must be selected)
-      IF lr_bp->IsCustomer IS INITIAL AND lr_bp->IsSupplier IS INITIAL.
+      IF lr_partner->IsCustomer IS INITIAL AND lr_partner->IsSupplier IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
-          %tky                = lr_bp->%tky
+          %tky                = lr_partner->%tky
           %state_area         = c_val_role
           %msg                = NEW zcx_merp_md(
                                   textid   = zcx_merp_md=>select_partner_role
@@ -100,14 +100,14 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
       IF lv_has_error = abap_true.
         " Mark entity instance as failed to prevent transaction commit
         APPEND VALUE #(
-          %tky        = lr_bp->%tky
+          %tky        = lr_partner->%tky
           %fail-cause = if_abap_behv=>cause-unspecific
         ) TO failed-businesspartner.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD clearMessagesForFilledFields.
+   METHOD clearMessagesForFilledFields.
     IF keys IS INITIAL.
       RETURN.
     ENDIF.
@@ -117,17 +117,17 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
       ENTITY BusinessPartner
       FIELDS ( PartnerName IsCustomer IsSupplier )
       WITH CORRESPONDING #( keys )
-      RESULT DATA(lt_bp).
+      RESULT DATA(lt_partners).
 
-    LOOP AT lt_bp REFERENCE INTO DATA(lr_bp).
+    LOOP AT lt_partners REFERENCE INTO DATA(lr_partner).
       " Clear message area for Business Partner Name
-      IF lr_bp->PartnerName IS NOT INITIAL.
-        APPEND VALUE #( %tky = lr_bp->%tky %state_area = c_val_name ) TO reported-businesspartner.
+      IF lr_partner->PartnerName IS NOT INITIAL.
+        APPEND VALUE #( %tky = lr_partner->%tky %state_area = c_val_name ) TO reported-businesspartner.
       ENDIF.
 
       " Clear message area for Partner Roles if at least one checkbox is set
-      IF lr_bp->IsCustomer IS NOT INITIAL OR lr_bp->IsSupplier IS NOT INITIAL.
-        APPEND VALUE #( %tky = lr_bp->%tky %state_area = c_val_role ) TO reported-businesspartner.
+      IF lr_partner->IsCustomer IS NOT INITIAL OR lr_partner->IsSupplier IS NOT INITIAL.
+        APPEND VALUE #( %tky = lr_partner->%tky %state_area = c_val_role ) TO reported-businesspartner.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
