@@ -139,6 +139,26 @@ CLASS zcx_merp_pur DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF po_has_posted_receipts,
 
+      " &1 = goods receipt item number
+      BEGIN OF po_item_not_found,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '120',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF po_item_not_found,
+
+      " &1 = purchase order number, &2 = company code of the purchase order
+      BEGIN OF po_company_mismatch,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '121',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE 'MV_ATTR2',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF po_company_mismatch,
+
       " --- Dependency Checks (150, 152) ---
       " &1 = document number, &2 = entity that uses the document
       BEGIN OF purchase_order_in_use,

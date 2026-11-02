@@ -277,6 +277,21 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                                        severity = if_abap_behv_message=>severity-error )
           %element-PoReferenceUUID = if_abap_behv=>mk-on
         ) TO reported-goodsreceipt.
+      ELSEIF lr_header->CompanyCode IS NOT INITIAL
+         AND lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ]-CompanyCode <> lr_header->CompanyCode.
+        " A numbered document keeps its company (deriveDocFromPurchaseOrder does not take it over),
+        " so an order of another company set via API/EML is rejected here
+        lv_has_error = abap_true.
+        APPEND VALUE #(
+          %tky                     = lr_header->%tky
+          %state_area              = c_val_po_ref
+          %msg                     = NEW zcx_merp_pur(
+                                       textid   = zcx_merp_pur=>po_company_mismatch
+                                       attr1    = CONV string( lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ]-DocumentNumber )
+                                       attr2    = CONV string( lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ]-CompanyCode )
+                                       severity = if_abap_behv_message=>severity-error )
+          %element-PoReferenceUUID = if_abap_behv=>mk-on
+        ) TO reported-goodsreceipt.
       ENDIF.
 
       " 2. Company Code Validation
@@ -611,14 +626,15 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         LOOP AT lt_items REFERENCE INTO DATA(lr_item)
              WHERE HeaderUUID          = lr_header->DocumentUUID
                AND PoItemReferenceUUID IS NOT INITIAL.
-          ASSIGN lt_open[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO FIELD-SYMBOL(<open>).
-          IF sy-subrc <> 0.
-            CONTINUE.
-          ENDIF.
-
           CLEAR lo_item_message.
 
-          IF lr_item->Quantity > <open>-OpenQuantity.
+          ASSIGN lt_open[ PoItemUUID = lr_item->PoItemReferenceUUID ] TO FIELD-SYMBOL(<open>).
+          IF sy-subrc <> 0.
+            " The referenced purchase order item does not exist (any more)
+            lo_item_message = NEW #( textid   = zcx_merp_pur=>po_item_not_found
+                                     severity = if_abap_behv_message=>severity-error
+                                     attr1    = CONV #( lr_item->ItemNo ) ).
+          ELSEIF lr_item->Quantity > <open>-OpenQuantity.
             lo_item_message = NEW #( textid   = zcx_merp_pur=>po_open_quantity_exceeded
                                      severity = if_abap_behv_message=>severity-error
                                      attr1    = CONV #( lr_item->ItemNo )
@@ -1046,7 +1062,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
     " Headers with the changed purchase order reference and their current items
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt
-        FIELDS ( PoReferenceUUID CompanyCode WarehouseCode BusinessPartnerCode CurrencyCode
+        FIELDS ( PoReferenceUUID DocumentNumber CompanyCode WarehouseCode BusinessPartnerCode CurrencyCode
                  SupplierReference TotalNetAmount TotalGrossAmount )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_headers)
@@ -1072,9 +1088,13 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
     " 1. Open (not yet received) quantities of a receivable purchase order become the new items.
     "    Amounts are taken from the open amounts, so earlier rounding differences are closed to zero.
+    "    A numbered document keeps its company: an order of another company gives no items
+    "    (rejected by validateHeaderFields)
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       ASSIGN lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ] TO FIELD-SYMBOL(<po>).
-      IF sy-subrc <> 0 OR zcl_merp_doc_po_lifecycle=>can_receive_goods( <po>-Status ) = abap_false.
+      IF sy-subrc <> 0
+         OR zcl_merp_doc_po_lifecycle=>can_receive_goods( <po>-Status ) = abap_false
+         OR ( lr_header->DocumentNumber IS NOT INITIAL AND <po>-CompanyCode <> lr_header->CompanyCode ).
         CONTINUE.
       ENDIF.
 
@@ -1123,15 +1143,16 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       DATA(ls_header) = lr_header->*.
 
       ASSIGN lt_po_headers[ DocumentUUID = ls_header-PoReferenceUUID ] TO <po>.
-      IF sy-subrc = 0.
+      IF sy-subrc <> 0.
+        " The currency belongs to the purchase order: without an order there is none
+        CLEAR ls_header-CurrencyCode.
+      ELSEIF ls_header-DocumentNumber IS INITIAL OR <po>-CompanyCode = ls_header-CompanyCode.
+        " A numbered document keeps its company (the number carries the company prefix)
         ls_header-CompanyCode         = <po>-CompanyCode.
         ls_header-WarehouseCode       = <po>-WarehouseCode.
         ls_header-BusinessPartnerCode = <po>-BusinessPartnerCode.
         ls_header-CurrencyCode        = <po>-CurrencyCode.
         ls_header-SupplierReference   = <po>-SupplierReference.
-      ELSE.
-        " The currency belongs to the purchase order: without an order there is none
-        CLEAR ls_header-CurrencyCode.
       ENDIF.
 
       ASSIGN lt_totals[ HeaderUUID = ls_header-DocumentUUID
@@ -1716,7 +1737,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
     " Read entity fields in local mode to bypass global authorization checks during validation
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceiptItem
-      FIELDS ( HeaderUUID ItemCode Quantity Price UnitOfMeasure VatCode )
+      FIELDS ( HeaderUUID ItemCode Quantity Price UnitOfMeasure VatCode PoItemReferenceUUID )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_items).
 
@@ -1754,13 +1775,16 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
     " Read ALL items belonging to the affected headers to correctly evaluate duplicates
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt BY \_Items
-      FIELDS ( HeaderUUID ItemCode )
+      FIELDS ( HeaderUUID ItemCode PoItemReferenceUUID )
       WITH CORRESPONDING #( lt_header_keys )
       RESULT DATA(lt_all_document_items).
 
-    " Identify unique combinations of HeaderUUID and ItemCode that appear multiple times
+    " Duplicates are checked among manual lines only: a purchase order line exists once per order item
+    " (created by deriveDocFromPurchaseOrder, reference read-only), and a manual line may repeat its item
     DATA(lt_duplicates) = zcl_merp_doc_validator=>get_duplicate_item_codes(
-      CORRESPONDING zcl_merp_doc_validator=>tt_item_fields( lt_all_document_items )
+      VALUE #( FOR doc_item IN lt_all_document_items WHERE ( PoItemReferenceUUID IS INITIAL )
+               ( HeaderUUID = doc_item-HeaderUUID
+                 ItemCode   = doc_item-ItemCode ) )
     ).
 
     " Execute optimized bulk selections via Master Data Selector interfaces directly inline
@@ -1801,7 +1825,8 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
                                 severity = if_abap_behv_message=>severity-error )
           %element-ItemCode = if_abap_behv=>mk-on
         ) TO reported-goodsreceiptitem.
-      ELSEIF line_exists( lt_duplicates[ HeaderUUID = lr_item->HeaderUUID
+      ELSEIF lr_item->PoItemReferenceUUID IS INITIAL
+         AND line_exists( lt_duplicates[ HeaderUUID = lr_item->HeaderUUID
                                          ItemCode   = lr_item->ItemCode ] ).
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -1926,7 +1951,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
     " Read ALL items belonging to the affected headers to evaluate full document context
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt BY \_Items
-      FIELDS ( HeaderUUID ItemCode )
+      FIELDS ( HeaderUUID ItemCode PoItemReferenceUUID )
       WITH CORRESPONDING #( lt_header_keys )
       RESULT DATA(lt_all_document_items).
 
@@ -1940,9 +1965,11 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
         %state_area = c_val_item_code )
     ).
 
-    " Get hash table of duplicate combinations using optimized validator method
+    " Duplicates among manual lines only (see validateItemFields)
     DATA(lt_duplicates) = zcl_merp_doc_validator=>get_duplicate_item_codes(
-      CORRESPONDING zcl_merp_doc_validator=>tt_item_fields( lt_all_document_items )
+      VALUE #( FOR doc_item IN lt_all_document_items WHERE ( PoItemReferenceUUID IS INITIAL )
+               ( HeaderUUID = doc_item-HeaderUUID
+                 ItemCode   = doc_item-ItemCode ) )
     ).
 
     IF lt_duplicates IS INITIAL.
@@ -1950,7 +1977,8 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
     ENDIF.
 
     " Report duplicate errors back to the RAP framework for ALL lines currently involved in duplication
-    LOOP AT lt_all_document_items REFERENCE INTO DATA(lr_doc_item) WHERE ItemCode IS NOT INITIAL.
+    LOOP AT lt_all_document_items REFERENCE INTO DATA(lr_doc_item) WHERE ItemCode            IS NOT INITIAL
+                                                                     AND PoItemReferenceUUID IS INITIAL.
 
       " Check if this specific document line is part of the duplicates found in the full context
       IF line_exists( lt_duplicates[ HeaderUUID = lr_doc_item->HeaderUUID
