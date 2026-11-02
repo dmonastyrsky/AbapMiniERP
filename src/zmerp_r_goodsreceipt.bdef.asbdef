@@ -22,9 +22,10 @@ authorization master ( global )
   field ( readonly ) DocumentNumber;
   field ( readonly ) Status;
   field ( readonly ) TotalNetAmount, TotalGrossAmount;
+  field ( readonly ) CurrencyCode;  // taken from the purchase order (deriveDocFromPurchaseOrder)
   field ( readonly ) CreatedBy, CreatedAt, LocalLastChangedBy, LocalLastChangedAt, LastChangedAt;
 
-  field ( mandatory ) CompanyCode, WarehouseCode, BusinessPartnerCode, CurrencyCode, DocumentDate, PoReferenceUUID;
+  field ( mandatory ) CompanyCode, WarehouseCode, BusinessPartnerCode, DocumentDate, PoReferenceUUID;
 
   action ( features : instance ) postDocument result [1] $self;
   action ( features : instance ) cancelDocument result [1] $self;

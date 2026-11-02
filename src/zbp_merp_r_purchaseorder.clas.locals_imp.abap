@@ -335,7 +335,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
         ) TO reported-purchaseorder.
       ENDIF.
 
-      " 4. Currency Code Mandatory Validation
+      " 4. Currency Code Mandatory & Company Currency Validation
       IF lr_header->CurrencyCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -343,6 +343,22 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
           %state_area           = c_val_currency
           %msg                  = NEW zcx_merp_pur(
                                     textid   = zcx_merp_pur=>select_currency
+                                    severity = if_abap_behv_message=>severity-error )
+          %element-CurrencyCode = if_abap_behv=>mk-on
+        ) TO reported-purchaseorder.
+      " Only the company currency is allowed until currency conversion exists
+      " (goods receipts are valuated in the company currency)
+      ELSEIF line_exists( lt_companies[ CompanyCode = lr_header->CompanyCode ] )
+         AND NOT line_exists( lt_companies[ CompanyCode  = lr_header->CompanyCode
+                                            CurrencyCode = lr_header->CurrencyCode ] ).
+        lv_has_error = abap_true.
+        APPEND VALUE #(
+          %tky                  = lr_header->%tky
+          %state_area           = c_val_currency
+          %msg                  = NEW zcx_merp_pur(
+                                    textid   = zcx_merp_pur=>currency_not_company
+                                    attr1    = CONV string( lr_header->CurrencyCode )
+                                    attr2    = CONV string( lt_companies[ CompanyCode = lr_header->CompanyCode ]-CurrencyCode )
                                     severity = if_abap_behv_message=>severity-error )
           %element-CurrencyCode = if_abap_behv=>mk-on
         ) TO reported-purchaseorder.
@@ -1900,3 +1916,4 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+

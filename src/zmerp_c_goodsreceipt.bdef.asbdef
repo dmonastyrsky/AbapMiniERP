@@ -34,12 +34,11 @@ side effects
         field SupplierReference, field TotalNetAmount, field TotalGrossAmount, field PoDocumentNumber,
         entity _Items, messages;
 
-    field CompanyCode affects field CurrencyCode, field WarehouseCode, field PoReferenceUUID, field PoDocumentNumber,
+    field CompanyCode affects field WarehouseCode, field PoReferenceUUID, field PoDocumentNumber,
         field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
     field BusinessPartnerCode affects field PoReferenceUUID, field PoDocumentNumber, field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
     field WarehouseCode affects field PoReferenceUUID, field PoDocumentNumber, field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
 
-    field CurrencyCode affects entity _Items, messages;
     entity _Items affects field TotalNetAmount, field TotalGrossAmount, entity _Items, messages;
 
     field DocumentDate affects field PostingDate, messages;

@@ -48,6 +48,7 @@ annotate view ZMERP_C_COMPANY_CODE with
     }
   ]
 
+  @EndUserText.label: 'Company Code'
   @UI.textArrangement: #TEXT_SEPARATE
   @UI.lineItem: [{ position: 10, importance: #HIGH }]
   @UI.fieldGroup: [{ qualifier: 'BasicGroup', position: 10 }]
