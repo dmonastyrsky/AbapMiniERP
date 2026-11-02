@@ -201,6 +201,7 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 
   METHOD validateHeaderFields.
     DATA lv_has_error TYPE abap_bool.
+    DATA lo_message   TYPE REF TO if_abap_behv_message.
 
     " Clear the messages of the previous validation run
     reported-purchaseorder = VALUE #(
@@ -239,146 +240,108 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
       VALUE #( FOR header IN lt_headers ( WarehouseCode = header-WarehouseCode ) )
     ).
 
+    " Per field: the first rule that fails gives the message (none if the field is valid)
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       lv_has_error = abap_false.
 
       " 1. Company: mandatory, exists
-      IF lr_header->CompanyCode IS INITIAL.
+      lo_message = COND #(
+        WHEN lr_header->CompanyCode IS INITIAL
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>select_company
+                                 severity = if_abap_behv_message=>severity-error )
+        WHEN NOT line_exists( lt_companies[ CompanyCode = lr_header->CompanyCode ] )
+          THEN NEW zcx_merp_md( textid   = zcx_merp_md=>company_code_not_found
+                                attr1    = CONV string( lr_header->CompanyCode )
+                                severity = if_abap_behv_message=>severity-error ) ).
+
+      IF lo_message IS BOUND.
         lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                 = lr_header->%tky
-          %state_area          = c_val_company
-          %msg                 = NEW zcx_merp_pur(
-                                   textid   = zcx_merp_pur=>select_company
-                                   severity = if_abap_behv_message=>severity-error )
-          %element-CompanyCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
-      ELSEIF NOT line_exists( lt_companies[ CompanyCode = lr_header->CompanyCode ] ).
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                 = lr_header->%tky
-          %state_area          = c_val_company
-          %msg                 = NEW zcx_merp_md(
-                                   textid   = zcx_merp_md=>company_code_not_found
-                                   attr1    = CONV string( lr_header->CompanyCode )
-                                   severity = if_abap_behv_message=>severity-error )
-          %element-CompanyCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
+        APPEND VALUE #( %tky                 = lr_header->%tky
+                        %state_area          = c_val_company
+                        %msg                 = lo_message
+                        %element-CompanyCode = if_abap_behv=>mk-on ) TO reported-purchaseorder.
       ENDIF.
 
       " 2. Partner: mandatory, exists, is a supplier
-      IF lr_header->BusinessPartnerCode IS INITIAL.
+      lo_message = COND #(
+        WHEN lr_header->BusinessPartnerCode IS INITIAL
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>select_business_partner
+                                 severity = if_abap_behv_message=>severity-error )
+        WHEN NOT line_exists( lt_partners[ PartnerCode = lr_header->BusinessPartnerCode ] )
+          THEN NEW zcx_merp_md( textid   = zcx_merp_md=>business_partner_not_found
+                                attr1    = CONV string( lr_header->BusinessPartnerCode )
+                                severity = if_abap_behv_message=>severity-error )
+        WHEN zcl_merp_doc_validator=>is_pur_partner_supplier(
+               lt_partners[ PartnerCode = lr_header->BusinessPartnerCode ]-IsSupplier ) = abap_false
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>bp_is_not_supplier
+                                 attr1    = CONV string( lr_header->BusinessPartnerCode )
+                                 severity = if_abap_behv_message=>severity-error ) ).
+
+      IF lo_message IS BOUND.
         lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                         = lr_header->%tky
-          %state_area                  = c_val_partner
-          %msg                         = NEW zcx_merp_pur(
-                                           textid   = zcx_merp_pur=>select_business_partner
-                                           severity = if_abap_behv_message=>severity-error )
-          %element-BusinessPartnerCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
-      ELSEIF NOT line_exists( lt_partners[ PartnerCode = lr_header->BusinessPartnerCode ] ).
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                         = lr_header->%tky
-          %state_area                  = c_val_partner
-          %msg                 = NEW zcx_merp_md(
-                                   textid   = zcx_merp_md=>business_partner_not_found
-                                   attr1    = CONV string( lr_header->BusinessPartnerCode )
-                                   severity = if_abap_behv_message=>severity-error )
-          %element-BusinessPartnerCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
-      ELSEIF zcl_merp_doc_validator=>is_pur_partner_supplier(
-               lt_partners[ PartnerCode = lr_header->BusinessPartnerCode ]-IsSupplier ) = abap_false.
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                         = lr_header->%tky
-          %state_area                  = c_val_partner
-          %msg                         = NEW zcx_merp_pur(
-                                           textid   = zcx_merp_pur=>bp_is_not_supplier
-                                           attr1    = CONV string( lr_header->BusinessPartnerCode )
-                                           severity = if_abap_behv_message=>severity-error )
-          %element-BusinessPartnerCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
+        APPEND VALUE #( %tky                         = lr_header->%tky
+                        %state_area                  = c_val_partner
+                        %msg                         = lo_message
+                        %element-BusinessPartnerCode = if_abap_behv=>mk-on ) TO reported-purchaseorder.
       ENDIF.
 
       " 3. Warehouse: mandatory, exists, belongs to the company
-      IF lr_header->WarehouseCode IS INITIAL.
+      lo_message = COND #(
+        WHEN lr_header->WarehouseCode IS INITIAL
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>select_warehouse
+                                 severity = if_abap_behv_message=>severity-error )
+        WHEN NOT line_exists( lt_warehouses[ WarehouseCode = lr_header->WarehouseCode ] )
+          THEN NEW zcx_merp_md( textid   = zcx_merp_md=>warehouse_not_found
+                                attr1    = CONV string( lr_header->WarehouseCode )
+                                severity = if_abap_behv_message=>severity-error )
+        WHEN lr_header->CompanyCode IS NOT INITIAL
+         AND lt_warehouses[ WarehouseCode = lr_header->WarehouseCode ]-CompanyCode <> lr_header->CompanyCode
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>warehouse_company_mismatch
+                                 attr1    = CONV string( lr_header->WarehouseCode )
+                                 attr2    = CONV string( lr_header->CompanyCode )
+                                 severity = if_abap_behv_message=>severity-error ) ).
+
+      IF lo_message IS BOUND.
         lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                   = lr_header->%tky
-          %state_area            = c_val_warehouse
-          %msg                   = NEW zcx_merp_pur(
-                                     textid   = zcx_merp_pur=>select_warehouse
-                                     severity = if_abap_behv_message=>severity-error )
-          %element-WarehouseCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
-      ELSEIF NOT line_exists( lt_warehouses[ WarehouseCode = lr_header->WarehouseCode ] ).
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                   = lr_header->%tky
-          %state_area            = c_val_warehouse
-          %msg                 = NEW zcx_merp_md(
-                                   textid   = zcx_merp_md=>warehouse_not_found
-                                   attr1    = CONV string( lr_header->WarehouseCode )
-                                   severity = if_abap_behv_message=>severity-error )
-          %element-WarehouseCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
-      ELSEIF lr_header->CompanyCode IS NOT INITIAL AND lt_warehouses[ WarehouseCode = lr_header->WarehouseCode ]-CompanyCode <> lr_header->CompanyCode.
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                   = lr_header->%tky
-          %state_area            = c_val_warehouse
-          %msg                   = NEW zcx_merp_pur(
-                                     textid   = zcx_merp_pur=>warehouse_company_mismatch
-                                     attr1    = CONV string( lr_header->WarehouseCode )
-                                     attr2    = CONV string( lr_header->CompanyCode )
-                                     severity = if_abap_behv_message=>severity-error )
-          %element-WarehouseCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
+        APPEND VALUE #( %tky                   = lr_header->%tky
+                        %state_area            = c_val_warehouse
+                        %msg                   = lo_message
+                        %element-WarehouseCode = if_abap_behv=>mk-on ) TO reported-purchaseorder.
       ENDIF.
 
       " 4. Currency: mandatory, equals the company currency
-      IF lr_header->CurrencyCode IS INITIAL.
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                  = lr_header->%tky
-          %state_area           = c_val_currency
-          %msg                  = NEW zcx_merp_pur(
-                                    textid   = zcx_merp_pur=>select_currency
-                                    severity = if_abap_behv_message=>severity-error )
-          %element-CurrencyCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
-      " Only the company currency is allowed until currency conversion exists
-      " (goods receipts are valuated in the company currency)
-      ELSEIF line_exists( lt_companies[ CompanyCode = lr_header->CompanyCode ] )
+      "    (only the company currency is allowed until currency conversion exists, D1)
+      lo_message = COND #(
+        WHEN lr_header->CurrencyCode IS INITIAL
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>select_currency
+                                 severity = if_abap_behv_message=>severity-error )
+        WHEN line_exists( lt_companies[ CompanyCode = lr_header->CompanyCode ] )
          AND NOT line_exists( lt_companies[ CompanyCode  = lr_header->CompanyCode
-                                            CurrencyCode = lr_header->CurrencyCode ] ).
+                                            CurrencyCode = lr_header->CurrencyCode ] )
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>currency_not_company
+                                 attr1    = CONV string( lr_header->CurrencyCode )
+                                 attr2    = CONV string( lt_companies[ CompanyCode = lr_header->CompanyCode ]-CurrencyCode )
+                                 severity = if_abap_behv_message=>severity-error ) ).
+
+      IF lo_message IS BOUND.
         lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                  = lr_header->%tky
-          %state_area           = c_val_currency
-          %msg                  = NEW zcx_merp_pur(
-                                    textid   = zcx_merp_pur=>currency_not_company
-                                    attr1    = CONV string( lr_header->CurrencyCode )
-                                    attr2    = CONV string( lt_companies[ CompanyCode = lr_header->CompanyCode ]-CurrencyCode )
-                                    severity = if_abap_behv_message=>severity-error )
-          %element-CurrencyCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
+        APPEND VALUE #( %tky                  = lr_header->%tky
+                        %state_area           = c_val_currency
+                        %msg                  = lo_message
+                        %element-CurrencyCode = if_abap_behv=>mk-on ) TO reported-purchaseorder.
       ENDIF.
 
       " Any error fails the instance
       IF lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky        = lr_header->%tky
-          %fail-cause = if_abap_behv=>cause-unspecific
-        ) TO failed-purchaseorder.
+        APPEND VALUE #( %tky        = lr_header->%tky
+                        %fail-cause = if_abap_behv=>cause-unspecific ) TO failed-purchaseorder.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
 
   METHOD validateDates.
     DATA lv_has_error TYPE abap_bool.
+    DATA lo_message   TYPE REF TO if_abap_behv_message.
 
     " Clear the messages of the previous validation run
     reported-purchaseorder = VALUE #(
@@ -404,106 +367,77 @@ CLASS lhc_zmerp_r_purchaseorder IMPLEMENTATION.
 
     DATA(lv_today) = cl_abap_context_info=>get_system_date( ).
 
+    " Per field: the first rule that fails gives the message (none if the field is valid)
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       lv_has_error = abap_false.
 
       " 1. Document date: mandatory, not in the future
-      IF lr_header->DocumentDate IS INITIAL.
+      lo_message = COND #(
+        WHEN lr_header->DocumentDate IS INITIAL
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>enter_document_date
+                                 severity = if_abap_behv_message=>severity-error )
+        WHEN zcl_merp_doc_validator=>is_document_date_valid( iv_doc_date = lr_header->DocumentDate
+                                                             iv_today    = lv_today ) = abap_false
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>document_date_future_invalid
+                                 severity = if_abap_behv_message=>severity-error ) ).
+
+      IF lo_message IS BOUND.
         lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                  = lr_header->%tky
-          %state_area           = c_val_doc_date
-          %msg                  = NEW zcx_merp_pur(
-                                    textid   = zcx_merp_pur=>enter_document_date
-                                    severity = if_abap_behv_message=>severity-error )
-          %element-DocumentDate = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
-      ELSEIF zcl_merp_doc_validator=>is_document_date_valid( iv_doc_date = lr_header->DocumentDate
-                                                             iv_today    = lv_today ) = abap_false.
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                  = lr_header->%tky
-          %state_area           = c_val_doc_date
-          %msg                  = NEW zcx_merp_pur(
-                                    textid   = zcx_merp_pur=>document_date_future_invalid
-                                    severity = if_abap_behv_message=>severity-error )
-          %element-DocumentDate = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
+        APPEND VALUE #( %tky                  = lr_header->%tky
+                        %state_area           = c_val_doc_date
+                        %msg                  = lo_message
+                        %element-DocumentDate = if_abap_behv=>mk-on ) TO reported-purchaseorder.
       ENDIF.
 
       " 2. Posting date: mandatory, not in the future, not before the document date
-      IF lr_header->PostingDate IS INITIAL.
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                 = lr_header->%tky
-          %state_area          = c_val_post_date
-          %msg                 = NEW zcx_merp_pur(
-                                   textid   = zcx_merp_pur=>enter_posting_date
-                                   severity = if_abap_behv_message=>severity-error )
-          %element-PostingDate = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
-      ELSEIF zcl_merp_doc_validator=>is_posting_date_not_future( iv_post_date = lr_header->PostingDate
-                                                                 iv_today     = lv_today ) = abap_false.
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                 = lr_header->%tky
-          %state_area          = c_val_post_date
-          %msg                 = NEW zcx_merp_pur(
-                                   textid   = zcx_merp_pur=>posting_date_future_invalid
-                                   severity = if_abap_behv_message=>severity-error )
-          %element-PostingDate = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
-      ELSEIF lr_header->DocumentDate IS NOT INITIAL
+      lo_message = COND #(
+        WHEN lr_header->PostingDate IS INITIAL
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>enter_posting_date
+                                 severity = if_abap_behv_message=>severity-error )
+        WHEN zcl_merp_doc_validator=>is_posting_date_not_future( iv_post_date = lr_header->PostingDate
+                                                                 iv_today     = lv_today ) = abap_false
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>posting_date_future_invalid
+                                 severity = if_abap_behv_message=>severity-error )
+        WHEN lr_header->DocumentDate IS NOT INITIAL
          AND zcl_merp_doc_validator=>is_posting_date_valid( iv_doc_date  = lr_header->DocumentDate
-                                                            iv_post_date = lr_header->PostingDate ) = abap_false.
+                                                            iv_post_date = lr_header->PostingDate ) = abap_false
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>posting_date_sequence_invalid
+                                 severity = if_abap_behv_message=>severity-error ) ).
+
+      IF lo_message IS BOUND.
         lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                 = lr_header->%tky
-          %state_area          = c_val_post_date
-          %msg                 = NEW zcx_merp_pur(
-                                   textid   = zcx_merp_pur=>posting_date_sequence_invalid
-                                   severity = if_abap_behv_message=>severity-error )
-          %element-PostingDate = if_abap_behv=>mk-on
-        ) TO reported-purchaseorder.
+        APPEND VALUE #( %tky                 = lr_header->%tky
+                        %state_area          = c_val_post_date
+                        %msg                 = lo_message
+                        %element-PostingDate = if_abap_behv=>mk-on ) TO reported-purchaseorder.
       ENDIF.
 
       " 3. Delivery date (optional): not in the past while New, not before the document date
-      IF lr_header->DeliveryDate IS NOT INITIAL.
-        IF zcl_merp_doc_po_lifecycle=>is_delivery_date_actual( iv_status    = lr_header->Status
-                                                           iv_delivery_date = lr_header->DeliveryDate
-                                                           iv_today         = lv_today ) = abap_false.
-          lv_has_error = abap_true.
-          APPEND VALUE #(
-            %tky                  = lr_header->%tky
-            %state_area           = c_val_deliv_date
-            %msg                  = NEW zcx_merp_pur(
-                                      textid   = zcx_merp_pur=>delivery_date_past_invalid
-                                      severity = if_abap_behv_message=>severity-error )
-            %element-DeliveryDate = if_abap_behv=>mk-on
-          ) TO reported-purchaseorder.
-        ENDIF.
+      lo_message = COND #(
+        WHEN lr_header->DeliveryDate IS NOT INITIAL
+         AND zcl_merp_doc_po_lifecycle=>is_delivery_date_actual( iv_status        = lr_header->Status
+                                                                 iv_delivery_date = lr_header->DeliveryDate
+                                                                 iv_today         = lv_today ) = abap_false
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>delivery_date_past_invalid
+                                 severity = if_abap_behv_message=>severity-error )
+        WHEN lr_header->DeliveryDate IS NOT INITIAL AND lr_header->DocumentDate IS NOT INITIAL
+         AND zcl_merp_doc_validator=>is_delivery_date_valid( iv_doc_date   = lr_header->DocumentDate
+                                                             iv_deliv_date = lr_header->DeliveryDate ) = abap_false
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>delivery_date_before_doc_date
+                                 severity = if_abap_behv_message=>severity-error ) ).
 
-        IF lr_header->DocumentDate IS NOT INITIAL
-           AND zcl_merp_doc_validator=>is_delivery_date_valid( iv_doc_date = lr_header->DocumentDate
-                                                               iv_deliv_date = lr_header->DeliveryDate ) = abap_false.
-          lv_has_error = abap_true.
-          APPEND VALUE #(
-            %tky                  = lr_header->%tky
-            %state_area           = c_val_deliv_date
-            %msg                  = NEW zcx_merp_pur(
-                                      textid   = zcx_merp_pur=>delivery_date_before_doc_date
-                                      severity = if_abap_behv_message=>severity-error )
-            %element-DeliveryDate = if_abap_behv=>mk-on
-          ) TO reported-purchaseorder.
-        ENDIF.
+      IF lo_message IS BOUND.
+        lv_has_error = abap_true.
+        APPEND VALUE #( %tky                  = lr_header->%tky
+                        %state_area           = c_val_deliv_date
+                        %msg                  = lo_message
+                        %element-DeliveryDate = if_abap_behv=>mk-on ) TO reported-purchaseorder.
       ENDIF.
 
       " Any error fails the instance
       IF lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky        = lr_header->%tky
-          %fail-cause = if_abap_behv=>cause-unspecific
-        ) TO failed-purchaseorder.
+        APPEND VALUE #( %tky        = lr_header->%tky
+                        %fail-cause = if_abap_behv=>cause-unspecific ) TO failed-purchaseorder.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
@@ -1329,6 +1263,7 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
 
   METHOD validateItemFields.
     DATA lv_has_error TYPE abap_bool.
+    DATA lo_message   TYPE REF TO if_abap_behv_message.
 
     READ ENTITIES OF zmerp_r_purchaseorder IN LOCAL MODE
       ENTITY PurchaseOrderItem
@@ -1386,130 +1321,107 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
       VALUE #( FOR item IN lt_items ( VatCode = item-VatCode ) )
     ).
 
+    " Per field: the first rule that fails gives the message (none if the field is valid)
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       lv_has_error = abap_false.
 
       " 1. Item: mandatory, exists, not twice in the document
-      IF lr_item->ItemCode IS INITIAL.
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky              = lr_item->%tky
-          %path             = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
-                                       PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
-          %state_area       = c_val_item_code
-          %msg              = NEW zcx_merp_pur(
-                                textid   = zcx_merp_pur=>select_item
-                                severity = if_abap_behv_message=>severity-error )
-          %element-ItemCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorderitem.
-      ELSEIF NOT line_exists( lt_items_master[ ItemCode = lr_item->ItemCode ] ).
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky              = lr_item->%tky
-          %path             = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
-                                       PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
-          %state_area       = c_val_item_code
-          %msg              = NEW zcx_merp_md(
-                                textid   = zcx_merp_md=>item_not_found
+      lo_message = COND #(
+        WHEN lr_item->ItemCode IS INITIAL
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>select_item
+                                 severity = if_abap_behv_message=>severity-error )
+        WHEN NOT line_exists( lt_items_master[ ItemCode = lr_item->ItemCode ] )
+          THEN NEW zcx_merp_md( textid   = zcx_merp_md=>item_not_found
                                 attr1    = CONV string( lr_item->ItemCode )
                                 severity = if_abap_behv_message=>severity-error )
-          %element-ItemCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorderitem.
-      ELSEIF line_exists( lt_duplicates[ HeaderUUID = lr_item->HeaderUUID
-                                         ItemCode   = lr_item->ItemCode ] ).
+        WHEN line_exists( lt_duplicates[ HeaderUUID = lr_item->HeaderUUID
+                                         ItemCode   = lr_item->ItemCode ] )
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>item_duplicate_invalid
+                                 attr1    = CONV string( lr_item->ItemCode )
+                                 severity = if_abap_behv_message=>severity-error ) ).
+
+      IF lo_message IS BOUND.
         lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky              = lr_item->%tky
-          %path             = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
-                                       PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
-          %state_area       = c_val_item_code
-          %msg              = NEW zcx_merp_pur(
-                                textid   = zcx_merp_pur=>item_duplicate_invalid
-                                attr1    = CONV string( lr_item->ItemCode )
-                                severity = if_abap_behv_message=>severity-error )
-          %element-ItemCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorderitem.
+        APPEND VALUE #( %tky              = lr_item->%tky
+                        %path             = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
+                                                     PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
+                        %state_area       = c_val_item_code
+                        %msg              = lo_message
+                        %element-ItemCode = if_abap_behv=>mk-on ) TO reported-purchaseorderitem.
       ENDIF.
 
       " 2. Quantity: greater than zero
-      IF zcl_merp_doc_validator=>is_item_quantity_valid( lr_item->Quantity ) = abap_false.
+      lo_message = COND #(
+        WHEN zcl_merp_doc_validator=>is_item_quantity_valid( lr_item->Quantity ) = abap_false
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>quantity_must_be_positive
+                                 severity = if_abap_behv_message=>severity-error ) ).
+
+      IF lo_message IS BOUND.
         lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky              = lr_item->%tky
-          %path             = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
-                                       PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
-          %state_area       = c_val_quantity
-          %msg              = NEW zcx_merp_pur(
-                                textid   = zcx_merp_pur=>quantity_must_be_positive
-                                severity = if_abap_behv_message=>severity-error )
-          %element-Quantity = if_abap_behv=>mk-on
-        ) TO reported-purchaseorderitem.
+        APPEND VALUE #( %tky              = lr_item->%tky
+                        %path             = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
+                                                     PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
+                        %state_area       = c_val_quantity
+                        %msg              = lo_message
+                        %element-Quantity = if_abap_behv=>mk-on ) TO reported-purchaseorderitem.
       ENDIF.
 
       " 3. Price: greater than zero
-      IF zcl_merp_doc_validator=>is_item_price_valid( lr_item->Price ) = abap_false.
+      lo_message = COND #(
+        WHEN zcl_merp_doc_validator=>is_item_price_valid( lr_item->Price ) = abap_false
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>price_must_be_positive
+                                 severity = if_abap_behv_message=>severity-error ) ).
+
+      IF lo_message IS BOUND.
         lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky           = lr_item->%tky
-          %path          = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
-                                    PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
-          %state_area    = c_val_price
-          %msg           = NEW zcx_merp_pur(
-                             textid   = zcx_merp_pur=>price_must_be_positive
-                             severity = if_abap_behv_message=>severity-error )
-          %element-Price = if_abap_behv=>mk-on
-        ) TO reported-purchaseorderitem.
+        APPEND VALUE #( %tky           = lr_item->%tky
+                        %path          = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
+                                                  PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
+                        %state_area    = c_val_price
+                        %msg           = lo_message
+                        %element-Price = if_abap_behv=>mk-on ) TO reported-purchaseorderitem.
       ENDIF.
 
       " 4. Unit of measure: mandatory
-      IF lr_item->UnitOfMeasure IS INITIAL.
+      lo_message = COND #(
+        WHEN lr_item->UnitOfMeasure IS INITIAL
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>select_unit_of_measure
+                                 severity = if_abap_behv_message=>severity-error ) ).
+
+      IF lo_message IS BOUND.
         lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky                   = lr_item->%tky
-          %path                  = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
-                                            PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
-          %state_area            = c_val_uom
-          %msg                   = NEW zcx_merp_pur(
-                                     textid   = zcx_merp_pur=>select_unit_of_measure
-                                     severity = if_abap_behv_message=>severity-error )
-          %element-UnitOfMeasure = if_abap_behv=>mk-on
-        ) TO reported-purchaseorderitem.
+        APPEND VALUE #( %tky                   = lr_item->%tky
+                        %path                  = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
+                                                          PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
+                        %state_area            = c_val_uom
+                        %msg                   = lo_message
+                        %element-UnitOfMeasure = if_abap_behv=>mk-on ) TO reported-purchaseorderitem.
       ENDIF.
 
       " 5. VAT code: mandatory, exists
-      IF lr_item->VatCode IS INITIAL.
+      lo_message = COND #(
+        WHEN lr_item->VatCode IS INITIAL
+          THEN NEW zcx_merp_pur( textid   = zcx_merp_pur=>select_vat_code
+                                 severity = if_abap_behv_message=>severity-error )
+        WHEN NOT line_exists( lt_vat_rates[ VatCode = lr_item->VatCode ] )
+          THEN NEW zcx_merp_md( textid   = zcx_merp_md=>vat_code_not_found
+                                attr1    = CONV string( lr_item->VatCode )
+                                severity = if_abap_behv_message=>severity-error ) ).
+
+      IF lo_message IS BOUND.
         lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky             = lr_item->%tky
-          %path            = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
-                                      PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
-          %state_area      = c_val_vat_code
-          %msg             = NEW zcx_merp_pur(
-                               textid   = zcx_merp_pur=>select_vat_code
-                               severity = if_abap_behv_message=>severity-error )
-          %element-VatCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorderitem.
-      ELSEIF NOT line_exists( lt_vat_rates[ VatCode = lr_item->VatCode ] ).
-        lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky             = lr_item->%tky
-          %path            = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
-                                      PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
-          %state_area      = c_val_vat_code
-          %msg             = NEW zcx_merp_md(
-                               textid   = zcx_merp_md=>vat_code_not_found
-                               attr1    = CONV string( lr_item->VatCode )
-                               severity = if_abap_behv_message=>severity-error )
-          %element-VatCode = if_abap_behv=>mk-on
-        ) TO reported-purchaseorderitem.
+        APPEND VALUE #( %tky             = lr_item->%tky
+                        %path            = VALUE #( PurchaseOrder-%is_draft    = lr_item->%is_draft
+                                                    PurchaseOrder-DocumentUUID = lr_item->HeaderUUID )
+                        %state_area      = c_val_vat_code
+                        %msg             = lo_message
+                        %element-VatCode = if_abap_behv=>mk-on ) TO reported-purchaseorderitem.
       ENDIF.
 
       " Any error fails the instance
       IF lv_has_error = abap_true.
-        APPEND VALUE #(
-          %tky        = lr_item->%tky
-          %fail-cause = if_abap_behv=>cause-unspecific
-        ) TO failed-purchaseorderitem.
+        APPEND VALUE #( %tky        = lr_item->%tky
+                        %fail-cause = if_abap_behv=>cause-unspecific ) TO failed-purchaseorderitem.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
@@ -1851,4 +1763,5 @@ CLASS lhc_zmerp_r_purchaseorderitm IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 
