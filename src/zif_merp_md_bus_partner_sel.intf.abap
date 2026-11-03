@@ -14,6 +14,7 @@ INTERFACE zif_merp_md_bus_partner_sel
            UsedInEntity   TYPE zmerp_entity_name,
            UsedAsSupplier TYPE abap_boolean,
            UsedAsCustomer TYPE abap_boolean,
+           IsDocument   TYPE abap_boolean,
          END OF ty_usage,
          tt_usages TYPE SORTED TABLE OF ty_usage WITH UNIQUE KEY PartnerCode UsedInEntity.
 

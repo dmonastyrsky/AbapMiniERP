@@ -12,6 +12,7 @@ INTERFACE zif_merp_md_warehouse_sel
   TYPES: BEGIN OF ty_usage,
            WarehouseCode TYPE zmerp_r_warehouse-WarehouseCode,
            UsedInEntity  TYPE zmerp_entity_name,
+           IsDocument   TYPE abap_boolean,
          END OF ty_usage,
          tt_usages TYPE SORTED TABLE OF ty_usage WITH UNIQUE KEY WarehouseCode UsedInEntity.
 

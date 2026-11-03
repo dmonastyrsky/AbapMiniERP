@@ -8,7 +8,8 @@ define view entity ZMERP_I_WAREHOUSE_USAGE
   key WarehouseCode                                    as WarehouseCode,
   key DocumentUUID                                     as DocumentUUID,
   key cast( bintohex( DocumentUUID ) as abap.char(40) ) as RefEntityKey,
-  key cast( 'Purchase Order' as zmerp_entity_name )    as UsedInEntity
+  key cast( 'Purchase Order' as zmerp_entity_name )    as UsedInEntity,
+      cast( 'X' as abap_boolean preserving type )       as IsDocument
 }
 where WarehouseCode is not initial
 
@@ -17,6 +18,7 @@ union all select from ZMERP_R_GOODSRECEIPT
   key WarehouseCode                                    as WarehouseCode,
   key DocumentUUID                                     as DocumentUUID,
   key cast( bintohex( DocumentUUID ) as abap.char(40) ) as RefEntityKey,
-  key cast( 'Goods Receipt' as zmerp_entity_name )     as UsedInEntity
+  key cast( 'Goods Receipt' as zmerp_entity_name )     as UsedInEntity,
+      cast( 'X' as abap_boolean preserving type )       as IsDocument
 }
 where WarehouseCode is not initial

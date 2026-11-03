@@ -53,7 +53,7 @@ CLASS zcl_merp_md_item_sel IMPLEMENTATION.
     ENDIF.
 
     " DISTINCT: one row per code and using entity, however many documents use the code
-    SELECT DISTINCT usage~ItemCode, usage~UsedInEntity
+    SELECT DISTINCT usage~ItemCode, usage~UsedInEntity, usage~IsDocument
       FROM zmerp_i_item_usage AS usage
       INNER JOIN @lt_clean_keys AS keys ON usage~ItemCode = keys~ItemCode
       INTO CORRESPONDING FIELDS OF TABLE @rt_usages.
