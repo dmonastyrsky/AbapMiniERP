@@ -814,6 +814,29 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
                                                ( item_no = 5 quantity = 10 price = '30.00' ) ) )
       out   = out ).
 
+    " PO 7 (3000, Samsung): not released -> 'New'
+    DATA(lv_po7) = create_purchase_order(
+      is_po = VALUE #( company_code = '3000' warehouse_no = 9 partner_no = 4
+                       days_ago     = 1      delivery_in  = 7
+                       responsible  = 'WEBER_J'
+                       remarks      = 'TV season stock'
+                       release      = abap_false
+                       lines        = VALUE #( ( item_no = 7  quantity = 3  price = '599.99' )
+                                               ( item_no = 10 quantity = 3  price = '10.00' )
+                                               ( item_no = 14 quantity = 3  price = '100.00' ) ) )
+      out   = out ).
+
+    create_goods_receipt(
+      is_gr = VALUE #( po_uuid     = lv_po1
+                       days_ago    = 1
+                       responsible = 'WEBER_J'
+                       remarks     = 'Delivery 1 of 2: 1 TV with warranty follows'
+                       post        = abap_true
+                       lines       = VALUE #( ( item_no = 7  quantity = 2 )
+                                              ( item_no = 10 quantity = 2 )
+                                              ( item_no = 14 quantity = 2 ) ) )
+      out   = out ).
+
     " Summary: resulting purchase order statuses
     SELECT document_number, status
       FROM zmerp_po_hdr

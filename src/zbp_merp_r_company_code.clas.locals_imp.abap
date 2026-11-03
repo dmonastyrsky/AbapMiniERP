@@ -401,10 +401,9 @@ ENDCLASS.
 CLASS lsc_zmerp_r_company_code IMPLEMENTATION.
 
   METHOD save_modified.
-    " Same synchronization as in the seed: the level follows the documents of the company (none yet)
+    " A new company has no documents yet: its document intervals start at level zero
     LOOP AT create-companycode REFERENCE INTO DATA(lr_company).
-      zcl_merp_num_range_util=>sync_po_interval_from_db( iv_company_code = lr_company->CompanyCode ).
-      zcl_merp_num_range_util=>sync_gr_interval_from_db( iv_company_code = lr_company->CompanyCode ).
+      zcl_merp_nro_admin_util=>reset_company_doc_intervals( lr_company->CompanyCode ).
     ENDLOOP.
   ENDMETHOD.
 
