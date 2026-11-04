@@ -837,12 +837,15 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
   METHOD setup_documents.
     " Readable amounts: every line (also of a partial receipt) has a net amount that is a multiple of 100,
-    " so VAT (19% / 7%) and gross amounts have no cents. The only exception is the TV in PO 1:
-    " it shows how the last receipt closes the rounding cents of a purchase order item.
-    "   PO line 3 x 1199.99 at 19% VAT = 3599.97 net, VAT 683.9943 -> 683.99
-    "   GR 1:  2 TVs                   = 2399.98 net, VAT 455.9962 -> 456.00
-    "   GR 2:  last TV                 = 1199.99 net, VAT 227.9981 -> 228.00 by calculation,
-    "                                    but takes the open VAT 683.99 - 456.00 = 227.99 -> PO item closed to 0.00
+    " so VAT (19% / 7%) and gross amounts have no cents. Two exceptions show how the last receipt closes
+    " the rounding cents of a purchase order item:
+    "   PO 1: TV 3 x 1199.99 at 19% VAT = 3599.97 net, VAT 683.9943 -> 683.99
+    "     GR 1:  2 TVs = 2399.98 net, VAT 455.9962 -> 456.00
+    "     GR 2:  last TV = 1199.99 net, VAT 227.9981 -> 228.00 by calculation,
+    "            but takes the open VAT 683.99 - 456.00 = 227.99 -> PO item closed to 0.00
+    "   PO 7: TV 4 x 599.99 at 19% VAT = 2399.96 net, VAT 455.9924 -> 455.99
+    "     GR 1:  2 TVs = 1199.98 net, VAT 228.00;  GR 2: 1 TV = 599.99 net, VAT 114.00
+    "     The last TV stays open for a live demo: 114.00 by calculation, takes 455.99 - 342.00 = 113.99
     " Units: EA for goods, H for services charged by the hour (units of the SAP standard).
 
     " PO 1 (1000, Samsung): received completely by two goods receipts -> 'Completed'
@@ -974,16 +977,17 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       is_codes = is_codes
       out      = out ).
 
-    " PO 7 (3000, Samsung): partially received -> 'In Delivery' (1 TV, 1 cable and 1 h warranty open)
+    " PO 7 (3000, Samsung): two partial receipts -> 'In Delivery'
+    "   (1 TV, 1 cable and 1 h warranty stay open for a live demo of the cents case, see above)
     DATA(lv_po7) = create_purchase_order(
       is_po = VALUE #( company_no   = 3      warehouse_no = 9 partner_no = 4
                        days_ago     = 1      delivery_in  = 7
                        responsible  = 'WEBER_J'
                        remarks      = 'TV season stock'
                        release      = abap_true
-                       lines        = VALUE #( ( item_no = 7  quantity = 3  price = '599.99' )
-                                               ( item_no = 10 quantity = 3  price = '10.00' )
-                                               ( item_no = 14 quantity = 3  price = '100.00' ) ) )
+                       lines        = VALUE #( ( item_no = 7  quantity = 4  price = '599.99' )
+                                               ( item_no = 10 quantity = 4  price = '10.00' )
+                                               ( item_no = 14 quantity = 4  price = '100.00' ) ) )
       is_codes = is_codes
       out      = out ).
 
@@ -991,11 +995,23 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       is_gr = VALUE #( po_uuid     = lv_po7
                        days_ago    = 1
                        responsible = 'WEBER_J'
-                       remarks     = 'Partial delivery: 1 TV, 1 cable and 1 h warranty follow'
+                       remarks     = 'Delivery 1: 2 TVs, 2 cables and 2 h warranty'
                        post        = abap_true
                        lines       = VALUE #( ( item_no = 7  quantity = 2 )
                                               ( item_no = 10 quantity = 2 )
                                               ( item_no = 14 quantity = 2 ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    create_goods_receipt(
+      is_gr = VALUE #( po_uuid     = lv_po7
+                       days_ago    = 0
+                       responsible = 'WEBER_J'
+                       remarks     = 'Delivery 2: 1 TV, 1 cable and 1 h warranty; the rest follows'
+                       post        = abap_true
+                       lines       = VALUE #( ( item_no = 7  quantity = 1 )
+                                              ( item_no = 10 quantity = 1 )
+                                              ( item_no = 14 quantity = 1 ) ) )
       is_codes = is_codes
       out      = out ).
 
