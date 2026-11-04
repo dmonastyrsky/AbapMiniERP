@@ -6,7 +6,7 @@ CLASS zcl_merp_num_range_util DEFINITION
   PUBLIC SECTION.
 
     " Bulk NRO Generation Methods
-    "! Generates multiple sequential Business Partner codes using NRO API with DB fallback.
+    "! Generates multiple sequential Business Partner codes via NRO.
     "! @parameter iv_count | Total count of sequential codes requested
     "! @parameter rt_codes | Table of generated formatted Business Partner codes
     CLASS-METHODS get_next_bp_codes_nro
@@ -17,7 +17,7 @@ CLASS zcl_merp_num_range_util DEFINITION
       RAISING
         cx_number_ranges.
 
-    "! Generates multiple sequential Item codes using NRO API with DB fallback.
+    "! Generates multiple sequential Item codes via NRO.
     "! @parameter iv_count | Total count of sequential codes requested
     "! @parameter rt_codes | Table of generated formatted Item codes
     CLASS-METHODS get_next_item_codes_nro
@@ -28,7 +28,7 @@ CLASS zcl_merp_num_range_util DEFINITION
       RAISING
         cx_number_ranges.
 
-    "! Generates multiple sequential Item Group codes using NRO API with DB fallback.
+    "! Generates multiple sequential Item Group codes via NRO.
     "! @parameter iv_count | Total count of sequential codes requested
     "! @parameter rt_codes | Table of generated formatted Item Group codes
     CLASS-METHODS get_next_item_grp_codes_nro
@@ -39,7 +39,7 @@ CLASS zcl_merp_num_range_util DEFINITION
       RAISING
         cx_number_ranges.
 
-    "! Generates multiple sequential VAT codes using NRO API with DB fallback.
+    "! Generates multiple sequential VAT codes via NRO.
     "! @parameter iv_count | Total count of sequential codes requested
     "! @parameter rt_codes | Table of generated formatted VAT codes
     CLASS-METHODS get_next_vat_codes_nro
@@ -50,7 +50,7 @@ CLASS zcl_merp_num_range_util DEFINITION
       RAISING
         cx_number_ranges.
 
-    "! Generates multiple sequential Warehouse codes using NRO API with DB fallback.
+    "! Generates multiple sequential Warehouse codes via NRO.
     "! @parameter iv_count | Total count of sequential codes requested
     "! @parameter rt_codes | Table of generated formatted Warehouse codes
     CLASS-METHODS get_next_wh_codes_nro
@@ -61,7 +61,7 @@ CLASS zcl_merp_num_range_util DEFINITION
       RAISING
         cx_number_ranges.
 
-    "! Generates multiple sequential Purchase Order numbers using NRO API with DB fallback.
+    "! Generates multiple sequential Purchase Order numbers via NRO.
     "! @parameter iv_company_code | Company code context
     "! @parameter iv_count        | Total count of sequential numbers requested
     "! @parameter rt_numbers      | Table of generated formatted Purchase Order numbers
@@ -74,7 +74,7 @@ CLASS zcl_merp_num_range_util DEFINITION
       RAISING
         cx_number_ranges.
 
-    "! Generates multiple sequential Goods Receipt numbers using NRO API with DB fallback.
+    "! Generates multiple sequential Goods Receipt numbers via NRO.
     "! @parameter iv_company_code | Company code context
     "! @parameter iv_count        | Total count of sequential numbers requested
     "! @parameter rt_numbers      | Table of generated formatted Goods Receipt numbers
@@ -134,7 +134,7 @@ CLASS zcl_merp_num_range_util DEFINITION
       RETURNING
         VALUE(rv_prefix) TYPE string.
 
-    "! Several master data codes: NRO with fallback to the database max search.
+    "! Several master data codes via NRO (no fallback, N1).
     CLASS-METHODS get_next_codes_nro
       IMPORTING
         is_meta         TYPE zif_merp_constants=>ty_entity_metadata
@@ -144,7 +144,7 @@ CLASS zcl_merp_num_range_util DEFINITION
       RAISING
         cx_number_ranges.
 
-    "! Several document numbers of a company code: NRO with fallback to the database max search.
+    "! Several document numbers of a company code via NRO (no fallback, N1).
     CLASS-METHODS get_next_doc_numbers_nro
       IMPORTING
         is_meta           TYPE zif_merp_constants=>ty_entity_metadata
@@ -356,13 +356,10 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     DATA(lv_prefix_upper) = cl_abap_dyn_prg=>escape_quotes( to_upper( iv_prefix ) ).
     DATA(lv_prefix_lower) = cl_abap_dyn_prg=>escape_quotes( to_lower( iv_prefix ) ).
 
-    DATA(lv_comp_field) = COND string(
-      WHEN to_lower( iv_table ) CS '_d' THEN 'companycode'
-      ELSE 'company_code' ).
-
+    " Only active tables are read (C1): their company field is COMPANY_CODE
     DATA(lv_company_filter) = COND string(
       WHEN iv_company_code IS NOT INITIAL
-      THEN | AND { lv_comp_field } = '{ cl_abap_dyn_prg=>escape_quotes( CONV string( iv_company_code ) ) }'|
+      THEN | AND company_code = '{ cl_abap_dyn_prg=>escape_quotes( CONV string( iv_company_code ) ) }'|
       ELSE '' ).
 
     TRY.
