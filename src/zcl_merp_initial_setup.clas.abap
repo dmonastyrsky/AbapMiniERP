@@ -974,13 +974,13 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       is_codes = is_codes
       out      = out ).
 
-    " PO 7 (3000, Samsung): not released -> 'New'
+    " PO 7 (3000, Samsung): partially received -> 'In Delivery' (1 TV, 1 cable and 1 h warranty open)
     DATA(lv_po7) = create_purchase_order(
       is_po = VALUE #( company_no   = 3      warehouse_no = 9 partner_no = 4
                        days_ago     = 1      delivery_in  = 7
                        responsible  = 'WEBER_J'
                        remarks      = 'TV season stock'
-                       release      = abap_false
+                       release      = abap_true
                        lines        = VALUE #( ( item_no = 7  quantity = 3  price = '599.99' )
                                                ( item_no = 10 quantity = 3  price = '10.00' )
                                                ( item_no = 14 quantity = 3  price = '100.00' ) ) )
@@ -991,7 +991,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       is_gr = VALUE #( po_uuid     = lv_po7
                        days_ago    = 1
                        responsible = 'WEBER_J'
-                       remarks     = 'Delivery 1 of 2: 1 TV with warranty follows'
+                       remarks     = 'Partial delivery: 1 TV, 1 cable and 1 h warranty follow'
                        post        = abap_true
                        lines       = VALUE #( ( item_no = 7  quantity = 2 )
                                               ( item_no = 10 quantity = 2 )
