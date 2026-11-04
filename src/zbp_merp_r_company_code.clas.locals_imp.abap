@@ -127,6 +127,17 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
                ( company_code   = comp-CompanyCode
                  company_prefix = comp-CompanyPrefix ) ) ).
 
+    " SAP standard master data referenced by the companies (one selection each)
+    DATA(lo_sap_md_sel) = CAST zif_merp_md_sap_sel( NEW zcl_merp_md_sap_sel( ) ).
+
+    DATA(lt_currencies) = lo_sap_md_sel->read_currencies(
+      VALUE #( FOR comp IN lt_comp_codes ( Currency = comp-CurrencyCode ) )
+    ).
+
+    DATA(lt_countries) = lo_sap_md_sel->read_countries(
+      VALUE #( FOR comp IN lt_comp_codes ( Country = comp-Country ) )
+    ).
+
     LOOP AT lt_comp_codes REFERENCE INTO DATA(lr_comp_code).
       lv_has_error = abap_false.
 
@@ -181,7 +192,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
         ENDIF.
       ENDIF.
 
-      " 3. Currency: mandatory
+      " 3. Currency: mandatory, exists
       IF lr_comp_code->CurrencyCode IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -192,9 +203,20 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
                                     severity = if_abap_behv_message=>severity-error )
           %element-CurrencyCode = if_abap_behv=>mk-on
         ) TO reported-companycode.
+      ELSEIF NOT line_exists( lt_currencies[ Currency = lr_comp_code->CurrencyCode ] ).
+        lv_has_error = abap_true.
+        APPEND VALUE #(
+          %tky                  = lr_comp_code->%tky
+          %state_area           = c_val_curr
+          %msg                  = NEW zcx_merp_md(
+                                    textid   = zcx_merp_md=>currency_not_found
+                                    attr1    = CONV string( lr_comp_code->CurrencyCode )
+                                    severity = if_abap_behv_message=>severity-error )
+          %element-CurrencyCode = if_abap_behv=>mk-on
+        ) TO reported-companycode.
       ENDIF.
 
-      " 4. Country: mandatory
+      " 4. Country: mandatory, exists
       IF lr_comp_code->Country IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -202,6 +224,17 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
           %state_area       = c_val_cntr
           %msg              = NEW zcx_merp_md(
                                 textid   = zcx_merp_md=>select_country
+                                severity = if_abap_behv_message=>severity-error )
+          %element-Country  = if_abap_behv=>mk-on
+        ) TO reported-companycode.
+      ELSEIF NOT line_exists( lt_countries[ Country = lr_comp_code->Country ] ).
+        lv_has_error = abap_true.
+        APPEND VALUE #(
+          %tky              = lr_comp_code->%tky
+          %state_area       = c_val_cntr
+          %msg              = NEW zcx_merp_md(
+                                textid   = zcx_merp_md=>country_not_found
+                                attr1    = CONV string( lr_comp_code->Country )
                                 severity = if_abap_behv_message=>severity-error )
           %element-Country  = if_abap_behv=>mk-on
         ) TO reported-companycode.

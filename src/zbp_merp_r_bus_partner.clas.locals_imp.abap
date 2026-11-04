@@ -3,7 +3,8 @@ CLASS lhc_zmerp_r_bus_partner DEFINITION INHERITING FROM cl_abap_behavior_handle
   PRIVATE SECTION.
     CONSTANTS:
       c_val_name TYPE string VALUE 'VALIDATE_PARTNER_NAME',
-      c_val_role TYPE string VALUE 'VALIDATE_PARTNER_ROLE'.
+      c_val_role TYPE string VALUE 'VALIDATE_PARTNER_ROLE',
+      c_val_cntr TYPE string VALUE 'VALIDATE_COUNTRY'.
 
     "! Evaluates global authorizations for CUD operations.
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
@@ -93,17 +94,24 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
         %state_area = c_val_name )
       ( %tky        = key-%tky
         %state_area = c_val_role )
+      ( %tky        = key-%tky
+        %state_area = c_val_cntr )
     ).
 
     READ ENTITIES OF zmerp_r_bus_partner IN LOCAL MODE
       ENTITY BusinessPartner
-      FIELDS ( PartnerName IsCustomer IsSupplier )
+      FIELDS ( PartnerName IsCustomer IsSupplier Country )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_partners).
 
     IF lt_partners IS INITIAL.
       RETURN.
     ENDIF.
+
+    " Countries of the partners (one selection; initial countries are skipped by the selector)
+    DATA(lt_countries) = NEW zcl_merp_md_sap_sel( )->zif_merp_md_sap_sel~read_countries(
+      VALUE #( FOR partner IN lt_partners ( Country = partner-Country ) )
+    ).
 
     LOOP AT lt_partners REFERENCE INTO DATA(lr_partner).
       lv_has_error = abap_false.
@@ -132,6 +140,21 @@ CLASS lhc_zmerp_r_bus_partner IMPLEMENTATION.
                                   severity = if_abap_behv_message=>severity-error )
           %element-IsCustomer = if_abap_behv=>mk-on
           %element-IsSupplier = if_abap_behv=>mk-on
+        ) TO reported-businesspartner.
+      ENDIF.
+
+      " 3. Country: optional, must exist when entered
+      IF lr_partner->Country IS NOT INITIAL
+         AND NOT line_exists( lt_countries[ Country = lr_partner->Country ] ).
+        lv_has_error = abap_true.
+        APPEND VALUE #(
+          %tky             = lr_partner->%tky
+          %state_area      = c_val_cntr
+          %msg             = NEW zcx_merp_md(
+                               textid   = zcx_merp_md=>country_not_found
+                               attr1    = CONV string( lr_partner->Country )
+                               severity = if_abap_behv_message=>severity-error )
+          %element-Country = if_abap_behv=>mk-on
         ) TO reported-businesspartner.
       ENDIF.
 

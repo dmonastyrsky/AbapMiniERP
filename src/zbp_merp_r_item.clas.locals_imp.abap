@@ -103,7 +103,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Read all referenced item groups and VAT codes (one selection each)
+    " Read all referenced item groups, VAT codes and units (one selection each)
     DATA(lt_item_groups) = NEW zcl_merp_md_item_group_sel( )->zif_merp_md_item_group_sel~read_item_groups(
       VALUE #( FOR item IN lt_items ( ItemGroupCode = item-ItemGroupCode ) )
     ).
@@ -112,6 +112,9 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
       VALUE #( FOR item IN lt_items ( VatCode = item-DefaultVatCode ) )
     ).
 
+    DATA(lt_units) = NEW zcl_merp_md_sap_sel( )->zif_merp_md_sap_sel~read_units(
+      VALUE #( FOR item IN lt_items ( UnitOfMeasure = item-BaseUnitOfMeasure ) )
+    ).
 
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       lv_has_error = abap_false.
@@ -203,7 +206,7 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
         ) TO reported-item.
       ENDIF.
 
-      " 5. Base unit of measure: mandatory
+      " 5. Base unit of measure: mandatory, exists
       IF lr_item->BaseUnitOfMeasure IS INITIAL.
         lv_has_error = abap_true.
         APPEND VALUE #(
@@ -211,6 +214,17 @@ CLASS lhc_zmerp_r_item IMPLEMENTATION.
           %state_area                = c_val_uom
           %msg                       = NEW zcx_merp_md(
                                          textid   = zcx_merp_md=>select_base_unit
+                                         severity = if_abap_behv_message=>severity-error )
+          %element-BaseUnitOfMeasure = if_abap_behv=>mk-on
+        ) TO reported-item.
+      ELSEIF NOT line_exists( lt_units[ UnitOfMeasure = lr_item->BaseUnitOfMeasure ] ).
+        lv_has_error = abap_true.
+        APPEND VALUE #(
+          %tky                       = lr_item->%tky
+          %state_area                = c_val_uom
+          %msg                       = NEW zcx_merp_md(
+                                         textid   = zcx_merp_md=>unit_not_found
+                                         attr1    = CONV string( lr_item->BaseUnitOfMeasure )
                                          severity = if_abap_behv_message=>severity-error )
           %element-BaseUnitOfMeasure = if_abap_behv=>mk-on
         ) TO reported-item.
