@@ -20,6 +20,7 @@ CLASS lhc_zmerp_r_company_code DEFINITION INHERITING FROM cl_abap_behavior_handl
       END OF ty_prefix_conflict,
       tt_prefix_conflicts TYPE SORTED TABLE OF ty_prefix_conflict WITH UNIQUE KEY company_code.
 
+    " --- Access and state ---
     "! Evaluates global authorizations for CUD operations.
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
       IMPORTING
@@ -32,24 +33,28 @@ CLASS lhc_zmerp_r_company_code DEFINITION INHERITING FROM cl_abap_behavior_handl
         keys   REQUEST requested_features FOR CompanyCode
       RESULT   result.
 
-    "! Clears validation messages for fields that have been filled in.
-    "! CompanyPrefix is handled by handlePrefixChange (clear and re-check in one place).
-    METHODS clearMessagesForFilledFields FOR DETERMINE ON MODIFY
-      IMPORTING keys FOR CompanyCode~clearMessagesForFilledFields.
-
-    "! Validates mandatory fields, prefix length and prefix uniqueness before saving.
-    METHODS validateMandatoryFields FOR VALIDATE ON SAVE
-      IMPORTING keys FOR CompanyCode~validateMandatoryFields.
-
     "! Pre-checks deletion dependencies in referenced entities.
     METHODS precheck_delete FOR PRECHECK
       IMPORTING keys FOR DELETE CompanyCode.
 
+    " --- Determinations on modify ---
     "! Converts the company prefix to upper case and interactively checks
     "! its length and uniqueness. Owns the prefix state area.
     METHODS handlePrefixChange FOR DETERMINE ON MODIFY
       IMPORTING keys FOR CompanyCode~handlePrefixChange.
 
+    " --- Validations ---
+    "! Validates mandatory fields, prefix length and prefix uniqueness before saving.
+    METHODS validateMandatoryFields FOR VALIDATE ON SAVE
+      IMPORTING keys FOR CompanyCode~validateMandatoryFields.
+
+    " --- Clearing of validation messages ---
+    "! Clears validation messages for fields that have been filled in.
+    "! CompanyPrefix is handled by handlePrefixChange (clear and re-check in one place).
+    METHODS clearMessagesForFilledFields FOR DETERMINE ON MODIFY
+      IMPORTING keys FOR CompanyCode~clearMessagesForFilledFields.
+
+    " --- Helpers ---
     "! Returns the companies whose prefix is already used by another company
     "! (active record or draft). The same prefix would give equal document numbers.
     "! @parameter it_checks    | Company codes with the prefixes to check (upper case)
@@ -62,6 +67,7 @@ ENDCLASS.
 
 CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
 
+  " --- Access and state ---
   METHOD get_global_authorizations.
     IF requested_authorizations-%create = if_abap_behv=>mk-on.
       result-%create = if_abap_behv=>auth-allowed.
@@ -94,6 +100,115 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
     ).
   ENDMETHOD.
 
+  METHOD precheck_delete.
+    " Usages of all keys in one selection (the selector skips initial keys)
+    DATA(lt_usages) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_usages(
+      VALUE #( FOR key IN keys ( CompanyCode = key-CompanyCode ) ) ).
+
+    IF lt_usages IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    LOOP AT keys REFERENCE INTO DATA(lr_key).
+      IF NOT line_exists( lt_usages[ CompanyCode = lr_key->CompanyCode ] ).
+        CONTINUE.
+      ENDIF.
+
+      APPEND VALUE #(
+        %tky        = lr_key->%tky
+        %fail-cause = if_abap_behv=>cause-dependency
+      ) TO failed-companycode.
+
+      " One message per using entity (sorted table: WHERE uses the table key)
+      LOOP AT lt_usages REFERENCE INTO DATA(lr_usage) WHERE CompanyCode = lr_key->CompanyCode.
+        APPEND VALUE #(
+          %tky                 = lr_key->%tky
+          %element-CompanyCode = if_abap_behv=>mk-on
+          %msg                 = NEW zcx_merp_md(
+                                   textid   = zcx_merp_md=>company_code_in_use
+                                   attr1    = CONV #( lr_usage->CompanyCode )
+                                   attr2    = CONV #( lr_usage->UsedInEntity )
+                                   severity = if_abap_behv_message=>severity-error )
+        ) TO reported-companycode.
+      ENDLOOP.
+    ENDLOOP.
+  ENDMETHOD.
+
+  " --- Determinations on modify ---
+  METHOD handlePrefixChange.
+    DATA lt_update TYPE TABLE FOR UPDATE zmerp_r_company_code.
+
+    READ ENTITIES OF zmerp_r_company_code IN LOCAL MODE
+      ENTITY CompanyCode
+      FIELDS ( CompanyPrefix )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_comp_codes).
+
+    IF lt_comp_codes IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    " Uniqueness is checked on the upper-case value that will be stored
+    DATA(lt_conflicts) = find_prefix_conflicts(
+      VALUE #( FOR comp IN lt_comp_codes
+               ( company_code   = comp-CompanyCode
+                 company_prefix = to_upper( comp-CompanyPrefix ) ) ) ).
+
+    LOOP AT lt_comp_codes REFERENCE INTO DATA(lr_comp_code).
+      " This determination owns the prefix state area: clear it before re-checking
+      APPEND VALUE #( %tky = lr_comp_code->%tky %state_area = c_val_prefix ) TO reported-companycode.
+
+      " An empty prefix is reported on save, like all other mandatory fields
+      IF lr_comp_code->CompanyPrefix IS INITIAL.
+        CONTINUE.
+      ENDIF.
+
+      DATA(lv_upper_prefix) = CONV zmerp_company_prefix( to_upper( lr_comp_code->CompanyPrefix ) ).
+
+      IF zcl_merp_md_validator=>is_company_prefix_valid( lv_upper_prefix ) = abap_false.
+        APPEND VALUE #(
+          %tky                   = lr_comp_code->%tky
+          %state_area            = c_val_prefix
+          %msg                   = NEW zcx_merp_md(
+                                     textid   = zcx_merp_md=>invalid_prefix_length
+                                     severity = if_abap_behv_message=>severity-error )
+          %element-CompanyPrefix = if_abap_behv=>mk-on
+        ) TO reported-companycode.
+      ELSE.
+        ASSIGN lt_conflicts[ company_code = lr_comp_code->CompanyCode ] TO FIELD-SYMBOL(<ls_conflict>).
+        IF sy-subrc = 0.
+          APPEND VALUE #(
+            %tky                   = lr_comp_code->%tky
+            %state_area            = c_val_prefix
+            %msg                   = NEW zcx_merp_md(
+                                       textid   = zcx_merp_md=>company_prefix_not_unique
+                                       attr1    = CONV #( lv_upper_prefix )
+                                       attr2    = CONV #( <ls_conflict>-owner_code )
+                                       severity = if_abap_behv_message=>severity-error )
+            %element-CompanyPrefix = if_abap_behv=>mk-on
+          ) TO reported-companycode.
+        ENDIF.
+      ENDIF.
+
+      " Store the prefix in upper case (document numbers start with it)
+      IF lr_comp_code->CompanyPrefix <> lv_upper_prefix.
+        APPEND VALUE #(
+          %tky                   = lr_comp_code->%tky
+          CompanyPrefix          = lv_upper_prefix
+          %control-CompanyPrefix = if_abap_behv=>mk-on
+        ) TO lt_update.
+      ENDIF.
+    ENDLOOP.
+
+    IF lt_update IS NOT INITIAL.
+      MODIFY ENTITIES OF zmerp_r_company_code IN LOCAL MODE
+        ENTITY CompanyCode
+        UPDATE FIELDS ( CompanyPrefix )
+        WITH lt_update.
+    ENDIF.
+  ENDMETHOD.
+
+  " --- Validations ---
   METHOD validateMandatoryFields.
     DATA lv_has_error TYPE abap_bool.
 
@@ -250,6 +365,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+  " --- Clearing of validation messages ---
   METHOD clearMessagesForFilledFields.
     IF keys IS INITIAL.
       RETURN.
@@ -279,113 +395,7 @@ CLASS lhc_zmerp_r_company_code IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD handlePrefixChange.
-    DATA lt_update TYPE TABLE FOR UPDATE zmerp_r_company_code.
-
-    READ ENTITIES OF zmerp_r_company_code IN LOCAL MODE
-      ENTITY CompanyCode
-      FIELDS ( CompanyPrefix )
-      WITH CORRESPONDING #( keys )
-      RESULT DATA(lt_comp_codes).
-
-    IF lt_comp_codes IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    " Uniqueness is checked on the upper-case value that will be stored
-    DATA(lt_conflicts) = find_prefix_conflicts(
-      VALUE #( FOR comp IN lt_comp_codes
-               ( company_code   = comp-CompanyCode
-                 company_prefix = to_upper( comp-CompanyPrefix ) ) ) ).
-
-    LOOP AT lt_comp_codes REFERENCE INTO DATA(lr_comp_code).
-      " This determination owns the prefix state area: clear it before re-checking
-      APPEND VALUE #( %tky = lr_comp_code->%tky %state_area = c_val_prefix ) TO reported-companycode.
-
-      " An empty prefix is reported on save, like all other mandatory fields
-      IF lr_comp_code->CompanyPrefix IS INITIAL.
-        CONTINUE.
-      ENDIF.
-
-      DATA(lv_upper_prefix) = CONV zmerp_company_prefix( to_upper( lr_comp_code->CompanyPrefix ) ).
-
-      IF zcl_merp_md_validator=>is_company_prefix_valid( lv_upper_prefix ) = abap_false.
-        APPEND VALUE #(
-          %tky                   = lr_comp_code->%tky
-          %state_area            = c_val_prefix
-          %msg                   = NEW zcx_merp_md(
-                                     textid   = zcx_merp_md=>invalid_prefix_length
-                                     severity = if_abap_behv_message=>severity-error )
-          %element-CompanyPrefix = if_abap_behv=>mk-on
-        ) TO reported-companycode.
-      ELSE.
-        ASSIGN lt_conflicts[ company_code = lr_comp_code->CompanyCode ] TO FIELD-SYMBOL(<ls_conflict>).
-        IF sy-subrc = 0.
-          APPEND VALUE #(
-            %tky                   = lr_comp_code->%tky
-            %state_area            = c_val_prefix
-            %msg                   = NEW zcx_merp_md(
-                                       textid   = zcx_merp_md=>company_prefix_not_unique
-                                       attr1    = CONV #( lv_upper_prefix )
-                                       attr2    = CONV #( <ls_conflict>-owner_code )
-                                       severity = if_abap_behv_message=>severity-error )
-            %element-CompanyPrefix = if_abap_behv=>mk-on
-          ) TO reported-companycode.
-        ENDIF.
-      ENDIF.
-
-      " Store the prefix in upper case (document numbers start with it)
-      IF lr_comp_code->CompanyPrefix <> lv_upper_prefix.
-        APPEND VALUE #(
-          %tky                   = lr_comp_code->%tky
-          CompanyPrefix          = lv_upper_prefix
-          %control-CompanyPrefix = if_abap_behv=>mk-on
-        ) TO lt_update.
-      ENDIF.
-    ENDLOOP.
-
-    IF lt_update IS NOT INITIAL.
-      MODIFY ENTITIES OF zmerp_r_company_code IN LOCAL MODE
-        ENTITY CompanyCode
-        UPDATE FIELDS ( CompanyPrefix )
-        WITH lt_update.
-    ENDIF.
-  ENDMETHOD.
-
-  METHOD precheck_delete.
-    " Usages of all keys in one selection (the selector skips initial keys)
-    DATA(lt_usages) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_usages(
-      VALUE #( FOR key IN keys ( CompanyCode = key-CompanyCode ) ) ).
-
-    IF lt_usages IS INITIAL.
-      RETURN.
-    ENDIF.
-
-    LOOP AT keys REFERENCE INTO DATA(lr_key).
-      IF NOT line_exists( lt_usages[ CompanyCode = lr_key->CompanyCode ] ).
-        CONTINUE.
-      ENDIF.
-
-      APPEND VALUE #(
-        %tky        = lr_key->%tky
-        %fail-cause = if_abap_behv=>cause-dependency
-      ) TO failed-companycode.
-
-      " One message per using entity (sorted table: WHERE uses the table key)
-      LOOP AT lt_usages REFERENCE INTO DATA(lr_usage) WHERE CompanyCode = lr_key->CompanyCode.
-        APPEND VALUE #(
-          %tky                 = lr_key->%tky
-          %element-CompanyCode = if_abap_behv=>mk-on
-          %msg                 = NEW zcx_merp_md(
-                                   textid   = zcx_merp_md=>company_code_in_use
-                                   attr1    = CONV #( lr_usage->CompanyCode )
-                                   attr2    = CONV #( lr_usage->UsedInEntity )
-                                   severity = if_abap_behv_message=>severity-error )
-        ) TO reported-companycode.
-      ENDLOOP.
-    ENDLOOP.
-  ENDMETHOD.
-
+  " --- Helpers ---
   METHOD find_prefix_conflicts.
     TYPES: BEGIN OF ty_prefix,
              company_prefix TYPE zmerp_company_prefix,
@@ -441,4 +451,5 @@ CLASS lsc_zmerp_r_company_code IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 
