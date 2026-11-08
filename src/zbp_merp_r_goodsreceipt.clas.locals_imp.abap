@@ -2216,21 +2216,24 @@ ENDCLASS.
 CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
   METHOD save_modified.
+    DATA lt_changed   TYPE zcl_merp_stock_posting=>tt_document_keys.
     DATA lt_posted    TYPE TABLE FOR READ IMPORT zmerp_r_goodsreceipt.
-    DATA lt_movements TYPE STANDARD TABLE OF zmerp_stock_mov WITH EMPTY KEY.
+    DATA lt_movements TYPE zcl_merp_stock_posting=>tt_movements.
 
     " Only status changes are relevant for stock
     LOOP AT update-goodsreceipt REFERENCE INTO DATA(lr_header)
          WHERE %control-Status = if_abap_behv=>mk-on.
 
-      " 1. Any status change first removes the movements of the document (no-op if there are none)
-      DELETE FROM zmerp_stock_mov WHERE document_uuid = @lr_header->DocumentUUID.
+      " Any status change first removes the movements of the document ...
+      APPEND VALUE #( document_uuid = lr_header->DocumentUUID ) TO lt_changed.
 
-      " 2. Posted documents get new movements
+      " ... and posted documents get new movements
       IF zcl_merp_doc_gr_lifecycle=>is_posted( lr_header->Status ) = abap_true.
-         APPEND VALUE #( %key = lr_header->%key ) TO lt_posted.
+        APPEND VALUE #( %key = lr_header->%key ) TO lt_posted.
       ENDIF.
     ENDLOOP.
+
+    zcl_merp_stock_posting=>delete_document_movements( lt_changed ).
 
     IF lt_posted IS INITIAL.
       RETURN.
@@ -2246,56 +2249,31 @@ CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
         WITH CORRESPONDING #( lt_posted )
         RESULT DATA(lt_items).
 
-    " Services are received (purchase order progress) but are not kept in stock
-    DATA(lt_items_master) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items(
-      VALUE #( FOR item IN lt_items ( ItemCode = item-ItemCode ) ) ).
-
-    DATA(lv_user) = cl_abap_context_info=>get_user_technical_name( ).
-    GET TIME STAMP FIELD DATA(lv_timestamp).
-
     " One incoming movement per goods receipt item: positive quantity, value = net amount
-    " (the document currency equals the company currency, checked on posting)
+    " (the document currency equals the company currency, checked on posting);
+    " services are skipped by the stock posting
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<ls_header>).
       IF sy-subrc <> 0.
         CONTINUE.
       ENDIF.
 
-      IF VALUE #( lt_items_master[ ItemCode = lr_item->ItemCode ]-ItemTypeCode OPTIONAL )
-         = zif_merp_constants=>c_item_type-service.
-        CONTINUE.
-      ENDIF.
-
-      TRY.
-          APPEND VALUE #(
-            movement_uuid         = cl_system_uuid=>create_uuid_x16_static( )
-            company_code          = <ls_header>-CompanyCode
-            warehouse_code        = <ls_header>-WarehouseCode
-            item_code             = lr_item->ItemCode
-            quantity              = lr_item->Quantity
-            unit_of_measure       = lr_item->UnitOfMeasure
-            amount                = lr_item->NetAmount
-            currency_code         = <ls_header>-CurrencyCode
-            posting_date          = <ls_header>-PostingDate
-            document_type         = c_document_type
-            document_uuid         = lr_item->HeaderUUID
-            document_item_uuid    = lr_item->ItemUUID
-            created_by            = lv_user
-            created_at            = lv_timestamp
-            local_last_changed_by = lv_user
-            local_last_changed_at = lv_timestamp
-            last_changed_at       = lv_timestamp
-          ) TO lt_movements.
-        CATCH cx_uuid_error INTO DATA(lx_uuid).
-          " A posted goods receipt without its stock movement would break the stock:
-          " abort the save (the whole transaction is rolled back) instead of skipping the movement
-          RAISE SHORTDUMP lx_uuid.
-      ENDTRY.
+      APPEND VALUE #(
+        document_uuid      = lr_item->HeaderUUID
+        document_item_uuid = lr_item->ItemUUID
+        company_code       = <ls_header>-CompanyCode
+        warehouse_code     = <ls_header>-WarehouseCode
+        item_code          = lr_item->ItemCode
+        quantity           = lr_item->Quantity
+        unit_of_measure    = lr_item->UnitOfMeasure
+        amount             = lr_item->NetAmount
+        currency_code      = <ls_header>-CurrencyCode
+        posting_date       = <ls_header>-PostingDate
+      ) TO lt_movements.
     ENDLOOP.
 
-    IF lt_movements IS NOT INITIAL.
-      INSERT zmerp_stock_mov FROM TABLE @lt_movements.
-    ENDIF.
+    zcl_merp_stock_posting=>insert_movements( iv_document_type = c_document_type
+                                              it_movements     = lt_movements ).
   ENDMETHOD.
 
 ENDCLASS.
