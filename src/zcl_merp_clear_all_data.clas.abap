@@ -75,6 +75,18 @@ CLASS zcl_merp_clear_all_data IMPLEMENTATION.
       iv_draft_tab  = CONV tabname( zif_merp_constants=>c_po-table_draft )
       out           = out ).
 
+     clear_entity(
+      iv_label      = 'Sales Order Items'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_so_itm-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_so_itm-table_draft )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Sales Order Header'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_so-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_so-table_draft )
+      out           = out ).
+
     " ------------------------------------------------------------------
     " 2. Document number ranges: intervals exist per company code,
     "    so they are reset while the company codes still exist
