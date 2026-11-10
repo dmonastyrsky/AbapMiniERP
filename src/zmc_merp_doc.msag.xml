@@ -239,6 +239,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>123</MSGNR>
+     <TEXT>Business Partner &amp;1 is not a Customer.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>130</MSGNR>
      <TEXT>Invalid document status.</TEXT>
     </T100>
@@ -283,6 +289,12 @@
      <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>137</MSGNR>
      <TEXT>Completion of document &amp;1 is not allowed.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>138</MSGNR>
+     <TEXT>	Rejection of document &amp;1 is not allowed.</TEXT>
     </T100>
     <T100>
      <SPRSL>E</SPRSL>
