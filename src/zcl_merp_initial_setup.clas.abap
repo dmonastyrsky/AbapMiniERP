@@ -60,6 +60,19 @@ CLASS zcl_merp_initial_setup DEFINITION
              lines       TYPE tt_lines,
            END OF ty_gr.
 
+     "! Sales order definition (master data by seed order, dates relative to today)
+    TYPES: BEGIN OF ty_so,
+             company_no   TYPE i,
+             warehouse_no TYPE i,
+             partner_no   TYPE i,
+             days_ago     TYPE i,
+             customer_ref TYPE zmerp_customer_ref,
+             responsible  TYPE zmerp_resp_person,
+             remarks      TYPE zmerp_remarks,
+             reject       TYPE abap_bool,
+             lines        TYPE tt_lines,
+           END OF ty_so.
+
     TYPES: BEGIN OF ty_quantity,
              item_code TYPE zmerp_item_code,
              quantity  TYPE zmerp_quantity,
@@ -154,6 +167,12 @@ CLASS zcl_merp_initial_setup DEFINITION
         is_codes TYPE ty_codes
         out      TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
+    "! Creates sales orders covering the states possible without goods issues (Open, Rejected).
+    CLASS-METHODS setup_sales_documents
+      IMPORTING
+        is_codes TYPE ty_codes
+        out      TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
     "! Creates a purchase order via EML and optionally releases it.
     "! @parameter is_po      | Purchase order definition
     "! @parameter rv_po_uuid | Key of the created purchase order (initial if it failed)
@@ -173,6 +192,17 @@ CLASS zcl_merp_initial_setup DEFINITION
         is_codes TYPE ty_codes
         is_gr    TYPE ty_gr
         out      TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
+    "! Creates a sales order via EML and optionally rejects it.
+    "! @parameter is_so      | Sales order definition
+    "! @parameter rv_so_uuid | Key of the created sales order (initial if it failed)
+    CLASS-METHODS create_sales_order
+      IMPORTING
+        is_codes          TYPE ty_codes
+        is_so             TYPE ty_so
+        out               TYPE REF TO if_oo_adt_classrun_out OPTIONAL
+      RETURNING
+        VALUE(rv_so_uuid) TYPE sysuuid_x16 .
 
 ENDCLASS.
 
@@ -200,8 +230,10 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " 3. Documents via EML (the business logic assigns numbers, amounts, stock and statuses)
+    " 3. Documents via EML (the business logic assigns numbers, amounts, stock and statuses):
+    "    purchasing first, its stock is needed by the sales documents
     setup_documents( is_codes = ls_codes out = out ).
+    setup_sales_documents( is_codes = ls_codes out = out ).
 
     write_log( iv_text = '==== Initial Data Setup Completed ====' out = out ).
   ENDMETHOD.
@@ -1199,6 +1231,167 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
                          |status { ls_gr-status }; PO status { ls_gr-po_status }.|
                out     = out ).
   ENDMETHOD.
+
+    METHOD setup_sales_documents.
+    " Readable amounts as in purchasing: every line net amount is a multiple of 100, so VAT and gross
+    " have no cents. Selling prices are above the purchase prices (margin on the goods issue later).
+    " The orders are placed in warehouses with stock from the purchasing documents, except SO 5.
+
+    " SO 1 (1000, Media-Saturn, Hauptlager Kusel): TVs, cables and warranty, stock of PO 1
+    create_sales_order(
+      is_so = VALUE #( company_no   = 1      warehouse_no = 1 partner_no = 6
+                       days_ago     = 1
+                       customer_ref = 'MS-2026-0815'
+                       responsible  = 'BRAUN_L'
+                       remarks      = 'TV promotion'
+                       lines        = VALUE #( ( item_no = 7  quantity = 2 price = '1500.00' )
+                                               ( item_no = 10 quantity = 4 price = '25.00' )
+                                               ( item_no = 14 quantity = 2 price = '150.00' ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    " SO 2 (1000, Expert, Hauptlager Frankfurt): washing machines with installation, stock of PO 2;
+    "   the dishwasher has no stock yet (it will stay open after the first goods issue)
+    create_sales_order(
+      is_so = VALUE #( company_no   = 1      warehouse_no = 2 partner_no = 7
+                       days_ago     = 1
+                       customer_ref = 'EXP-55102'
+                       responsible  = 'BRAUN_L'
+                       remarks      = 'Washing machines with installation'
+                       lines        = VALUE #( ( item_no = 1  quantity = 2 price = '750.00' )
+                                               ( item_no = 11 quantity = 5 price = '20.00' )
+                                               ( item_no = 13 quantity = 2 price = '50.00' )
+                                               ( item_no = 3  quantity = 1 price = '900.00' ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    " SO 3 (2000, Conrad as customer, Lager München): audio, stock of PO 5
+    create_sales_order(
+      is_so = VALUE #( company_no   = 2      warehouse_no = 7 partner_no = 12
+                       days_ago     = 0
+                       customer_ref = 'CON-7781'
+                       responsible  = 'FISCHER_K'
+                       remarks      = 'Audio for the Munich store'
+                       lines        = VALUE #( ( item_no = 8 quantity = 4 price = '350.00' )
+                                               ( item_no = 9 quantity = 2 price = '450.00' ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    " SO 4 (3000, Euronics): the customer withdrew the order -> 'Rejected'
+    create_sales_order(
+      is_so = VALUE #( company_no   = 3      warehouse_no = 9 partner_no = 8
+                       days_ago     = 1
+                       customer_ref = 'EU-3301'
+                       responsible  = 'WEBER_J'
+                       remarks      = 'Customer withdrew the order'
+                       reject       = abap_true
+                       lines        = VALUE #( ( item_no = 7 quantity = 1 price = '900.00' ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    " SO 5 (1000, Küchenstudio Schmidt, Lager Berlin): no stock in Berlin -> stays 'Open'
+    "   (demo of the availability check of the goods issue later)
+    create_sales_order(
+      is_so = VALUE #( company_no   = 1      warehouse_no = 3 partner_no = 10
+                       days_ago     = 0
+                       customer_ref = 'KS-118'
+                       responsible  = 'SCHMIDT_A'
+                       remarks      = 'Espresso machines, waiting for stock'
+                       lines        = VALUE #( ( item_no = 4  quantity = 2 price = '600.00' )
+                                               ( item_no = 12 quantity = 4 price = '25.00' ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    " Summary: resulting sales order statuses
+    SELECT document_number, status
+      FROM zmerp_so_hdr
+      ORDER BY document_number
+      INTO TABLE @DATA(lt_so_status).
+
+    write_log( iv_text = '[Summary] Sales order statuses:' out = out ).
+    LOOP AT lt_so_status REFERENCE INTO DATA(lr_so_status).
+      write_log( iv_text = |    { lr_so_status->document_number }: { lr_so_status->status }| out = out ).
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD create_sales_order.
+    DATA(lv_today)        = cl_abap_context_info=>get_system_date( ).
+    DATA(lv_company_code) = get_code( it_codes = is_codes-companies iv_no = is_so-company_no ).
+
+    " 1. Header and items: currency, item defaults and amounts are derived by the sales order logic
+    MODIFY ENTITIES OF zmerp_r_salesorder
+      ENTITY SalesOrder
+        CREATE FIELDS ( CompanyCode WarehouseCode BusinessPartnerCode DocumentDate CustomerReference
+                        ResponsiblePerson Remarks )
+        WITH VALUE #( ( %cid                = 'SO'
+                        CompanyCode         = lv_company_code
+                        WarehouseCode       = get_code( it_codes = is_codes-warehouses iv_no = is_so-warehouse_no )
+                        BusinessPartnerCode = get_code( it_codes = is_codes-partners iv_no = is_so-partner_no )
+                        DocumentDate        = CONV d( lv_today - is_so-days_ago )
+                        CustomerReference   = is_so-customer_ref
+                        ResponsiblePerson   = is_so-responsible
+                        Remarks             = is_so-remarks ) )
+        CREATE BY \_Items
+        FIELDS ( ItemCode Quantity Price )
+        WITH VALUE #( ( %cid_ref = 'SO'
+                        %target  = VALUE #( FOR so_line IN is_so-lines INDEX INTO lv_index
+                                            ( %cid     = |SO_ITEM_{ lv_index }|
+                                              ItemCode = get_code( it_codes = is_codes-items iv_no = so_line-item_no )
+                                              Quantity = so_line-quantity
+                                              Price    = so_line-price ) ) ) )
+      MAPPED DATA(ls_mapped).
+
+    rv_so_uuid = VALUE #( ls_mapped-salesorder[ 1 ]-DocumentUUID OPTIONAL ).
+
+    COMMIT ENTITIES RESPONSE OF zmerp_r_salesorder
+      FAILED DATA(ls_save_failed)
+      REPORTED DATA(ls_save_reported).
+
+    IF ls_save_failed IS NOT INITIAL OR rv_so_uuid IS INITIAL.
+      write_failure(
+        iv_text     = |[Sales Order]: Creation for company { lv_company_code } failed:|
+        it_messages = VALUE #( BASE VALUE #( FOR save_hdr IN ls_save_reported-salesorder ( save_hdr-%msg ) )
+                               FOR save_itm IN ls_save_reported-salesorderitem ( save_itm-%msg ) )
+        out         = out ).
+      ROLLBACK ENTITIES.
+      CLEAR rv_so_uuid.
+      RETURN.
+    ENDIF.
+
+    " 2. Rejection ('Open' -> 'Rejected')
+    IF is_so-reject = abap_true.
+      MODIFY ENTITIES OF zmerp_r_salesorder
+        ENTITY SalesOrder
+        EXECUTE rejectDocument
+        FROM VALUE #( ( DocumentUUID = rv_so_uuid ) )
+        FAILED DATA(ls_reject_failed)
+        REPORTED DATA(ls_reject_reported).
+
+      IF ls_reject_failed IS INITIAL.
+        COMMIT ENTITIES RESPONSE OF zmerp_r_salesorder
+          FAILED DATA(ls_commit_failed)
+          REPORTED DATA(ls_commit_reported).
+      ENDIF.
+
+      IF ls_reject_failed IS NOT INITIAL OR ls_commit_failed IS NOT INITIAL.
+        write_failure(
+          iv_text     = |[Sales Order]: Rejection for company { lv_company_code } failed:|
+          it_messages = VALUE #( BASE VALUE #( FOR rej_hdr IN ls_reject_reported-salesorder ( rej_hdr-%msg ) )
+                                 FOR com_hdr IN ls_commit_reported-salesorder ( com_hdr-%msg ) )
+          out         = out ).
+        ROLLBACK ENTITIES.
+      ENDIF.
+    ENDIF.
+
+    SELECT SINGLE document_number, status
+      FROM zmerp_so_hdr
+      WHERE document_uuid = @rv_so_uuid
+      INTO @DATA(ls_so).
+
+    write_log( iv_text = |[Sales Order]: { ls_so-document_number } created, status { ls_so-status }.| out = out ).
+  ENDMETHOD.
+
+
 
 
 ENDCLASS.
