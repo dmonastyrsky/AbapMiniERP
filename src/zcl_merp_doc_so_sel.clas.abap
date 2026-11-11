@@ -18,6 +18,35 @@ ENDCLASS.
 
 CLASS zcl_merp_doc_so_sel IMPLEMENTATION.
 
+  METHOD zif_merp_doc_so_sel~read_headers.
+    DATA(lt_clean_keys) = prepare_keys( it_document_keys ).
+    IF lt_clean_keys IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    " ty_header is derived from the same view, so INTO TABLE (without CORRESPONDING)
+    " makes any structure mismatch visible at compile time instead of silently skipping fields
+    SELECT so~*
+      FROM zmerp_r_salesorder AS so
+      INNER JOIN @lt_clean_keys AS keys ON so~DocumentUUID = keys~DocumentUUID
+      INTO TABLE @rt_headers.
+  ENDMETHOD.
+
+
+  METHOD zif_merp_doc_so_sel~read_progress.
+    DATA(lt_clean_keys) = prepare_keys( it_document_keys ).
+    IF lt_clean_keys IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    " ty_progress is derived from the same view, see the comment in read_headers
+    SELECT prg~*
+      FROM zmerp_i_so_progress AS prg
+      INNER JOIN @lt_clean_keys AS keys ON prg~SoHeaderUUID = keys~DocumentUUID
+      INTO TABLE @rt_progress.
+  ENDMETHOD.
+
+
   METHOD zif_merp_doc_so_sel~read_usages.
     DATA(lt_clean_keys) = prepare_keys( it_document_keys ).
     IF lt_clean_keys IS INITIAL.
