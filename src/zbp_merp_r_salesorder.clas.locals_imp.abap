@@ -42,6 +42,13 @@ CLASS lhc_zmerp_r_salesorder DEFINITION INHERITING FROM cl_abap_behavior_handler
         keys   FOR ACTION SalesOrder~completeDocument
       RESULT   result.
 
+    "! Sets the issue status (Open / In Process / Completed) calculated by the goods issue.
+    "! API for other business objects, not exposed in the service.
+    METHODS setIssueStatus FOR MODIFY
+      IMPORTING
+        keys   FOR ACTION SalesOrder~setIssueStatus
+      RESULT   result.
+
     " --- Determinations on modify ---
     "! Sets default header values on document creation.
     METHODS setHeaderDefaults FOR DETERMINE ON MODIFY
@@ -346,6 +353,67 @@ CLASS lhc_zmerp_r_salesorder IMPLEMENTATION.
     ENDIF.
 
     " Action result: current state of the documents
+    READ ENTITIES OF zmerp_r_salesorder IN LOCAL MODE
+      ENTITY SalesOrder
+      ALL FIELDS
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_result).
+
+    result = VALUE #( FOR header IN lt_result ( %tky = header-%tky %param = header ) ).
+  ENDMETHOD.
+
+  METHOD setIssueStatus.
+    DATA lt_update  TYPE TABLE FOR UPDATE zmerp_r_salesorder.
+    DATA lo_message TYPE REF TO zcx_merp_sd.
+
+    READ ENTITIES OF zmerp_r_salesorder IN LOCAL MODE
+      ENTITY SalesOrder
+      FIELDS ( Status DocumentNumber )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_headers).
+
+    LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
+      CLEAR lo_message.
+
+      ASSIGN keys[ %tky = lr_header->%tky ] TO FIELD-SYMBOL(<ls_key>).
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+
+      " Only transitions within the issue lifecycle (Open / In Process / Completed) are allowed
+      IF zcl_merp_doc_so_lifecycle=>is_issue_status( lr_header->Status ) = abap_false
+         OR zcl_merp_doc_so_lifecycle=>is_issue_status( <ls_key>-%param-Status ) = abap_false.
+        lo_message = NEW #( textid   = zcx_merp_sd=>invalid_document_status
+                            severity = if_abap_behv_message=>severity-error ).
+      ENDIF.
+
+      IF lo_message IS BOUND.
+        APPEND VALUE #( %tky        = lr_header->%tky
+                        %fail-cause = if_abap_behv=>cause-conflict ) TO failed-salesorder.
+        APPEND VALUE #( %tky                   = lr_header->%tky
+                        %msg                   = lo_message
+                        %action-setIssueStatus = if_abap_behv=>mk-on ) TO reported-salesorder.
+      ELSEIF <ls_key>-%param-Status <> lr_header->Status.
+        APPEND VALUE #( %tky   = lr_header->%tky
+                        Status = <ls_key>-%param-Status ) TO lt_update.
+      ENDIF.
+    ENDLOOP.
+
+    IF lt_update IS NOT INITIAL.
+      MODIFY ENTITIES OF zmerp_r_salesorder IN LOCAL MODE
+        ENTITY SalesOrder
+        UPDATE FIELDS ( Status )
+        WITH lt_update
+        FAILED DATA(lt_mod_failed)
+        REPORTED DATA(lt_mod_reported).
+
+      IF lt_mod_failed IS NOT INITIAL.
+        failed-salesorder   = CORRESPONDING #( BASE ( failed-salesorder ) lt_mod_failed-salesorder ).
+        reported-salesorder = CORRESPONDING #( BASE ( reported-salesorder ) lt_mod_reported-salesorder ).
+        RETURN.
+      ENDIF.
+    ENDIF.
+
     READ ENTITIES OF zmerp_r_salesorder IN LOCAL MODE
       ENTITY SalesOrder
       ALL FIELDS

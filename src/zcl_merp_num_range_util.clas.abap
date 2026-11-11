@@ -100,6 +100,19 @@ CLASS zcl_merp_num_range_util DEFINITION
       RAISING
         cx_number_ranges.
 
+    "! Generates multiple sequential Goods Issue numbers via NRO.
+    "! @parameter iv_company_code | Company code context
+    "! @parameter iv_count        | Total count of sequential numbers requested
+    "! @parameter rt_numbers      | Table of generated formatted Goods Issue numbers
+    CLASS-METHODS get_next_gi_numbers_nro
+      IMPORTING
+        iv_company_code TYPE zmerp_company_code
+        iv_count        TYPE i
+      RETURNING
+        VALUE(rt_numbers) TYPE string_table
+      RAISING
+        cx_number_ranges.
+
     " NRO Setup & Administration
     "! Synchronizes current NRO interval levels for Master Data with actual active database record counts.
     CLASS-METHODS sync_intervals_from_db.
@@ -140,6 +153,12 @@ CLASS zcl_merp_num_range_util DEFINITION
     "! Synchronizes Sales Order NRO interval level for specified company code.
     "! @parameter iv_company_code | Company code context
     CLASS-METHODS sync_so_interval_from_db
+      IMPORTING
+        iv_company_code TYPE zmerp_company_code.
+
+    "! Synchronizes Goods Issue NRO interval level for specified company code.
+    "! @parameter iv_company_code | Company code context
+    CLASS-METHODS sync_gi_interval_from_db
       IMPORTING
         iv_company_code TYPE zmerp_company_code.
 
@@ -254,6 +273,17 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
                                            iv_count        = iv_count ).
   ENDMETHOD.
 
+  METHOD get_next_gi_numbers_nro.
+    rt_numbers = get_next_doc_numbers_nro( is_meta         = zif_merp_constants=>c_gi
+                                           iv_company_code = iv_company_code
+                                           iv_count        = iv_count ).
+  ENDMETHOD.
+
+  METHOD sync_gi_interval_from_db.
+    sync_interval( is_meta         = zif_merp_constants=>c_gi
+                   iv_company_code = iv_company_code ).
+  ENDMETHOD.
+
   METHOD sync_intervals_from_db.
     sync_master_intervals_from_db( ).
     sync_doc_intervals_from_db( ).
@@ -277,6 +307,7 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
       sync_po_interval_from_db( iv_company_code = <ls_company>-company_code ).
       sync_gr_interval_from_db( iv_company_code = <ls_company>-company_code ).
       sync_so_interval_from_db( iv_company_code = <ls_company>-company_code ).
+      sync_gi_interval_from_db( iv_company_code = <ls_company>-company_code ).
     ENDLOOP.
   ENDMETHOD.
 

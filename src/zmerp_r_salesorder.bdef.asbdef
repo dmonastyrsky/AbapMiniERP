@@ -30,6 +30,9 @@ authorization master ( global )
   action ( features : instance ) rejectDocument result [1] $self;
   action ( features : instance ) completeDocument result [1] $self;
 
+  // API for goods issues: not exposed in the projection
+  action ( authorization : update ) setIssueStatus parameter ZMERP_A_DOC_SO_ISSUE_STATUS result [1] $self;
+
   determination setHeaderDefaults        on modify { create; }
   determination deriveHeaderOnCompanyCode on modify { field CompanyCode; }
   determination deriveDatesOnDocumentDate on modify { field DocumentDate; }
