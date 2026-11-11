@@ -40,3 +40,12 @@ union all select from ZMERP_R_SALESORDER
       cast( 'X' as abap_boolean preserving type )       as IsDocument
 }
 where CompanyCode is not initial
+
+union all select from ZMERP_R_GOODSISSUE
+{
+  key CompanyCode,
+  key cast( bintohex( DocumentUUID ) as abap.char(40) ) as RefEntityKey,
+  key cast( 'Goods Issue' as zmerp_entity_name )        as UsedInEntity,
+      cast( 'X' as abap_boolean preserving type )       as IsDocument
+}
+where CompanyCode is not initial

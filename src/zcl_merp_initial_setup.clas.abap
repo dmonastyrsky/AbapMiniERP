@@ -60,7 +60,7 @@ CLASS zcl_merp_initial_setup DEFINITION
              lines       TYPE tt_lines,
            END OF ty_gr.
 
-     "! Sales order definition (master data by seed order, dates relative to today)
+    "! Sales order definition (master data by seed order, dates relative to today)
     TYPES: BEGIN OF ty_so,
              company_no   TYPE i,
              warehouse_no TYPE i,
@@ -72,6 +72,17 @@ CLASS zcl_merp_initial_setup DEFINITION
              reject       TYPE abap_bool,
              lines        TYPE tt_lines,
            END OF ty_so.
+
+    "! Goods issue definition: lines contain only quantities differing from the open quantity;
+    "! quantity 0 removes the line (e.g. an item without stock)
+    TYPES: BEGIN OF ty_gi,
+             so_uuid     TYPE sysuuid_x16,
+             days_ago    TYPE i,
+             responsible TYPE zmerp_resp_person,
+             remarks     TYPE zmerp_remarks,
+             post        TYPE abap_bool,
+             lines       TYPE tt_lines,
+           END OF ty_gi.
 
     TYPES: BEGIN OF ty_quantity,
              item_code TYPE zmerp_item_code,
@@ -173,7 +184,7 @@ CLASS zcl_merp_initial_setup DEFINITION
         is_codes TYPE ty_codes
         out      TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
-    "! Creates sales orders covering the states possible without goods issues (Open, Rejected).
+    "! Creates sales orders and goods issues covering the main lifecycle states.
     CLASS-METHODS setup_sales_documents
       IMPORTING
         is_codes TYPE ty_codes
@@ -209,6 +220,15 @@ CLASS zcl_merp_initial_setup DEFINITION
         out               TYPE REF TO if_oo_adt_classrun_out OPTIONAL
       RETURNING
         VALUE(rv_so_uuid) TYPE sysuuid_x16 .
+
+    "! Creates a goods issue for a sales order via EML and optionally posts it.
+    "! Items are filled from the open quantities of the sales order by the goods issue logic.
+    "! @parameter is_gi | Goods issue definition
+    CLASS-METHODS create_goods_issue
+      IMPORTING
+        is_codes TYPE ty_codes
+        is_gi    TYPE ty_gi
+        out      TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
 ENDCLASS.
 
@@ -1071,11 +1091,11 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
 
   METHOD setup_sales_documents.
     " Readable amounts as in purchasing: every line net amount is a multiple of 100, so VAT and gross
-    " have no cents. Selling prices are above the purchase prices (margin on the goods issue later).
+    " have no cents. Selling prices are above the purchase prices (margin against the moving average cost).
     " The orders are placed in warehouses with stock from the purchasing documents, except SO 5.
 
     " SO 1 (1000, Media-Saturn, Hauptlager Kusel): TVs, cables and warranty, stock of PO 1
-    create_sales_order(
+    DATA(lv_so1) = create_sales_order(
       is_so = VALUE #( company_no   = 1      warehouse_no = 1 partner_no = 6
                        days_ago     = 1
                        customer_ref = 'MS-2026-0815'
@@ -1088,8 +1108,8 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       out      = out ).
 
     " SO 2 (1000, Expert, Hauptlager Frankfurt): washing machines with installation, stock of PO 2;
-    "   the dishwasher has no stock yet (it will stay open after the first goods issue)
-    create_sales_order(
+    "   the dishwasher has no stock yet (it stays open after the goods issue)
+    DATA(lv_so2) = create_sales_order(
       is_so = VALUE #( company_no   = 1      warehouse_no = 2 partner_no = 7
                        days_ago     = 1
                        customer_ref = 'EXP-55102'
@@ -1103,7 +1123,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       out      = out ).
 
     " SO 3 (2000, Conrad as customer, Lager München): audio, stock of PO 5
-    create_sales_order(
+    DATA(lv_so3) = create_sales_order(
       is_so = VALUE #( company_no   = 2      warehouse_no = 7 partner_no = 12
                        days_ago     = 0
                        customer_ref = 'CON-7781'
@@ -1126,9 +1146,8 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       is_codes = is_codes
       out      = out ).
 
-    " SO 5 (1000, Küchenstudio Schmidt, Lager Berlin): no stock in Berlin -> stays 'Open'
-    "   (demo of the availability check of the goods issue later)
-    create_sales_order(
+    " SO 5 (1000, Küchenstudio Schmidt, Lager Berlin): no stock in Berlin
+    DATA(lv_so5) = create_sales_order(
       is_so = VALUE #( company_no   = 1      warehouse_no = 3 partner_no = 10
                        days_ago     = 0
                        customer_ref = 'KS-118'
@@ -1136,6 +1155,61 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
                        remarks      = 'Espresso machines, waiting for stock'
                        lines        = VALUE #( ( item_no = 4  quantity = 2 price = '600.00' )
                                                ( item_no = 12 quantity = 4 price = '25.00' ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    " Goods issues: stock is issued at moving average cost (3 TVs of PO 1 = 3599.97 -> 1199.99 each)
+
+    " SO 1: two goods issues -> 'In Process' after the first, 'Completed' after the second
+    create_goods_issue(
+      is_gi = VALUE #( so_uuid     = lv_so1
+                       days_ago    = 0
+                       responsible = 'BRAUN_L'
+                       remarks     = 'Issue 1 of 2: 1 TV, 2 cables, 1 h warranty'
+                       post        = abap_true
+                       lines       = VALUE #( ( item_no = 7  quantity = 1 )
+                                              ( item_no = 10 quantity = 2 )
+                                              ( item_no = 14 quantity = 1 ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    create_goods_issue(
+      is_gi = VALUE #( so_uuid     = lv_so1
+                       days_ago    = 0
+                       responsible = 'BRAUN_L'
+                       remarks     = 'Issue 2 of 2: the rest of the order'
+                       post        = abap_true )
+      is_codes = is_codes
+      out      = out ).
+
+    " SO 2: everything with stock is issued, the dishwasher line is removed -> 'In Process'
+    create_goods_issue(
+      is_gi = VALUE #( so_uuid     = lv_so2
+                       days_ago    = 0
+                       responsible = 'BRAUN_L'
+                       remarks     = 'Dishwasher follows when it is in stock'
+                       post        = abap_true
+                       lines       = VALUE #( ( item_no = 3 quantity = 0 ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    " SO 3: complete goods issue -> 'Completed'
+    create_goods_issue(
+      is_gi = VALUE #( so_uuid     = lv_so3
+                       days_ago    = 0
+                       responsible = 'FISCHER_K'
+                       remarks     = 'Complete delivery'
+                       post        = abap_true )
+      is_codes = is_codes
+      out      = out ).
+
+    " SO 5: the goods issue is prepared, posting fails on the stock check (expected) -> goods issue 'New'
+    create_goods_issue(
+      is_gi = VALUE #( so_uuid     = lv_so5
+                       days_ago    = 0
+                       responsible = 'SCHMIDT_A'
+                       remarks     = 'Waiting for stock in Berlin (posting fails as expected)'
+                       post        = abap_true )
       is_codes = is_codes
       out      = out ).
 
@@ -1400,6 +1474,104 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     write_log( iv_text = |[Sales Order]: { ls_so-document_number } created, status { ls_so-status }.| out = out ).
   ENDMETHOD.
 
+    METHOD create_goods_issue.
+    IF is_gi-so_uuid IS INITIAL.
+      write_log( iv_text = '[Goods Issue]: Skipped, the sales order was not created.' out = out ).
+      RETURN.
+    ENDIF.
+
+    DATA(lv_date) = CONV d( cl_abap_context_info=>get_system_date( ) - is_gi-days_ago ).
+
+    " 1. Header with the sales order reference: header fields and items (open quantities)
+    "    are derived by the goods issue logic (deriveDocFromSalesOrder)
+    MODIFY ENTITIES OF zmerp_r_goodsissue
+      ENTITY GoodsIssue
+      CREATE FIELDS ( SoReferenceUUID DocumentDate PostingDate ResponsiblePerson Remarks )
+      WITH VALUE #( ( %cid              = 'GI'
+                      SoReferenceUUID   = is_gi-so_uuid
+                      DocumentDate      = lv_date
+                      PostingDate       = lv_date
+                      ResponsiblePerson = is_gi-responsible
+                      Remarks           = is_gi-remarks ) )
+      MAPPED DATA(ls_mapped).
+
+    DATA(lv_gi_uuid) = VALUE #( ls_mapped-goodsissue[ 1 ]-DocumentUUID OPTIONAL ).
+
+    " 2. Partial issue: the listed items get the given quantity, quantity 0 removes the line,
+    "    all others keep the open quantity
+    IF is_gi-lines IS NOT INITIAL AND lv_gi_uuid IS NOT INITIAL.
+      DATA(lt_quantities) = VALUE tt_quantities(
+        FOR gi_line IN is_gi-lines ( item_code = get_code( it_codes = is_codes-items iv_no = gi_line-item_no )
+                                     quantity  = gi_line-quantity ) ).
+
+      READ ENTITIES OF zmerp_r_goodsissue
+        ENTITY GoodsIssue BY \_Items
+        FIELDS ( ItemCode )
+        WITH VALUE #( ( DocumentUUID = lv_gi_uuid ) )
+        RESULT DATA(lt_items).
+
+      MODIFY ENTITIES OF zmerp_r_goodsissue
+        ENTITY GoodsIssueItem
+          UPDATE FIELDS ( Quantity )
+          WITH VALUE #( FOR gi_item IN lt_items
+                        FOR qty IN lt_quantities WHERE ( item_code = gi_item-ItemCode AND quantity > 0 )
+                        ( %tky     = gi_item-%tky
+                          Quantity = qty-quantity ) )
+          DELETE FROM VALUE #( FOR gi_item IN lt_items
+                               FOR qty IN lt_quantities WHERE ( item_code = gi_item-ItemCode AND quantity = 0 )
+                               ( %tky = gi_item-%tky ) ).
+    ENDIF.
+
+    COMMIT ENTITIES RESPONSE OF zmerp_r_goodsissue
+      FAILED DATA(ls_save_failed)
+      REPORTED DATA(ls_save_reported).
+
+    IF ls_save_failed IS NOT INITIAL OR lv_gi_uuid IS INITIAL.
+      write_failure(
+        iv_text     = '[Goods Issue]: Saving failed:'
+        it_messages = VALUE #( BASE VALUE #( FOR save_hdr IN ls_save_reported-goodsissue ( save_hdr-%msg ) )
+                               FOR save_itm IN ls_save_reported-goodsissueitem ( save_itm-%msg ) )
+        out         = out ).
+      ROLLBACK ENTITIES.
+      RETURN.
+    ENDIF.
+
+    " 3. Posting: stock movements and the sales order status follow the goods issue logic
+    IF is_gi-post = abap_true.
+      MODIFY ENTITIES OF zmerp_r_goodsissue
+        ENTITY GoodsIssue
+        EXECUTE postDocument
+        FROM VALUE #( ( DocumentUUID = lv_gi_uuid ) )
+        FAILED DATA(ls_post_failed)
+        REPORTED DATA(ls_post_reported).
+
+      IF ls_post_failed IS INITIAL.
+        COMMIT ENTITIES RESPONSE OF zmerp_r_goodsissue
+          FAILED DATA(ls_commit_failed)
+          REPORTED DATA(ls_commit_reported).
+      ENDIF.
+
+      IF ls_post_failed IS NOT INITIAL OR ls_commit_failed IS NOT INITIAL.
+        write_failure(
+          iv_text     = '[Goods Issue]: Posting failed:'
+          it_messages = VALUE #( BASE VALUE #( BASE VALUE #( FOR post_hdr IN ls_post_reported-goodsissue ( post_hdr-%msg ) )
+                                               FOR post_itm IN ls_post_reported-goodsissueitem ( post_itm-%msg ) )
+                                 FOR com_hdr IN ls_commit_reported-goodsissue ( com_hdr-%msg ) )
+          out         = out ).
+        ROLLBACK ENTITIES.
+      ENDIF.
+    ENDIF.
+
+    SELECT SINGLE gi~document_number, gi~status, so~document_number AS so_number, so~status AS so_status
+      FROM zmerp_gi_hdr AS gi
+      INNER JOIN zmerp_so_hdr AS so ON so~document_uuid = gi~so_reference_uuid
+      WHERE gi~document_uuid = @lv_gi_uuid
+      INTO @DATA(ls_gi).
+
+    write_log( iv_text = |[Goods Issue]: { ls_gi-document_number } for SO { ls_gi-so_number } created, | &&
+                         |status { ls_gi-status }; SO status { ls_gi-so_status }.|
+               out     = out ).
+  ENDMETHOD.
 
 
 ENDCLASS.

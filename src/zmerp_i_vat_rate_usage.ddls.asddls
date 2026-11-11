@@ -49,3 +49,12 @@ union all select from ZMERP_R_SALESORDERITM
       cast( 'X' as abap_boolean preserving type )     as IsDocument
 }
 where VatCode is not initial
+
+union all select from ZMERP_R_GOODSISSUEITM
+{
+  key VatCode                                         as VatCode,
+  key cast( bintohex( ItemUUID ) as abap.char(40) )   as RefEntityKey,
+  key cast( 'Goods Issue Item' as zmerp_entity_name ) as UsedInEntity,
+      cast( 'X' as abap_boolean preserving type )     as IsDocument
+}
+where VatCode is not initial
