@@ -90,6 +90,11 @@ annotate view ZMERP_C_GOODSISSUEITM with
   @UI.lineItem: [{ position: 35, importance: #HIGH, label: 'Open in SO' }]
   @UI.fieldGroup: [{ qualifier: 'ItemGeneralGroup', position: 35, label: 'Open in SO' }]
   SoOpenQuantity;
+  
+  @EndUserText.label: 'In Stock'
+  @UI.lineItem: [{ position: 37, importance: #HIGH, label: 'In Stock' }]
+  @UI.fieldGroup: [{ qualifier: 'ItemGeneralGroup', position: 37, label: 'In Stock' }]
+  StockQuantity;
 
   @UI.hidden: true
   SoItemReferenceUUID;

@@ -283,17 +283,18 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
   " --- Actions ---
   METHOD postDocument.
     DATA lt_update       TYPE TABLE FOR UPDATE zmerp_r_goodsissue.
+    DATA lt_stock_keys   TYPE zif_merp_stock_sel=>tt_stock_keys.
     DATA lo_message      TYPE REF TO zcx_merp_sd.
     DATA lo_item_message TYPE REF TO zcx_merp_sd.
     DATA lv_items_valid  TYPE abap_bool.
 
     READ ENTITIES OF zmerp_r_goodsissue IN LOCAL MODE
       ENTITY GoodsIssue
-        FIELDS ( Status DocumentNumber CompanyCode CurrencyCode SoReferenceUUID PostingDate )
+        FIELDS ( Status DocumentNumber CompanyCode WarehouseCode CurrencyCode SoReferenceUUID PostingDate )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_headers)
       ENTITY GoodsIssue BY \_Items
-        FIELDS ( HeaderUUID ItemNo Quantity NetAmount VatAmount GrossAmount SoItemReferenceUUID )
+        FIELDS ( HeaderUUID ItemNo ItemCode Quantity UnitOfMeasure NetAmount VatAmount GrossAmount SoItemReferenceUUID )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_items).
 
@@ -307,6 +308,31 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
     DATA(lo_so_selector) = NEW zcl_merp_doc_so_sel( ).
     DATA(lt_so_headers)  = lo_so_selector->zif_merp_doc_so_sel~read_headers( lt_so_keys ).
     DATA(lt_progress)    = lo_so_selector->zif_merp_doc_so_sel~read_progress( lt_so_keys ).
+
+    " Services are not kept in stock: only products are checked against the stock
+    DATA(lt_items_master) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items(
+      VALUE #( FOR item IN lt_items ( ItemCode = item-ItemCode ) ) ).
+
+    DATA(lt_stock_items) = lt_items.
+    LOOP AT lt_stock_items REFERENCE INTO DATA(lr_stock_item).
+      IF VALUE #( lt_items_master[ ItemCode = lr_stock_item->ItemCode ]-ItemTypeCode OPTIONAL )
+         = zif_merp_constants=>c_item_type-service.
+        DELETE lt_stock_items.
+      ENDIF.
+    ENDLOOP.
+
+    " Current stock of the affected products (ST1: current balance, not the posting date)
+    LOOP AT lt_stock_items REFERENCE INTO lr_stock_item.
+      ASSIGN lt_headers[ DocumentUUID = lr_stock_item->HeaderUUID ] TO FIELD-SYMBOL(<ls_stock_header>).
+      IF sy-subrc = 0.
+        APPEND VALUE #( CompanyCode   = <ls_stock_header>-CompanyCode
+                        WarehouseCode = <ls_stock_header>-WarehouseCode
+                        ItemCode      = lr_stock_item->ItemCode
+                        UnitOfMeasure = lr_stock_item->UnitOfMeasure ) TO lt_stock_keys.
+      ENDIF.
+    ENDLOOP.
+
+    DATA(lt_stock) = NEW zcl_merp_stock_sel( )->zif_merp_stock_sel~read_balances( lt_stock_keys ).
 
     " Open quantities and amounts are reduced by each document accepted below, so further documents
     " of the same request on the same sales order are checked against the remaining values
@@ -388,6 +414,35 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
         ENDLOOP.
       ENDIF.
 
+      " 3. Availability: the stock of every product must cover the issued quantity
+      "    (products only; several lines of one item and several documents are checked one after another)
+      IF lo_message IS NOT BOUND AND lv_items_valid = abap_true.
+        DATA(lt_stock_check) = lt_stock.
+
+        LOOP AT lt_stock_items REFERENCE INTO lr_item WHERE HeaderUUID = lr_header->DocumentUUID.
+          ASSIGN lt_stock_check[ CompanyCode   = lr_header->CompanyCode
+                                 WarehouseCode = lr_header->WarehouseCode
+                                 ItemCode      = lr_item->ItemCode
+                                 UnitOfMeasure = lr_item->UnitOfMeasure ] TO FIELD-SYMBOL(<ls_check>).
+
+          IF sy-subrc <> 0 OR <ls_check>-Quantity < lr_item->Quantity.
+            lv_items_valid = abap_false.
+            APPEND VALUE #( %tky              = lr_item->%tky
+                            %path             = VALUE #( GoodsIssue-%is_draft    = lr_item->%is_draft
+                                                         GoodsIssue-DocumentUUID = lr_item->HeaderUUID )
+                            %msg              = NEW zcx_merp_sd(
+                                                  textid   = zcx_merp_sd=>stock_would_be_negative
+                                                  severity = if_abap_behv_message=>severity-error
+                                                  attr1    = CONV #( lr_item->ItemNo )
+                                                  attr2    = CONV #( lr_item->ItemCode )
+                                                  attr3    = CONV #( lr_header->WarehouseCode ) )
+                            %element-Quantity = if_abap_behv=>mk-on ) TO reported-goodsissueitem.
+          ELSE.
+            <ls_check>-Quantity -= lr_item->Quantity.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
       IF lo_message IS BOUND OR lv_items_valid = abap_false.
         APPEND VALUE #( %tky        = lr_header->%tky
                         %fail-cause = if_abap_behv=>cause-conflict ) TO failed-goodsissue.
@@ -400,7 +455,7 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
         APPEND VALUE #( %tky   = lr_header->%tky
                         Status = zcl_merp_doc_gi_lifecycle=>c_status_posted ) TO lt_update.
 
-        " This document now takes its part of the open values
+        " This document now takes its part of the open values and of the stock
         LOOP AT lt_items REFERENCE INTO lr_item
              WHERE HeaderUUID          = lr_header->DocumentUUID
                AND SoItemReferenceUUID IS NOT INITIAL.
@@ -412,11 +467,13 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
             <ls_open>-OpenGrossAmount -= lr_item->GrossAmount.
           ENDIF.
         ENDLOOP.
+
+        lt_stock = lt_stock_check.
       ENDIF.
     ENDLOOP.
 
     IF lt_update IS NOT INITIAL.
-      " 3. Sales orders follow the issue progress including the documents posted now
+      " 4. Sales orders follow the issue progress including the documents posted now
       IF update_so_issue_status(
            it_items    = VALUE #( FOR upd IN lt_update
                                   FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
@@ -441,7 +498,7 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
         RETURN.
       ENDIF.
 
-      " 4. Goods issues are posted
+      " 5. Goods issues are posted (stock movements are written by the saver)
       MODIFY ENTITIES OF zmerp_r_goodsissue IN LOCAL MODE
         ENTITY GoodsIssue
         UPDATE FIELDS ( Status )
@@ -2137,6 +2194,112 @@ CLASS lhc_zmerp_r_goodsissueitm IMPLEMENTATION.
         ) TO reported-goodsissueitem.
       ENDIF.
     ENDLOOP.
+  ENDMETHOD.
+
+ENDCLASS.
+
+"! Saver for Goods Issue: writes stock movements (negative quantity and moving average value)
+"! when a document is posted and removes them when it leaves the posted status.
+CLASS lsc_zmerp_r_goodsissue DEFINITION INHERITING FROM cl_abap_behavior_saver.
+  PROTECTED SECTION.
+    CONSTANTS c_document_type TYPE zmerp_doc_type VALUE 'GI'.
+
+    METHODS save_modified REDEFINITION.
+ENDCLASS.
+
+CLASS lsc_zmerp_r_goodsissue IMPLEMENTATION.
+
+  METHOD save_modified.
+    DATA lt_changed    TYPE zcl_merp_stock_posting=>tt_document_keys.
+    DATA lt_posted     TYPE TABLE FOR READ IMPORT zmerp_r_goodsissue.
+    DATA lt_movements  TYPE zcl_merp_stock_posting=>tt_movements.
+    DATA lt_stock_keys TYPE zif_merp_stock_sel=>tt_stock_keys.
+    DATA lv_amount     TYPE zmerp_net_amount.
+
+    " Only status changes are relevant for stock
+    LOOP AT update-goodsissue REFERENCE INTO DATA(lr_header)
+         WHERE %control-Status = if_abap_behv=>mk-on.
+
+      " Any status change first removes the movements of the document ...
+      APPEND VALUE #( document_uuid = lr_header->DocumentUUID ) TO lt_changed.
+
+      " ... and posted documents get new movements
+      IF zcl_merp_doc_gi_lifecycle=>is_posted( lr_header->Status ) = abap_true.
+        APPEND VALUE #( %key = lr_header->%key ) TO lt_posted.
+      ENDIF.
+    ENDLOOP.
+
+    zcl_merp_stock_posting=>delete_document_movements( lt_changed ).
+
+    IF lt_posted IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    READ ENTITIES OF zmerp_r_goodsissue IN LOCAL MODE
+      ENTITY GoodsIssue
+        FIELDS ( CompanyCode WarehouseCode CurrencyCode PostingDate )
+        WITH lt_posted
+        RESULT DATA(lt_headers)
+      ENTITY GoodsIssue BY \_Items
+        FIELDS ( HeaderUUID ItemCode Quantity UnitOfMeasure )
+        WITH CORRESPONDING #( lt_posted )
+        RESULT DATA(lt_items).
+
+    " Current stock quantity and value of the issued items (ST1), read after the old movements are removed
+    LOOP AT lt_items REFERENCE INTO DATA(lr_item).
+      ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<ls_header>).
+      IF sy-subrc = 0.
+        APPEND VALUE #( CompanyCode   = <ls_header>-CompanyCode
+                        WarehouseCode = <ls_header>-WarehouseCode
+                        ItemCode      = lr_item->ItemCode
+                        UnitOfMeasure = lr_item->UnitOfMeasure ) TO lt_stock_keys.
+      ENDIF.
+    ENDLOOP.
+
+    DATA(lt_stock) = NEW zcl_merp_stock_sel( )->zif_merp_stock_sel~read_balances( lt_stock_keys ).
+
+    " One outgoing movement per goods issue item at moving average cost (ST2):
+    " quantity x stock value / stock quantity; the whole remaining quantity takes the whole remaining value,
+    " so the stock value closes at exactly 0.00. The balance is reduced item by item, so several items
+    " and documents of one save are valued one after another. Services have no stock (value 0)
+    " and are skipped by the stock posting.
+    LOOP AT lt_items REFERENCE INTO lr_item.
+      ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO <ls_header>.
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+
+      CLEAR lv_amount.
+      ASSIGN lt_stock[ CompanyCode   = <ls_header>-CompanyCode
+                       WarehouseCode = <ls_header>-WarehouseCode
+                       ItemCode      = lr_item->ItemCode
+                       UnitOfMeasure = lr_item->UnitOfMeasure ] TO FIELD-SYMBOL(<ls_stock>).
+      IF sy-subrc = 0 AND <ls_stock>-Quantity > 0.
+        lv_amount = COND #( WHEN lr_item->Quantity >= <ls_stock>-Quantity
+                              THEN <ls_stock>-StockValue
+                            ELSE round( val = CONV decfloat34( lr_item->Quantity ) * <ls_stock>-StockValue
+                                              / <ls_stock>-Quantity
+                                        dec = 2 ) ).
+        <ls_stock>-Quantity   -= lr_item->Quantity.
+        <ls_stock>-StockValue -= lv_amount.
+      ENDIF.
+
+      APPEND VALUE #(
+        document_uuid      = lr_item->HeaderUUID
+        document_item_uuid = lr_item->ItemUUID
+        company_code       = <ls_header>-CompanyCode
+        warehouse_code     = <ls_header>-WarehouseCode
+        item_code          = lr_item->ItemCode
+        quantity           = - lr_item->Quantity
+        unit_of_measure    = lr_item->UnitOfMeasure
+        amount             = - lv_amount
+        currency_code      = <ls_header>-CurrencyCode
+        posting_date       = <ls_header>-PostingDate
+      ) TO lt_movements.
+    ENDLOOP.
+
+    zcl_merp_stock_posting=>insert_movements( iv_document_type = c_document_type
+                                              it_movements     = lt_movements ).
   ENDMETHOD.
 
 ENDCLASS.

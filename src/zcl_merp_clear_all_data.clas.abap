@@ -46,6 +46,24 @@ CLASS zcl_merp_clear_all_data IMPLEMENTATION.
     " ------------------------------------------------------------------
     " 1. Documents (child tables first) and stock movements
     " ------------------------------------------------------------------
+
+    clear_entity(
+      iv_label      = 'Stock Movements'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_stock_mov-table_db )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Goods Issue Items'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_gi_itm-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_gi_itm-table_draft )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Goods Issue Header'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_gi-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_gi-table_draft )
+      out           = out ).
+
     clear_entity(
       iv_label      = 'Goods Receipt Items'
       iv_active_tab = CONV tabname( zif_merp_constants=>c_gr_itm-table_db )
@@ -56,11 +74,6 @@ CLASS zcl_merp_clear_all_data IMPLEMENTATION.
       iv_label      = 'Goods Receipt Header'
       iv_active_tab = CONV tabname( zif_merp_constants=>c_gr-table_db )
       iv_draft_tab  = CONV tabname( zif_merp_constants=>c_gr-table_draft )
-      out           = out ).
-
-    clear_entity(
-      iv_label      = 'Stock Movements'
-      iv_active_tab = CONV tabname( zif_merp_constants=>c_stock_mov-table_db )
       out           = out ).
 
     clear_entity(
