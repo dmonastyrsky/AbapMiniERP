@@ -908,6 +908,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     "   PO 7: TV 4 x 599.99 at 19% VAT = 2399.96 net, VAT 455.9924 -> 455.99
     "     GR 1:  2 TVs = 1199.98 net, VAT 228.00;  GR 2: 1 TV = 599.99 net, VAT 114.00
     "     The last TV stays open for a live demo: 114.00 by calculation, takes 455.99 - 342.00 = 113.99
+    " PO 8 and PO 9 receive the same item at two prices: the moving average cost of SO 6 has cents.
     " Units: EA for goods, H for services charged by the hour (units of the SAP standard).
 
     " PO 1 (1000, Samsung): received completely by two goods receipts -> 'Completed'
@@ -1077,6 +1078,49 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
       is_codes = is_codes
       out      = out ).
 
+    " PO 8 and PO 9 (3000, Hauptlager Kusel): the same soundbar received at two prices,
+    "   so the moving average cost has cents (issued by SO 6, see the sales documents):
+    "   2 x 250.00 + 1 x 500.00 = 3 pieces for 1000.00 -> 333.333... per piece
+    " PO 8 (3000, Sony): received completely -> 'Completed'
+    DATA(lv_po8) = create_purchase_order(
+      is_po = VALUE #( company_no   = 3      warehouse_no = 9 partner_no = 5
+                       days_ago     = 3      delivery_in  = 1
+                       responsible  = 'WEBER_J'
+                       remarks      = 'Soundbars for Kusel, first delivery'
+                       release      = abap_true
+                       lines        = VALUE #( ( item_no = 8 quantity = 2 price = '250.00' ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    create_goods_receipt(
+      is_gr = VALUE #( po_uuid     = lv_po8
+                       days_ago    = 2
+                       responsible = 'WEBER_J'
+                       remarks     = 'Complete delivery'
+                       post        = abap_true )
+      is_codes = is_codes
+      out      = out ).
+
+    " PO 9 (3000, Conrad as supplier): the same soundbar at a higher price -> 'Completed'
+    DATA(lv_po9) = create_purchase_order(
+      is_po = VALUE #( company_no   = 3      warehouse_no = 9 partner_no = 12
+                       days_ago     = 1      delivery_in  = 1
+                       responsible  = 'WEBER_J'
+                       remarks      = 'Urgent soundbar at a higher price'
+                       release      = abap_true
+                       lines        = VALUE #( ( item_no = 8 quantity = 1 price = '500.00' ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    create_goods_receipt(
+      is_gr = VALUE #( po_uuid     = lv_po9
+                       days_ago    = 0
+                       responsible = 'WEBER_J'
+                       remarks     = 'Complete delivery'
+                       post        = abap_true )
+      is_codes = is_codes
+      out      = out ).
+
     " Summary: resulting purchase order statuses
     SELECT document_number, status
       FROM zmerp_po_hdr
@@ -1093,6 +1137,7 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
     " Readable amounts as in purchasing: every line net amount is a multiple of 100, so VAT and gross
     " have no cents. Selling prices are above the purchase prices (margin against the moving average cost).
     " The orders are placed in warehouses with stock from the purchasing documents, except SO 5.
+    " Issue values follow the moving average cost; SO 6 shows a value with cents (stock bought at two prices).
 
     " SO 1 (1000, Media-Saturn, Hauptlager Kusel): TVs, cables and warranty, stock of PO 1
     DATA(lv_so1) = create_sales_order(
@@ -1210,6 +1255,30 @@ CLASS zcl_merp_initial_setup IMPLEMENTATION.
                        responsible = 'SCHMIDT_A'
                        remarks     = 'Waiting for stock in Berlin (posting fails as expected)'
                        post        = abap_true )
+      is_codes = is_codes
+      out      = out ).
+
+    " SO 6 (3000, Elektro-Service Müller, Hauptlager Kusel): soundbars of PO 8 and PO 9,
+    "   stock 3 pieces for 1000.00. The goods issue of 1 piece is valued at 1000.00 / 3 = 333.33
+    "   (stock 2 pieces for 666.67) -> 'In Process'. The rest stays open for a live demo:
+    "   issuing the last 2 pieces takes the whole remaining value 666.67, the stock closes at 0.00
+    DATA(lv_so6) = create_sales_order(
+      is_so = VALUE #( company_no   = 3      warehouse_no = 9 partner_no = 9
+                       days_ago     = 0
+                       customer_ref = 'ESM-2026-31'
+                       responsible  = 'WEBER_J'
+                       remarks      = 'Soundbars for a hotel project'
+                       lines        = VALUE #( ( item_no = 8 quantity = 3 price = '500.00' ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    create_goods_issue(
+      is_gi = VALUE #( so_uuid     = lv_so6
+                       days_ago    = 0
+                       responsible = 'WEBER_J'
+                       remarks     = 'Issue 1 of 2: moving average cost with cents'
+                       post        = abap_true
+                       lines       = VALUE #( ( item_no = 8 quantity = 1 ) ) )
       is_codes = is_codes
       out      = out ).
 
