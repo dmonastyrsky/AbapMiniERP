@@ -1072,9 +1072,7 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
 
   " --- Determinations on save ---
   METHOD assignDocumentNumber.
-    DATA lt_company_headers TYPE TABLE FOR READ RESULT zmerp_r_goodsissue.
-    DATA lt_codes           TYPE string_table.
-    DATA lt_gi_update       TYPE TABLE FOR UPDATE zmerp_r_goodsissue.
+    DATA lt_gi_update TYPE TABLE FOR UPDATE zmerp_r_goodsissue.
 
     READ ENTITIES OF zmerp_r_goodsissue IN LOCAL MODE
       ENTITY GoodsIssue
@@ -1086,31 +1084,17 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
     " (that case is reported by validateHeaderFields)
     DELETE lt_headers WHERE DocumentNumber IS NOT INITIAL OR CompanyCode IS INITIAL.
 
-    " Numbers are drawn per company (the company is the number range subobject)
-    LOOP AT lt_headers INTO DATA(ls_header)
-         GROUP BY ( company_code = ls_header-CompanyCode )
-         INTO DATA(lg_company).
+    " Numbers per company (the company is the number range subobject); a document left without a number
+    " by an NRO error is rejected by validateDocumentNumber
+    DATA(lt_numbers) = zcl_merp_num_range_util=>get_doc_numbers(
+      is_meta     = zif_merp_constants=>c_gi
+      it_requests = VALUE #( FOR header IN lt_headers ( HeaderUUID  = header-DocumentUUID
+                                                        IsDraft     = header-%is_draft
+                                                        CompanyCode = header-CompanyCode ) ) ).
 
-      lt_company_headers = VALUE #( FOR member IN GROUP lg_company ( member ) ).
-
-      " An NRO error leaves the documents of this company without a number
-      TRY.
-          lt_codes = zcl_merp_num_range_util=>get_next_gi_numbers_nro(
-            iv_company_code = lg_company-company_code
-            iv_count        = lines( lt_company_headers ) ).
-        CATCH cx_number_ranges.
-          CLEAR lt_codes.
-      ENDTRY.
-
-      " Numbers in the order of the documents; a document without a number is rejected by validateDocumentNumber
-      LOOP AT lt_company_headers REFERENCE INTO DATA(lr_header).
-        DATA(lv_code) = VALUE string( lt_codes[ sy-tabix ] OPTIONAL ).
-        IF lv_code IS NOT INITIAL.
-          APPEND VALUE #( %tky           = lr_header->%tky
-                          DocumentNumber = CONV #( lv_code ) ) TO lt_gi_update.
-        ENDIF.
-      ENDLOOP.
-    ENDLOOP.
+    lt_gi_update = VALUE #( FOR number IN lt_numbers ( %is_draft      = number-IsDraft
+                                                       DocumentUUID   = number-HeaderUUID
+                                                       DocumentNumber = number-DocumentNumber ) ).
 
     IF lt_gi_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_goodsissue IN LOCAL MODE

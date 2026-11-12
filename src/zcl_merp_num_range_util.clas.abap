@@ -5,6 +5,22 @@ CLASS zcl_merp_num_range_util DEFINITION
 
   PUBLIC SECTION.
 
+    "! Document of the same type that needs a number (the company code is the number range subobject)
+    TYPES: BEGIN OF ty_doc_number_request,
+             HeaderUUID  TYPE sysuuid_x16,
+             IsDraft     TYPE abp_behv_flag,
+             CompanyCode TYPE zmerp_company_code,
+           END OF ty_doc_number_request,
+           tt_doc_number_requests TYPE STANDARD TABLE OF ty_doc_number_request WITH EMPTY KEY.
+
+    "! Number drawn for a document
+    TYPES: BEGIN OF ty_doc_number,
+             HeaderUUID     TYPE sysuuid_x16,
+             IsDraft        TYPE abp_behv_flag,
+             DocumentNumber TYPE zmerp_doc_num,
+           END OF ty_doc_number,
+           tt_doc_numbers TYPE STANDARD TABLE OF ty_doc_number WITH EMPTY KEY.
+
     " Bulk NRO Generation Methods
     "! Generates multiple sequential Business Partner codes via NRO.
     "! @parameter iv_count | Total count of sequential codes requested
@@ -61,57 +77,18 @@ CLASS zcl_merp_num_range_util DEFINITION
       RAISING
         cx_number_ranges.
 
-    "! Generates multiple sequential Purchase Order numbers via NRO.
-    "! @parameter iv_company_code | Company code context
-    "! @parameter iv_count        | Total count of sequential numbers requested
-    "! @parameter rt_numbers      | Table of generated formatted Purchase Order numbers
-    CLASS-METHODS get_next_po_numbers_nro
+    "! Draws document numbers via NRO: one bulk call per company code, numbers in the order of the documents.
+    "! Documents of a company whose numbers cannot be drawn get none (no fallback, N1): the caller's
+    "! validation rejects them.
+    "! @parameter is_meta      | NRO metadata of the document type (zif_merp_constants=>c_po, c_gr, c_so, c_gi)
+    "! @parameter it_requests  | Documents without a number, with company code
+    "! @parameter rt_numbers   | Drawn numbers (documents without a number are missing)
+    CLASS-METHODS get_doc_numbers
       IMPORTING
-        iv_company_code TYPE zmerp_company_code
-        iv_count        TYPE i
+        is_meta           TYPE zif_merp_constants=>ty_entity_metadata
+        it_requests       TYPE tt_doc_number_requests
       RETURNING
-        VALUE(rt_numbers) TYPE string_table
-      RAISING
-        cx_number_ranges.
-
-    "! Generates multiple sequential Goods Receipt numbers via NRO.
-    "! @parameter iv_company_code | Company code context
-    "! @parameter iv_count        | Total count of sequential numbers requested
-    "! @parameter rt_numbers      | Table of generated formatted Goods Receipt numbers
-    CLASS-METHODS get_next_gr_numbers_nro
-      IMPORTING
-        iv_company_code TYPE zmerp_company_code
-        iv_count        TYPE i
-      RETURNING
-        VALUE(rt_numbers) TYPE string_table
-      RAISING
-        cx_number_ranges.
-
-    "! Generates multiple sequential Sales Order numbers via NRO.
-    "! @parameter iv_company_code | Company code context
-    "! @parameter iv_count        | Total count of sequential numbers requested
-    "! @parameter rt_numbers      | Table of generated formatted Sales Order numbers
-    CLASS-METHODS get_next_so_numbers_nro
-      IMPORTING
-        iv_company_code TYPE zmerp_company_code
-        iv_count        TYPE i
-      RETURNING
-        VALUE(rt_numbers) TYPE string_table
-      RAISING
-        cx_number_ranges.
-
-    "! Generates multiple sequential Goods Issue numbers via NRO.
-    "! @parameter iv_company_code | Company code context
-    "! @parameter iv_count        | Total count of sequential numbers requested
-    "! @parameter rt_numbers      | Table of generated formatted Goods Issue numbers
-    CLASS-METHODS get_next_gi_numbers_nro
-      IMPORTING
-        iv_company_code TYPE zmerp_company_code
-        iv_count        TYPE i
-      RETURNING
-        VALUE(rt_numbers) TYPE string_table
-      RAISING
-        cx_number_ranges.
+        VALUE(rt_numbers) TYPE tt_doc_numbers.
 
     " NRO Setup & Administration
     "! Synchronizes current NRO interval levels for Master Data with actual active database record counts.
@@ -255,28 +232,35 @@ CLASS zcl_merp_num_range_util IMPLEMENTATION.
     rt_codes = get_next_codes_nro( is_meta = zif_merp_constants=>c_wh iv_count = iv_count ).
   ENDMETHOD.
 
-  METHOD get_next_po_numbers_nro.
-    rt_numbers = get_next_doc_numbers_nro( is_meta         = zif_merp_constants=>c_po
-                                           iv_company_code = iv_company_code
-                                           iv_count        = iv_count ).
-  ENDMETHOD.
+  METHOD get_doc_numbers.
+    DATA lt_numbers TYPE string_table.
 
-  METHOD get_next_gr_numbers_nro.
-    rt_numbers = get_next_doc_numbers_nro( is_meta         = zif_merp_constants=>c_gr
-                                           iv_company_code = iv_company_code
-                                           iv_count        = iv_count ).
-  ENDMETHOD.
+    LOOP AT it_requests INTO DATA(ls_request)
+         GROUP BY ls_request-CompanyCode
+         INTO DATA(lv_company_code).
 
-  METHOD get_next_so_numbers_nro.
-    rt_numbers = get_next_doc_numbers_nro( is_meta         = zif_merp_constants=>c_so
-                                           iv_company_code = iv_company_code
-                                           iv_count        = iv_count ).
-  ENDMETHOD.
+      DATA(lt_company_requests) = VALUE tt_doc_number_requests( FOR member IN GROUP lv_company_code ( member ) ).
 
-  METHOD get_next_gi_numbers_nro.
-    rt_numbers = get_next_doc_numbers_nro( is_meta         = zif_merp_constants=>c_gi
-                                           iv_company_code = iv_company_code
-                                           iv_count        = iv_count ).
+      " An NRO error leaves the documents of this company without a number
+      TRY.
+          lt_numbers = get_next_doc_numbers_nro( is_meta         = is_meta
+                                                 iv_company_code = lv_company_code
+                                                 iv_count        = lines( lt_company_requests ) ).
+        CATCH cx_number_ranges.
+          CLEAR lt_numbers.
+      ENDTRY.
+
+      " Numbers in the order of the documents
+      LOOP AT lt_company_requests INTO DATA(ls_company_request).
+        DATA(lv_number) = VALUE string( lt_numbers[ sy-tabix ] OPTIONAL ).
+        IF lv_number IS NOT INITIAL.
+          APPEND VALUE #( HeaderUUID     = ls_company_request-HeaderUUID
+                          IsDraft        = ls_company_request-IsDraft
+                          DocumentNumber = CONV #( lv_number ) ) TO rt_numbers.
+        ENDIF.
+      ENDLOOP.
+    ENDLOOP.
+
   ENDMETHOD.
 
   METHOD sync_gi_interval_from_db.
