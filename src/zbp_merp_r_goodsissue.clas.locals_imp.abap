@@ -2265,11 +2265,9 @@ ENDCLASS.
 CLASS lsc_zmerp_r_goodsissue IMPLEMENTATION.
 
   METHOD save_modified.
-    DATA lt_changed    TYPE zcl_merp_stock_posting=>tt_document_keys.
-    DATA lt_posted     TYPE TABLE FOR READ IMPORT zmerp_r_goodsissue.
-    DATA lt_movements  TYPE zcl_merp_stock_posting=>tt_movements.
-    DATA lt_stock_keys TYPE zif_merp_stock_sel=>tt_stock_keys.
-    DATA lv_amount     TYPE zmerp_net_amount.
+    DATA lt_changed   TYPE zcl_merp_stock_posting=>tt_document_keys.
+    DATA lt_posted    TYPE TABLE FOR READ IMPORT zmerp_r_goodsissue.
+    DATA lt_movements TYPE zcl_merp_stock_posting=>tt_movements.
 
     " Only status changes are relevant for stock
     LOOP AT update-goodsissue REFERENCE INTO DATA(lr_header)
@@ -2300,43 +2298,12 @@ CLASS lsc_zmerp_r_goodsissue IMPLEMENTATION.
         WITH CORRESPONDING #( lt_posted )
         RESULT DATA(lt_items).
 
-    " Current stock quantity and value of the issued items (ST1), read after the old movements are removed
+    " One outgoing movement per goods issue item: negative quantity; the value is computed
+    " by the stock posting at moving average cost (ST2)
     LOOP AT lt_items REFERENCE INTO DATA(lr_item).
       ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<ls_header>).
-      IF sy-subrc = 0.
-        APPEND VALUE #( CompanyCode   = <ls_header>-CompanyCode
-                        WarehouseCode = <ls_header>-WarehouseCode
-                        ItemCode      = lr_item->ItemCode
-                        UnitOfMeasure = lr_item->UnitOfMeasure ) TO lt_stock_keys.
-      ENDIF.
-    ENDLOOP.
-
-    DATA(lt_stock) = NEW zcl_merp_stock_sel( )->zif_merp_stock_sel~read_balances( lt_stock_keys ).
-
-    " One outgoing movement per goods issue item at moving average cost (ST2):
-    " quantity x stock value / stock quantity; the whole remaining quantity takes the whole remaining value,
-    " so the stock value closes at exactly 0.00. The balance is reduced item by item, so several items
-    " and documents of one save are valued one after another. Services have no stock (value 0)
-    " and are skipped by the stock posting.
-    LOOP AT lt_items REFERENCE INTO lr_item.
-      ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO <ls_header>.
       IF sy-subrc <> 0.
         CONTINUE.
-      ENDIF.
-
-      CLEAR lv_amount.
-      ASSIGN lt_stock[ CompanyCode   = <ls_header>-CompanyCode
-                       WarehouseCode = <ls_header>-WarehouseCode
-                       ItemCode      = lr_item->ItemCode
-                       UnitOfMeasure = lr_item->UnitOfMeasure ] TO FIELD-SYMBOL(<ls_stock>).
-      IF sy-subrc = 0 AND <ls_stock>-Quantity > 0.
-        lv_amount = COND #( WHEN lr_item->Quantity >= <ls_stock>-Quantity
-                              THEN <ls_stock>-StockValue
-                            ELSE round( val = CONV decfloat34( lr_item->Quantity ) * <ls_stock>-StockValue
-                                              / <ls_stock>-Quantity
-                                        dec = 2 ) ).
-        <ls_stock>-Quantity   -= lr_item->Quantity.
-        <ls_stock>-StockValue -= lv_amount.
       ENDIF.
 
       APPEND VALUE #(
@@ -2347,7 +2314,6 @@ CLASS lsc_zmerp_r_goodsissue IMPLEMENTATION.
         item_code          = lr_item->ItemCode
         quantity           = - lr_item->Quantity
         unit_of_measure    = lr_item->UnitOfMeasure
-        amount             = - lv_amount
         currency_code      = <ls_header>-CurrencyCode
         posting_date       = <ls_header>-PostingDate
       ) TO lt_movements.

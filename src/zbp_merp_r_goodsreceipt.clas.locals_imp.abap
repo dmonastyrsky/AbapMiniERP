@@ -2333,5 +2333,3 @@ CLASS lsc_zmerp_r_goodsreceipt IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-
-
