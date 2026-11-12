@@ -286,6 +286,7 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
     DATA lo_message      TYPE REF TO zcx_merp_sd.
     DATA lo_item_message TYPE REF TO zcx_merp_sd.
     DATA lv_items_valid  TYPE abap_bool.
+    DATA ls_so           TYPE zif_merp_doc_so_sel=>ty_header.
 
     READ ENTITIES OF zmerp_r_goodsissue IN LOCAL MODE
       ENTITY GoodsIssue
@@ -328,14 +329,25 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
     DATA(lt_so_headers)  = lo_so_selector->zif_merp_doc_so_sel~read_headers( lt_so_keys ).
     DATA(lt_progress)    = lo_so_selector->zif_merp_doc_so_sel~read_progress( lt_so_keys ).
 
+    " Items and open values in the shape of the shared follow-up logic (order item reference mapped, C15).
     " Open quantities and amounts are reduced by each document accepted below, so further documents
     " of the same request on the same sales order are checked against the remaining values
     " (lt_progress stays unchanged: the sales order status is derived from it including all documents)
-    DATA(lt_open) = lt_progress.
+    DATA(lt_doc_items) = CORRESPONDING zcl_merp_doc_item_logic=>tt_items(
+      lt_items MAPPING IsDraft                = %is_draft
+                       OrderItemReferenceUUID = SoItemReferenceUUID ).
+
+    DATA(lt_open) = CORRESPONDING zcl_merp_doc_order_ref_logic=>tt_order_items(
+      lt_progress MAPPING OrderUUID     = SoHeaderUUID
+                          OrderItemUUID = SoItemUUID
+                          DoneQuantity  = IssuedQuantity ).
 
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       CLEAR lo_message.
       lv_items_valid = abap_true.
+
+      " Sales order of the document (initial if it does not exist)
+      ls_so = VALUE #( lt_so_headers[ DocumentUUID = lr_header->SoReferenceUUID ] OPTIONAL ).
 
       " 1. Header checks
       IF zcl_merp_doc_gi_lifecycle=>can_post( lr_header->Status ) = abap_false.
@@ -349,8 +361,7 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
         " The sales order is edited or posted by another user
         lo_message = NEW #( textid   = zcx_merp_sd=>document_locked
                             severity = if_abap_behv_message=>severity-error
-                            attr1    = CONV #( VALUE #( lt_so_headers[ DocumentUUID = lr_header->SoReferenceUUID ]-DocumentNumber
-                                                        OPTIONAL ) ) ).
+                            attr1    = CONV #( ls_so-DocumentNumber ) ).
       ELSEIF NOT line_exists( lt_companies[ CompanyCode  = lr_header->CompanyCode
                                             CurrencyCode = lr_header->CurrencyCode ] ).
         " Stock is valuated in the company currency (no currency conversion yet)
@@ -359,19 +370,16 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
                             attr1    = CONV #( lr_header->CurrencyCode )
                             attr2    = CONV #( VALUE #( lt_companies[ CompanyCode = lr_header->CompanyCode ]-CurrencyCode
                                                         OPTIONAL ) ) ).
-      ELSEIF zcl_merp_doc_so_lifecycle=>can_issue_goods(
-               VALUE #( lt_so_headers[ DocumentUUID = lr_header->SoReferenceUUID ]-Status OPTIONAL ) ) = abap_false.
+      ELSEIF zcl_merp_doc_so_lifecycle=>can_issue_goods( ls_so-Status ) = abap_false.
         " The sales order may have been completed or rejected in the meantime
         lo_message = NEW #( textid   = zcx_merp_sd=>so_issue_not_allowed
                             severity = if_abap_behv_message=>severity-error
-                            attr1    = CONV #( VALUE #( lt_so_headers[ DocumentUUID = lr_header->SoReferenceUUID ]-DocumentNumber
-                                                        OPTIONAL ) ) ).
-      ELSEIF lr_header->PostingDate < VALUE #( lt_so_headers[ DocumentUUID = lr_header->SoReferenceUUID ]-DocumentDate
-                                               OPTIONAL ).
+                            attr1    = CONV #( ls_so-DocumentNumber ) ).
+      ELSEIF lr_header->PostingDate < ls_so-DocumentDate.
         " Goods cannot be issued before they were ordered
         lo_message = NEW #( textid   = zcx_merp_sd=>posting_date_before_so_date
                             severity = if_abap_behv_message=>severity-error
-                            attr1    = |{ lt_so_headers[ DocumentUUID = lr_header->SoReferenceUUID ]-DocumentDate DATE = ISO }| ).
+                            attr1    = |{ ls_so-DocumentDate DATE = ISO }| ).
       ENDIF.
 
       " 2. The stock of an item is being posted by another user: the document waits for the next attempt
@@ -393,40 +401,38 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
 
       " 3. Items of the sales order are checked against its current open quantities and amounts
       IF lo_message IS NOT BOUND.
-        LOOP AT lt_items REFERENCE INTO DATA(lr_item)
-             WHERE HeaderUUID          = lr_header->DocumentUUID
-               AND SoItemReferenceUUID IS NOT INITIAL.
-          CLEAR lo_item_message.
+        DATA(lt_open_checks) = zcl_merp_doc_order_ref_logic=>check_open_values(
+          it_items       = VALUE #( FOR doc_item IN lt_doc_items WHERE ( HeaderUUID = lr_header->DocumentUUID )
+                                    ( doc_item ) )
+          it_order_items = lt_open ).
 
-          ASSIGN lt_open[ SoItemUUID = lr_item->SoItemReferenceUUID ] TO FIELD-SYMBOL(<ls_open>).
+        LOOP AT lt_items REFERENCE INTO DATA(lr_item) WHERE HeaderUUID = lr_header->DocumentUUID.
+          ASSIGN lt_open_checks[ ItemUUID = lr_item->ItemUUID ] TO FIELD-SYMBOL(<ls_check>).
           IF sy-subrc <> 0.
-            " The referenced sales order item does not exist (any more)
-            lo_item_message = NEW #( textid   = zcx_merp_sd=>so_item_not_found
-                                     severity = if_abap_behv_message=>severity-error
-                                     attr1    = CONV #( lr_item->ItemNo ) ).
-          ELSEIF lr_item->Quantity > <ls_open>-OpenQuantity.
-            lo_item_message = NEW #( textid   = zcx_merp_sd=>so_open_quantity_exceeded
-                                     severity = if_abap_behv_message=>severity-error
-                                     attr1    = CONV #( lr_item->ItemNo )
-                                     attr2    = CONV #( <ls_open>-OpenQuantity ) ).
-          " The whole open quantity must take exactly the open amounts, so the order item is closed to zero
-          ELSEIF lr_item->Quantity = <ls_open>-OpenQuantity
-             AND ( lr_item->NetAmount   <> <ls_open>-OpenNetAmount
-                OR lr_item->VatAmount   <> <ls_open>-OpenVatAmount
-                OR lr_item->GrossAmount <> <ls_open>-OpenGrossAmount ).
-            lo_item_message = NEW #( textid   = zcx_merp_sd=>so_open_amounts_changed
-                                     severity = if_abap_behv_message=>severity-error
-                                     attr1    = CONV #( lr_item->ItemNo ) ).
+            CONTINUE.
           ENDIF.
 
-          IF lo_item_message IS BOUND.
-            lv_items_valid = abap_false.
-            APPEND VALUE #( %tky              = lr_item->%tky
-                            %path             = VALUE #( GoodsIssue-%is_draft    = lr_item->%is_draft
-                                                         GoodsIssue-DocumentUUID = lr_item->HeaderUUID )
-                            %msg              = lo_item_message
-                            %element-Quantity = if_abap_behv=>mk-on ) TO reported-goodsissueitem.
-          ENDIF.
+          " Message of the first failing rule: order item missing, quantity above open, open amounts changed
+          lo_item_message = SWITCH #( <ls_check>-Result
+            WHEN zcl_merp_doc_order_ref_logic=>c_open_check-item_not_found
+              THEN NEW #( textid   = zcx_merp_sd=>so_item_not_found
+                          severity = if_abap_behv_message=>severity-error
+                          attr1    = CONV #( lr_item->ItemNo ) )
+            WHEN zcl_merp_doc_order_ref_logic=>c_open_check-quantity_exceeded
+              THEN NEW #( textid   = zcx_merp_sd=>so_open_quantity_exceeded
+                          severity = if_abap_behv_message=>severity-error
+                          attr1    = CONV #( lr_item->ItemNo )
+                          attr2    = CONV #( <ls_check>-OpenQuantity ) )
+            ELSE NEW #( textid   = zcx_merp_sd=>so_open_amounts_changed
+                        severity = if_abap_behv_message=>severity-error
+                        attr1    = CONV #( lr_item->ItemNo ) ) ).
+
+          lv_items_valid = abap_false.
+          APPEND VALUE #( %tky              = lr_item->%tky
+                          %path             = VALUE #( GoodsIssue-%is_draft    = lr_item->%is_draft
+                                                       GoodsIssue-DocumentUUID = lr_item->HeaderUUID )
+                          %msg              = lo_item_message
+                          %element-Quantity = if_abap_behv=>mk-on ) TO reported-goodsissueitem.
         ENDLOOP.
       ENDIF.
 
@@ -472,17 +478,10 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
                         Status = zcl_merp_doc_gi_lifecycle=>c_status_posted ) TO lt_update.
 
         " This document now takes its part of the open values
-        LOOP AT lt_items REFERENCE INTO lr_item
-             WHERE HeaderUUID          = lr_header->DocumentUUID
-               AND SoItemReferenceUUID IS NOT INITIAL.
-          ASSIGN lt_open[ SoItemUUID = lr_item->SoItemReferenceUUID ] TO <ls_open>.
-          IF sy-subrc = 0.
-            <ls_open>-OpenQuantity    -= lr_item->Quantity.
-            <ls_open>-OpenNetAmount   -= lr_item->NetAmount.
-            <ls_open>-OpenVatAmount   -= lr_item->VatAmount.
-            <ls_open>-OpenGrossAmount -= lr_item->GrossAmount.
-          ENDIF.
-        ENDLOOP.
+        zcl_merp_doc_order_ref_logic=>consume_open_values(
+          EXPORTING it_items       = VALUE #( FOR doc_item IN lt_doc_items WHERE ( HeaderUUID = lr_header->DocumentUUID )
+                                              ( doc_item ) )
+          CHANGING  ct_order_items = lt_open ).
       ENDIF.
     ENDLOOP.
 
@@ -1450,48 +1449,25 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
 
   " --- Helpers ---
   METHOD calc_so_issue_status.
-    LOOP AT it_progress INTO DATA(ls_progress)
-         GROUP BY ( so_uuid   = ls_progress-SoHeaderUUID
-                    so_status = ls_progress-SoStatus )
-         INTO DATA(lg_so).
+    " Issued / ordered per touched sales order after posting or unposting the given items
+    DATA(lt_order_progress) = zcl_merp_doc_order_ref_logic=>calc_order_progress(
+      it_items       = it_items
+      it_order_items = CORRESPONDING #( it_progress MAPPING OrderUUID     = SoHeaderUUID
+                                                            OrderItemUUID = SoItemUUID
+                                                            DoneQuantity  = IssuedQuantity )
+      iv_sign        = iv_sign ).
 
-      DATA(lv_touched)    = abap_false.
-      DATA(lv_any_issued) = abap_false.
-      DATA(lv_all_issued) = abap_true.
-
-      LOOP AT GROUP lg_so INTO DATA(ls_so_item).
-        " Quantity of the given goods issue items for this order item
-        DATA(lv_delta) = REDUCE zmerp_quantity( INIT sum TYPE zmerp_quantity
-                                                FOR item IN it_items
-                                                WHERE ( OrderItemReferenceUUID = ls_so_item-SoItemUUID )
-                                                NEXT sum = sum + item-Quantity ).
-        IF lv_delta <> 0.
-          lv_touched = abap_true.
-        ENDIF.
-
-        " Issued quantity after posting / unposting the given items
-        DATA(lv_issued) = ls_so_item-IssuedQuantity + iv_sign * lv_delta.
-
-        IF lv_issued > 0.
-          lv_any_issued = abap_true.
-        ENDIF.
-        IF lv_issued < ls_so_item-OrderedQuantity.
-          lv_all_issued = abap_false.
-        ENDIF.
-      ENDLOOP.
-
-      " Sales orders not touched by the given items keep their status
-      IF lv_touched = abap_false.
-        CONTINUE.
-      ENDIF.
+    LOOP AT lt_order_progress REFERENCE INTO DATA(lr_order).
+      DATA(lv_status) = VALUE zmerp_so_status(
+        it_progress[ KEY ByHeader COMPONENTS SoHeaderUUID = lr_order->OrderUUID ]-SoStatus OPTIONAL ).
 
       DATA(lv_new_status) = zcl_merp_doc_so_lifecycle=>derive_issue_status(
-        iv_status     = lg_so-so_status
-        iv_any_issued = lv_any_issued
-        iv_all_issued = lv_all_issued ).
+        iv_status     = lv_status
+        iv_any_issued = lr_order->AnyDone
+        iv_all_issued = lr_order->AllDone ).
 
-      IF lv_new_status <> lg_so-so_status.
-        APPEND VALUE #( DocumentUUID = lg_so-so_uuid
+      IF lv_new_status <> lv_status.
+        APPEND VALUE #( DocumentUUID = lr_order->OrderUUID
                         Status       = lv_new_status ) TO rt_status.
       ENDIF.
     ENDLOOP.
@@ -1774,7 +1750,6 @@ CLASS lhc_zmerp_r_goodsissueitm IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD calcAmountsOnQtyPrice.
-    DATA lt_recalc       TYPE zcl_merp_doc_item_logic=>tt_items.
     DATA lt_items_update TYPE TABLE FOR UPDATE zmerp_r_goodsissue\\GoodsIssueItem.
 
     " Bulk read modified items (Quantity and Price changes) and their parent headers (sales order reference)
@@ -1796,34 +1771,22 @@ CLASS lhc_zmerp_r_goodsissueitm IMPLEMENTATION.
     DATA(lt_progress) = NEW zcl_merp_doc_so_sel( )->zif_merp_doc_so_sel~read_progress(
       VALUE #( FOR header IN lt_headers ( DocumentUUID = header-SoReferenceUUID ) ) ).
 
-    LOOP AT lt_items REFERENCE INTO DATA(lr_item).
-      ASSIGN lt_progress[ SoItemUUID = lr_item->SoItemReferenceUUID ] TO FIELD-SYMBOL(<ls_open>).
-
-      " Issuing the whole open quantity takes the open amounts, so the order item is closed to zero
-      IF sy-subrc = 0 AND lr_item->Quantity = <ls_open>-OpenQuantity.
-        IF lr_item->NetAmount   <> <ls_open>-OpenNetAmount OR
-           lr_item->VatAmount   <> <ls_open>-OpenVatAmount OR
-           lr_item->GrossAmount <> <ls_open>-OpenGrossAmount.
-          APPEND VALUE #(
-            %tky                 = lr_item->%tky
-            NetAmount            = <ls_open>-OpenNetAmount
-            VatAmount            = <ls_open>-OpenVatAmount
-            GrossAmount          = <ls_open>-OpenGrossAmount
-            %control-NetAmount   = if_abap_behv=>mk-on
-            %control-VatAmount   = if_abap_behv=>mk-on
-            %control-GrossAmount = if_abap_behv=>mk-on
-          ) TO lt_items_update.
-        ENDIF.
-      ELSE.
-        " Partial issue and items without reference: standard calculation
-        APPEND CORRESPONDING #( lr_item->* MAPPING IsDraft = %is_draft ) TO lt_recalc.
-      ENDIF.
-    ENDLOOP.
+    " Issuing the whole open quantity takes the open amounts, so the order item is closed to zero;
+    " partial issues and items without reference get the standard calculation
+    zcl_merp_doc_order_ref_logic=>apply_open_amounts(
+      EXPORTING it_items       = CORRESPONDING #( lt_items MAPPING IsDraft                = %is_draft
+                                                                   OrderItemReferenceUUID = SoItemReferenceUUID )
+                it_order_items = CORRESPONDING #( lt_progress MAPPING OrderUUID     = SoHeaderUUID
+                                                                      OrderItemUUID = SoItemUUID
+                                                                      DoneQuantity  = IssuedQuantity )
+      IMPORTING et_changed     = DATA(lt_open_changed)
+                et_calc        = DATA(lt_recalc) ).
 
     " Delegate the recalculation to the shared item logic (same for all documents), only changed items are returned
     DATA(lt_changed) = NEW zcl_merp_doc_item_logic( )->recalc_on_qty_price( lt_recalc ).
+    APPEND LINES OF lt_open_changed TO lt_changed.
 
-    " Map recalculated amounts back to the instances (UUID + draft state) of the transactional buffer
+    " Map the new amounts back to the instances (UUID + draft state) of the transactional buffer
     LOOP AT lt_changed REFERENCE INTO DATA(lr_changed).
       ASSIGN lt_items[ ItemUUID  = lr_changed->ItemUUID
                        %is_draft = lr_changed->IsDraft ] TO FIELD-SYMBOL(<ls_item>).
