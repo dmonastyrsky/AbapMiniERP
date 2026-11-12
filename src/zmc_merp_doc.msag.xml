@@ -410,6 +410,18 @@
      <MSGNR>200</MSGNR>
      <TEXT>Failed to generate Document number.</TEXT>
     </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>300</MSGNR>
+     <TEXT>Goods receipt draft for purchase order &amp;1 created, see Goods Receipts.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>301</MSGNR>
+     <TEXT>Goods issue draft for sales order &amp;1 created, see Goods Issues.</TEXT>
+    </T100>
    </T100>
   </asx:values>
  </asx:abap>

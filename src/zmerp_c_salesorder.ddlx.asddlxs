@@ -77,12 +77,14 @@ annotate view ZMERP_C_SALESORDER with
   DocumentUUID;
 
   @UI.identification: [
-    { type: #FOR_ACTION, dataAction: 'completeDocument', label: 'Complete', position: 10 },
-    { type: #FOR_ACTION, dataAction: 'rejectDocument',   label: 'Reject',   position: 20 }
+    { type: #FOR_ACTION, dataAction: 'completeDocument', label: 'Complete',    position: 10 },
+    { type: #FOR_ACTION, dataAction: 'createGoodsIssue', label: 'Goods Issue', position: 15 },
+    { type: #FOR_ACTION, dataAction: 'rejectDocument',   label: 'Reject',      position: 20 }
   ]
   @UI.lineItem: [
     { position: 10, importance: #HIGH },
     { type: #FOR_ACTION, dataAction: 'completeDocument', label: 'Complete' },
+    { type: #FOR_ACTION, dataAction: 'createGoodsIssue', label: 'Goods Issue' },
     { type: #FOR_ACTION, dataAction: 'rejectDocument',   label: 'Reject' }
   ]
 

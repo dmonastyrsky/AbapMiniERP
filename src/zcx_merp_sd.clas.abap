@@ -141,7 +141,16 @@ CLASS zcx_merp_sd DEFINITION
         attr2 TYPE scx_attrname VALUE '',
         attr3 TYPE scx_attrname VALUE '',
         attr4 TYPE scx_attrname VALUE '',
-      END OF sales_order_not_found.
+      END OF sales_order_not_found,
+
+      BEGIN OF goods_issue_draft_created,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '301',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF goods_issue_draft_created.
 
   PROTECTED SECTION.
   PRIVATE SECTION.

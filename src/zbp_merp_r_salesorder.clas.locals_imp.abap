@@ -49,6 +49,13 @@ CLASS lhc_zmerp_r_salesorder DEFINITION INHERITING FROM cl_abap_behavior_handler
         keys   FOR ACTION SalesOrder~setIssueStatus
       RESULT   result.
 
+    "! Creates a goods issue draft for the Sales Order: the goods issue takes over the order and its
+    "! open quantities exactly as when the order is selected in the goods issue (deriveDocFromSalesOrder).
+    METHODS createGoodsIssue FOR MODIFY
+      IMPORTING
+        keys   FOR ACTION SalesOrder~createGoodsIssue
+      RESULT   result.
+
     " --- Determinations on modify ---
     "! Sets default header values on document creation.
     METHODS setHeaderDefaults FOR DETERMINE ON MODIFY
@@ -155,6 +162,8 @@ CLASS lhc_zmerp_r_salesorder IMPLEMENTATION.
                              AND zcl_merp_doc_so_lifecycle=>can_complete( header-Status ) = abap_true )
           lv_reject   = xsdbool( lv_active = abap_true
                              AND zcl_merp_doc_so_lifecycle=>can_reject( header-Status ) = abap_true )
+          lv_issue    = xsdbool( lv_active = abap_true
+                             AND zcl_merp_doc_so_lifecycle=>can_issue_goods( header-Status ) = abap_true )
           lv_delete   = zcl_merp_doc_so_lifecycle=>can_delete( header-Status ) IN
       ( %tky                     = header-%tky
         %delete                  = COND #( WHEN lv_delete = abap_true
@@ -167,6 +176,9 @@ CLASS lhc_zmerp_r_salesorder IMPLEMENTATION.
                                            THEN if_abap_behv=>fc-o-enabled
                                            ELSE if_abap_behv=>fc-o-disabled )
         %action-rejectDocument   = COND #( WHEN lv_reject = abap_true
+                                           THEN if_abap_behv=>fc-o-enabled
+                                           ELSE if_abap_behv=>fc-o-disabled )
+        %action-createGoodsIssue = COND #( WHEN lv_issue = abap_true
                                            THEN if_abap_behv=>fc-o-enabled
                                            ELSE if_abap_behv=>fc-o-disabled )
         " The document number carries the company prefix, so the company is fixed once it is assigned
@@ -360,6 +372,85 @@ CLASS lhc_zmerp_r_salesorder IMPLEMENTATION.
       RESULT DATA(lt_result).
 
     result = VALUE #( FOR header IN lt_result ( %tky = header-%tky %param = header ) ).
+  ENDMETHOD.
+
+  METHOD createGoodsIssue.
+    DATA lt_issuable TYPE TABLE FOR READ RESULT zmerp_r_salesorder.
+
+    READ ENTITIES OF zmerp_r_salesorder IN LOCAL MODE
+      ENTITY SalesOrder
+      FIELDS ( Status DocumentNumber )
+      WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_headers).
+
+    " Goods can be issued only for 'Open' and 'In Process' orders
+    " (the action is hidden otherwise; the check also covers EML callers)
+    LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
+      IF zcl_merp_doc_so_lifecycle=>can_issue_goods( lr_header->Status ) = abap_true.
+        APPEND lr_header->* TO lt_issuable.
+      ELSE.
+        APPEND VALUE #( %tky        = lr_header->%tky
+                        %fail-cause = if_abap_behv=>cause-conflict ) TO failed-salesorder.
+        APPEND VALUE #( %tky                     = lr_header->%tky
+                        %msg                     = NEW zcx_merp_sd(
+                                                     textid   = zcx_merp_sd=>so_issue_not_allowed
+                                                     severity = if_abap_behv_message=>severity-error
+                                                     attr1    = CONV #( lr_header->DocumentNumber ) )
+                        %action-createGoodsIssue = if_abap_behv=>mk-on ) TO reported-salesorder.
+      ENDIF.
+    ENDLOOP.
+
+    IF lt_issuable IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    " The same path as selecting the order in a goods issue: only the order reference is set,
+    " header fields and items (open quantities and amounts) are derived by the goods issue itself
+    MODIFY ENTITIES OF zmerp_r_goodsissue
+      ENTITY GoodsIssue
+      CREATE FIELDS ( SoReferenceUUID )
+      WITH VALUE #( FOR so IN lt_issuable
+                    ( %cid            = |{ so-DocumentUUID }|
+                      %is_draft       = if_abap_behv=>mk-on
+                      SoReferenceUUID = so-DocumentUUID ) )
+      MAPPED DATA(ls_gi_mapped)
+      FAILED DATA(ls_gi_failed)
+      REPORTED DATA(ls_gi_reported).
+
+    " New goods issue drafts (the action result; an app with a route to goods issues opens them)
+    IF ls_gi_mapped-goodsissue IS NOT INITIAL.
+      READ ENTITIES OF zmerp_r_goodsissue
+        ENTITY GoodsIssue
+        ALL FIELDS
+        WITH VALUE #( FOR gi IN ls_gi_mapped-goodsissue ( %tky = gi-%tky ) )
+        RESULT DATA(lt_issues).
+    ENDIF.
+
+    LOOP AT lt_issuable REFERENCE INTO lr_header.
+      ASSIGN ls_gi_mapped-goodsissue[ %cid = |{ lr_header->DocumentUUID }| ] TO FIELD-SYMBOL(<ls_gi>).
+
+      IF sy-subrc = 0.
+        APPEND VALUE #( %tky   = lr_header->%tky
+                        %param = CORRESPONDING #( VALUE #( lt_issues[ %tky = <ls_gi>-%tky ] OPTIONAL ) ) ) TO result.
+
+        " The draft has no number yet (assigned on save): the user finds it in the goods issue list
+        APPEND VALUE #( %tky = lr_header->%tky
+                        %msg = NEW zcx_merp_sd(
+                                 textid   = zcx_merp_sd=>goods_issue_draft_created
+                                 severity = if_abap_behv_message=>severity-success
+                                 attr1    = CONV #( lr_header->DocumentNumber ) ) ) TO reported-salesorder.
+      ELSE.
+        " Messages of the goods issue are returned on the sales order
+        APPEND VALUE #( %tky        = lr_header->%tky
+                        %fail-cause = if_abap_behv=>cause-unspecific ) TO failed-salesorder.
+        LOOP AT ls_gi_reported-goodsissue REFERENCE INTO DATA(lr_gi_message)
+             WHERE %cid = |{ lr_header->DocumentUUID }|.
+          APPEND VALUE #( %tky                     = lr_header->%tky
+                          %msg                     = lr_gi_message->%msg
+                          %action-createGoodsIssue = if_abap_behv=>mk-on ) TO reported-salesorder.
+        ENDLOOP.
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD setIssueStatus.

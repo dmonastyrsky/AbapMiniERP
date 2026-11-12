@@ -29,6 +29,7 @@ authorization master ( global )
 
   action ( features : instance ) rejectDocument result [1] $self;
   action ( features : instance ) completeDocument result [1] $self;
+  action ( features : instance ) createGoodsIssue result [1] entity ZMERP_R_GOODSISSUE;
 
   // API for goods issues: not exposed in the projection
   action ( authorization : update ) setIssueStatus parameter ZMERP_A_DOC_SO_ISSUE_STATUS result [1] $self;
