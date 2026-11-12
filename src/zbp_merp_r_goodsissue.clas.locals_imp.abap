@@ -297,8 +297,18 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_items).
 
-    " Lock first, then read (as in SAP): the stock of the issued products stays locked until the end of
-    " the transaction, so no other user can take the same goods before the movements are saved
+    " Lock first, then read (as in SAP): the sales orders and the stock of the issued products stay locked
+    " until the end of the transaction, so no other user can change them before this posting is saved
+    DATA(lt_so_keys) = VALUE zif_merp_doc_so_sel=>tt_document_keys(
+      FOR header IN lt_headers WHERE ( SoReferenceUUID IS NOT INITIAL ) ( DocumentUUID = header-SoReferenceUUID ) ).
+    SORT lt_so_keys BY DocumentUUID.
+    DELETE ADJACENT DUPLICATES FROM lt_so_keys COMPARING DocumentUUID.
+
+    SET LOCKS OF zmerp_r_salesorder
+      ENTITY SalesOrder
+      FROM VALUE #( FOR so_key IN lt_so_keys ( DocumentUUID = so_key-DocumentUUID ) )
+      FAILED DATA(ls_so_lock_failed).
+
     DATA(lt_stock_keys) = VALUE zif_merp_stock_sel=>tt_stock_keys(
       FOR item IN lt_items
       LET header = VALUE #( lt_headers[ DocumentUUID = item-HeaderUUID ] OPTIONAL ) IN
@@ -313,9 +323,6 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
     " Company currencies and sales order context of all documents in one selection each
     DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
       VALUE #( FOR header IN lt_headers ( CompanyCode = header-CompanyCode ) ) ).
-
-    DATA(lt_so_keys) = VALUE zif_merp_doc_so_sel=>tt_document_keys(
-      FOR header IN lt_headers ( DocumentUUID = header-SoReferenceUUID ) ).
 
     DATA(lo_so_selector) = NEW zcl_merp_doc_so_sel( ).
     DATA(lt_so_headers)  = lo_so_selector->zif_merp_doc_so_sel~read_headers( lt_so_keys ).
@@ -338,6 +345,12 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
       ELSEIF NOT line_exists( lt_items[ HeaderUUID = lr_header->DocumentUUID ] ).
         lo_message = NEW #( textid   = zcx_merp_sd=>document_empty_items_invalid
                             severity = if_abap_behv_message=>severity-error ).
+      ELSEIF line_exists( ls_so_lock_failed-salesorder[ DocumentUUID = lr_header->SoReferenceUUID ] ).
+        " The sales order is edited or posted by another user
+        lo_message = NEW #( textid   = zcx_merp_sd=>document_locked
+                            severity = if_abap_behv_message=>severity-error
+                            attr1    = CONV #( VALUE #( lt_so_headers[ DocumentUUID = lr_header->SoReferenceUUID ]-DocumentNumber
+                                                        OPTIONAL ) ) ).
       ELSEIF NOT line_exists( lt_companies[ CompanyCode  = lr_header->CompanyCode
                                             CurrencyCode = lr_header->CurrencyCode ] ).
         " Stock is valuated in the company currency (no currency conversion yet)
@@ -379,7 +392,6 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
       ENDIF.
 
       " 3. Items of the sales order are checked against its current open quantities and amounts
-      "    (another goods issue may have been posted in the meantime)
       IF lo_message IS NOT BOUND.
         LOOP AT lt_items REFERENCE INTO DATA(lr_item)
              WHERE HeaderUUID          = lr_header->DocumentUUID
@@ -530,27 +542,69 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
 
     READ ENTITIES OF zmerp_r_goodsissue IN LOCAL MODE
       ENTITY GoodsIssue
-        FIELDS ( Status DocumentNumber SoReferenceUUID )
+        FIELDS ( Status DocumentNumber CompanyCode WarehouseCode SoReferenceUUID )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_headers)
       ENTITY GoodsIssue BY \_Items
-        FIELDS ( HeaderUUID Quantity SoItemReferenceUUID )
+        FIELDS ( HeaderUUID ItemCode Quantity UnitOfMeasure SoItemReferenceUUID )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_items).
 
-    " Issue progress of the referenced sales orders (the documents to be unposted are included)
-    DATA(lt_progress) = NEW zcl_merp_doc_so_sel( )->zif_merp_doc_so_sel~read_progress(
-      VALUE #( FOR header IN lt_headers ( DocumentUUID = header-SoReferenceUUID ) ) ).
+    " Lock first, then read (as in SAP): every goods movement locks its order and its stock;
+    " unposting returns goods to the stock, so no availability check is needed
+    DATA(lt_so_keys) = VALUE zif_merp_doc_so_sel=>tt_document_keys(
+      FOR header IN lt_headers WHERE ( SoReferenceUUID IS NOT INITIAL ) ( DocumentUUID = header-SoReferenceUUID ) ).
+    SORT lt_so_keys BY DocumentUUID.
+    DELETE ADJACENT DUPLICATES FROM lt_so_keys COMPARING DocumentUUID.
 
-    " Unposting returns goods to the stock, so no stock check is needed
+    SET LOCKS OF zmerp_r_salesorder
+      ENTITY SalesOrder
+      FROM VALUE #( FOR so_key IN lt_so_keys ( DocumentUUID = so_key-DocumentUUID ) )
+      FAILED DATA(ls_so_lock_failed).
+
+    DATA(lt_lock_failures) = zcl_merp_stock_control=>lock_stock(
+      VALUE #( FOR item IN lt_items
+               LET header = VALUE #( lt_headers[ DocumentUUID = item-HeaderUUID ] OPTIONAL ) IN
+               ( CompanyCode   = header-CompanyCode
+                 WarehouseCode = header-WarehouseCode
+                 ItemCode      = item-ItemCode
+                 UnitOfMeasure = item-UnitOfMeasure ) ) ).
+
+    " Issue progress and numbers of the referenced sales orders (the documents to be unposted are included)
+    DATA(lo_so_selector) = NEW zcl_merp_doc_so_sel( ).
+    DATA(lt_so_headers)  = lo_so_selector->zif_merp_doc_so_sel~read_headers( lt_so_keys ).
+    DATA(lt_progress)    = lo_so_selector->zif_merp_doc_so_sel~read_progress( lt_so_keys ).
+
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       CLEAR lo_message.
 
-      " Only posted documents can be unposted
+      " 1. Only posted documents can be unposted; the sales order must not be locked by another user
       IF zcl_merp_doc_gi_lifecycle=>can_unpost( lr_header->Status ) = abap_false.
         lo_message = NEW #( textid   = zcx_merp_sd=>unpost_not_allowed
                             severity = if_abap_behv_message=>severity-error
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
+      ELSEIF line_exists( ls_so_lock_failed-salesorder[ DocumentUUID = lr_header->SoReferenceUUID ] ).
+        lo_message = NEW #( textid   = zcx_merp_sd=>document_locked
+                            severity = if_abap_behv_message=>severity-error
+                            attr1    = CONV #( VALUE #( lt_so_headers[ DocumentUUID = lr_header->SoReferenceUUID ]-DocumentNumber
+                                                        OPTIONAL ) ) ).
+      ENDIF.
+
+      " 2. The stock of an item is being posted by another user: the document waits for the next attempt
+      IF lo_message IS NOT BOUND.
+        LOOP AT lt_items REFERENCE INTO DATA(lr_locked) WHERE HeaderUUID = lr_header->DocumentUUID.
+          ASSIGN lt_lock_failures[ company_code   = lr_header->CompanyCode
+                                   warehouse_code = lr_header->WarehouseCode
+                                   item_code      = lr_locked->ItemCode ] TO FIELD-SYMBOL(<ls_lock>).
+          IF sy-subrc = 0.
+            lo_message = NEW #( textid   = zcx_merp_sd=>stock_locked
+                                severity = if_abap_behv_message=>severity-error
+                                attr1    = CONV #( <ls_lock>-item_code )
+                                attr2    = CONV #( <ls_lock>-warehouse_code )
+                                attr3    = <ls_lock>-locked_by ).
+            EXIT.
+          ENDIF.
+        ENDLOOP.
       ENDIF.
 
       IF lo_message IS BOUND.
@@ -573,7 +627,7 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
                                   FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
                                                                AND SoItemReferenceUUID IS NOT INITIAL )
                                   ( OrderItemReferenceUUID = item-SoItemReferenceUUID
-                                    Quantity            = item-Quantity ) )
+                                    Quantity               = item-Quantity ) )
            it_progress = lt_progress
            iv_sign     = -1 ) = abap_false.
 
@@ -592,7 +646,7 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
         RETURN.
       ENDIF.
 
-      " Goods issues return to 'New'
+      " Goods issues return to 'New' (stock movements are removed by the saver)
       MODIFY ENTITIES OF zmerp_r_goodsissue IN LOCAL MODE
         ENTITY GoodsIssue
         UPDATE FIELDS ( Status )

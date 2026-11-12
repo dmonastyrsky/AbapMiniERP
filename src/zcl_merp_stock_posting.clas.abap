@@ -73,16 +73,15 @@ CLASS zcl_merp_stock_posting IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Services are received (order progress) but are not kept in stock
-    DATA(lt_items_master) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items(
+    " Only items kept in stock get movements: services close order items but have no stock (GR31)
+    DATA(lt_stock_items) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_stock_items(
       VALUE #( FOR movement IN it_movements ( ItemCode = movement-item_code ) ) ).
 
     DATA(lv_user) = cl_abap_context_info=>get_user_technical_name( ).
     GET TIME STAMP FIELD DATA(lv_timestamp).
 
     LOOP AT it_movements REFERENCE INTO DATA(lr_movement).
-      IF VALUE #( lt_items_master[ ItemCode = lr_movement->item_code ]-ItemTypeCode OPTIONAL )
-         = zif_merp_constants=>c_item_type-service.
+      IF NOT line_exists( lt_stock_items[ table_line = lr_movement->item_code ] ).
         CONTINUE.
       ENDIF.
 

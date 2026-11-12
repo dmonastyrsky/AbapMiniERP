@@ -353,6 +353,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>141</MSGNR>
+     <TEXT>Document &amp;1 is being processed by another user, try again.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>150</MSGNR>
      <TEXT>Purchase Order &amp;1 is used in &amp;2.</TEXT>
     </T100>

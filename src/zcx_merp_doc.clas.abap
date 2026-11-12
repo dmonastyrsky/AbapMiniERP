@@ -200,7 +200,7 @@ CLASS zcx_merp_doc DEFINITION
       END OF item_duplicate_invalid,
 
       " ==================================================================
-      " Stock (117)
+      " Stock and locks
       " ==================================================================
 
       " &1 = item number, &2 = item code, &3 = warehouse code
@@ -222,6 +222,16 @@ CLASS zcx_merp_doc DEFINITION
         attr3 TYPE scx_attrname VALUE 'MV_ATTR3',
         attr4 TYPE scx_attrname VALUE '',
       END OF stock_locked,
+
+      " &1 = document number of the locked order
+      BEGIN OF document_locked,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '141',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE '',
+        attr3 TYPE scx_attrname VALUE '',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF document_locked,
 
       " ==================================================================
       " Status & Lifecycle Actions (130, 132-137)

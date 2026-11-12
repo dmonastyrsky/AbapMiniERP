@@ -290,20 +290,38 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
 
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt
-        FIELDS ( Status DocumentNumber CompanyCode CurrencyCode PoReferenceUUID PostingDate )
+        FIELDS ( Status DocumentNumber CompanyCode WarehouseCode CurrencyCode PoReferenceUUID PostingDate )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_headers)
       ENTITY GoodsReceipt BY \_Items
-        FIELDS ( HeaderUUID ItemNo Quantity NetAmount VatAmount GrossAmount PoItemReferenceUUID )
+        FIELDS ( HeaderUUID ItemNo ItemCode Quantity UnitOfMeasure NetAmount VatAmount GrossAmount PoItemReferenceUUID )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_items).
+
+    " Lock first, then read (as in SAP): every goods movement locks its order and its stock
+    " (a receipt changes the stock value that the moving average of a parallel issue is computed from);
+    " a receipt adds goods, so no availability check is needed
+    DATA(lt_po_keys) = VALUE zif_merp_doc_po_sel=>tt_document_keys(
+      FOR header IN lt_headers WHERE ( PoReferenceUUID IS NOT INITIAL ) ( DocumentUUID = header-PoReferenceUUID ) ).
+    SORT lt_po_keys BY DocumentUUID.
+    DELETE ADJACENT DUPLICATES FROM lt_po_keys COMPARING DocumentUUID.
+
+    SET LOCKS OF zmerp_r_purchaseorder
+      ENTITY PurchaseOrder
+      FROM VALUE #( FOR po_key IN lt_po_keys ( DocumentUUID = po_key-DocumentUUID ) )
+      FAILED DATA(ls_po_lock_failed).
+
+    DATA(lt_lock_failures) = zcl_merp_stock_control=>lock_stock(
+      VALUE #( FOR item IN lt_items
+               LET header = VALUE #( lt_headers[ DocumentUUID = item-HeaderUUID ] OPTIONAL ) IN
+               ( CompanyCode   = header-CompanyCode
+                 WarehouseCode = header-WarehouseCode
+                 ItemCode      = item-ItemCode
+                 UnitOfMeasure = item-UnitOfMeasure ) ) ).
 
     " Company currencies and purchase order context of all documents in one selection each
     DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
       VALUE #( FOR header IN lt_headers ( CompanyCode = header-CompanyCode ) ) ).
-
-    DATA(lt_po_keys) = VALUE zif_merp_doc_po_sel=>tt_document_keys(
-      FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) ).
 
     DATA(lo_po_selector) = NEW zcl_merp_doc_po_sel( ).
     DATA(lt_po_headers)  = lo_po_selector->zif_merp_doc_po_sel~read_headers( lt_po_keys ).
@@ -326,6 +344,12 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
       ELSEIF NOT line_exists( lt_items[ HeaderUUID = lr_header->DocumentUUID ] ).
         lo_message = NEW #( textid   = zcx_merp_pur=>document_empty_items_invalid
                             severity = if_abap_behv_message=>severity-error ).
+      ELSEIF line_exists( ls_po_lock_failed-purchaseorder[ DocumentUUID = lr_header->PoReferenceUUID ] ).
+        " The purchase order is edited or posted by another user
+        lo_message = NEW #( textid   = zcx_merp_pur=>document_locked
+                            severity = if_abap_behv_message=>severity-error
+                            attr1    = CONV #( VALUE #( lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ]-DocumentNumber
+                                                        OPTIONAL ) ) ).
       ELSEIF NOT line_exists( lt_companies[ CompanyCode  = lr_header->CompanyCode
                                             CurrencyCode = lr_header->CurrencyCode ] ).
         " Stock is valuated in the company currency (no currency conversion yet)
@@ -349,8 +373,24 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                             attr1    = |{ lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ]-DocumentDate DATE = ISO }| ).
       ENDIF.
 
-      " 2. Items of the purchase order are checked against its current open quantities and amounts
-      "    (another goods receipt may have been posted in the meantime)
+      " 2. The stock of an item is being posted by another user: the document waits for the next attempt
+      IF lo_message IS NOT BOUND.
+        LOOP AT lt_items REFERENCE INTO DATA(lr_locked) WHERE HeaderUUID = lr_header->DocumentUUID.
+          ASSIGN lt_lock_failures[ company_code   = lr_header->CompanyCode
+                                   warehouse_code = lr_header->WarehouseCode
+                                   item_code      = lr_locked->ItemCode ] TO FIELD-SYMBOL(<ls_lock>).
+          IF sy-subrc = 0.
+            lo_message = NEW #( textid   = zcx_merp_pur=>stock_locked
+                                severity = if_abap_behv_message=>severity-error
+                                attr1    = CONV #( <ls_lock>-item_code )
+                                attr2    = CONV #( <ls_lock>-warehouse_code )
+                                attr3    = <ls_lock>-locked_by ).
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+      " 3. Items of the purchase order are checked against its current open quantities and amounts
       IF lo_message IS NOT BOUND.
         LOOP AT lt_items REFERENCE INTO DATA(lr_item)
              WHERE HeaderUUID          = lr_header->DocumentUUID
@@ -417,13 +457,13 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
     ENDLOOP.
 
     IF lt_update IS NOT INITIAL.
-      " 3. Purchase orders follow the receipt progress including the documents posted now
+      " 4. Purchase orders follow the receipt progress including the documents posted now
       IF update_po_receipt_status(
            it_items    = VALUE #( FOR upd IN lt_update
                                   FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
                                                                AND PoItemReferenceUUID IS NOT INITIAL )
                                   ( OrderItemReferenceUUID = item-PoItemReferenceUUID
-                                    Quantity            = item-Quantity ) )
+                                    Quantity               = item-Quantity ) )
            it_progress = lt_progress
            iv_sign     = 1 ) = abap_false.
 
@@ -442,7 +482,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         RETURN.
       ENDIF.
 
-      " 4. Goods receipts are posted (stock movements are written by the saver)
+      " 5. Goods receipts are posted (stock movements are written by the saver)
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceipt
         UPDATE FIELDS ( Status )
@@ -482,7 +522,17 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         RESULT DATA(lt_items).
 
     " Lock first, then read (as in SAP): unposting takes the received goods out of the stock again,
-    " so the stock of the products stays locked until the end of the transaction
+    " so the purchase orders and the stock of the products stay locked until the end of the transaction
+    DATA(lt_po_keys) = VALUE zif_merp_doc_po_sel=>tt_document_keys(
+      FOR header IN lt_headers WHERE ( PoReferenceUUID IS NOT INITIAL ) ( DocumentUUID = header-PoReferenceUUID ) ).
+    SORT lt_po_keys BY DocumentUUID.
+    DELETE ADJACENT DUPLICATES FROM lt_po_keys COMPARING DocumentUUID.
+
+    SET LOCKS OF zmerp_r_purchaseorder
+      ENTITY PurchaseOrder
+      FROM VALUE #( FOR po_key IN lt_po_keys ( DocumentUUID = po_key-DocumentUUID ) )
+      FAILED DATA(ls_po_lock_failed).
+
     DATA(lt_stock_keys) = VALUE zif_merp_stock_sel=>tt_stock_keys(
       FOR item IN lt_items
       LET header = VALUE #( lt_headers[ DocumentUUID = item-HeaderUUID ] OPTIONAL ) IN
@@ -494,19 +544,25 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
     DATA(lt_lock_failures) = zcl_merp_stock_control=>lock_stock( lt_stock_keys ).
     DATA(lo_stock)         = NEW zcl_merp_stock_control( lt_stock_keys ).
 
-    " Receipt progress of the referenced purchase orders (the documents to be unposted are included)
-    DATA(lt_progress) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_progress(
-      VALUE #( FOR header IN lt_headers ( DocumentUUID = header-PoReferenceUUID ) ) ).
+    " Receipt progress and numbers of the referenced purchase orders (the documents to be unposted are included)
+    DATA(lo_po_selector) = NEW zcl_merp_doc_po_sel( ).
+    DATA(lt_po_headers)  = lo_po_selector->zif_merp_doc_po_sel~read_headers( lt_po_keys ).
+    DATA(lt_progress)    = lo_po_selector->zif_merp_doc_po_sel~read_progress( lt_po_keys ).
 
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       CLEAR lo_message.
       lv_items_valid = abap_true.
 
-      " 1. Only posted documents can be unposted
+      " 1. Only posted documents can be unposted; the purchase order must not be locked by another user
       IF zcl_merp_doc_gr_lifecycle=>can_unpost( lr_header->Status ) = abap_false.
         lo_message = NEW #( textid   = zcx_merp_pur=>unpost_not_allowed
                             severity = if_abap_behv_message=>severity-error
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
+      ELSEIF line_exists( ls_po_lock_failed-purchaseorder[ DocumentUUID = lr_header->PoReferenceUUID ] ).
+        lo_message = NEW #( textid   = zcx_merp_pur=>document_locked
+                            severity = if_abap_behv_message=>severity-error
+                            attr1    = CONV #( VALUE #( lt_po_headers[ DocumentUUID = lr_header->PoReferenceUUID ]-DocumentNumber
+                                                        OPTIONAL ) ) ).
       ENDIF.
 
       " 2. The stock of an item is being posted by another user: the document waits for the next attempt
