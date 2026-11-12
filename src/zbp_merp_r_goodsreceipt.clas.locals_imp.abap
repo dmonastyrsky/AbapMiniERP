@@ -422,7 +422,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
            it_items    = VALUE #( FOR upd IN lt_update
                                   FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
                                                                AND PoItemReferenceUUID IS NOT INITIAL )
-                                  ( PoItemReferenceUUID = item-PoItemReferenceUUID
+                                  ( OrderItemReferenceUUID = item-PoItemReferenceUUID
                                     Quantity            = item-Quantity ) )
            it_progress = lt_progress
            iv_sign     = 1 ) = abap_false.
@@ -578,7 +578,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
            it_items    = VALUE #( FOR upd IN lt_update
                                   FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
                                                                AND PoItemReferenceUUID IS NOT INITIAL )
-                                  ( PoItemReferenceUUID = item-PoItemReferenceUUID
+                                  ( OrderItemReferenceUUID = item-PoItemReferenceUUID
                                     Quantity            = item-Quantity ) )
            it_progress = lt_progress
            iv_sign     = -1 ) = abap_false.
@@ -1415,7 +1415,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         " Quantity of the given goods receipt items for this order item
         DATA(lv_delta) = REDUCE zmerp_quantity( INIT sum TYPE zmerp_quantity
                                                 FOR item IN it_items
-                                                WHERE ( PoItemReferenceUUID = ls_po_item-PoItemUUID )
+                                                WHERE ( OrderItemReferenceUUID = ls_po_item-PoItemUUID )
                                                 NEXT sum = sum + item-Quantity ).
         IF lv_delta <> 0.
           lv_touched = abap_true.
@@ -1667,7 +1667,7 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
   ENDMETHOD.
 
   " --- Determinations on modify ---
-  METHOD setItemDefaults.
+    METHOD setItemDefaults.
 
     " Items and their parent headers (document currency)
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
@@ -1691,9 +1691,11 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       WITH CORRESPONDING #( lt_headers )
       RESULT DATA(lt_siblings).
 
-    " Delegate the defaulting to the shared item logic (same for all documents), only changed items are returned
+    " Delegate the defaulting to the shared item logic (same for all documents), only changed items are returned;
+    " lines of the purchase order keep their values (order item reference)
     DATA(lt_changed) = NEW zcl_merp_doc_item_logic( )->set_defaults(
-      it_items             = CORRESPONDING #( lt_items MAPPING IsDraft = %is_draft )
+      it_items             = CORRESPONDING #( lt_items MAPPING IsDraft                = %is_draft
+                                                               OrderItemReferenceUUID = PoItemReferenceUUID )
       it_siblings          = CORRESPONDING #( lt_siblings MAPPING IsDraft = %is_draft )
       it_header_currencies = CORRESPONDING #( lt_headers MAPPING HeaderUUID = DocumentUUID
                                                                  IsDraft    = %is_draft ) ).

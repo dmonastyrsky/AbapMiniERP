@@ -478,7 +478,7 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
            it_items    = VALUE #( FOR upd IN lt_update
                                   FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
                                                                AND SoItemReferenceUUID IS NOT INITIAL )
-                                  ( PoItemReferenceUUID = item-SoItemReferenceUUID
+                                  ( OrderItemReferenceUUID = item-SoItemReferenceUUID
                                     Quantity            = item-Quantity ) )
            it_progress = lt_progress
            iv_sign     = 1 ) = abap_false.
@@ -570,7 +570,7 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
            it_items    = VALUE #( FOR upd IN lt_update
                                   FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
                                                                AND SoItemReferenceUUID IS NOT INITIAL )
-                                  ( PoItemReferenceUUID = item-SoItemReferenceUUID
+                                  ( OrderItemReferenceUUID = item-SoItemReferenceUUID
                                     Quantity            = item-Quantity ) )
            it_progress = lt_progress
            iv_sign     = -1 ) = abap_false.
@@ -1405,10 +1405,9 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
 
       LOOP AT GROUP lg_so INTO DATA(ls_so_item).
         " Quantity of the given goods issue items for this order item
-        " (the order item reference is passed in PoItemReferenceUUID of the shared item type)
         DATA(lv_delta) = REDUCE zmerp_quantity( INIT sum TYPE zmerp_quantity
                                                 FOR item IN it_items
-                                                WHERE ( PoItemReferenceUUID = ls_so_item-SoItemUUID )
+                                                WHERE ( OrderItemReferenceUUID = ls_so_item-SoItemUUID )
                                                 NEXT sum = sum + item-Quantity ).
         IF lv_delta <> 0.
           lv_touched = abap_true.
@@ -1684,10 +1683,10 @@ CLASS lhc_zmerp_r_goodsissueitm IMPLEMENTATION.
       RESULT DATA(lt_siblings).
 
     " Delegate the defaulting to the shared item logic (same for all documents), only changed items are returned;
-    " lines of the sales order keep their values (order item reference in PoItemReferenceUUID of the shared type)
+    " lines of the sales order keep their values (order item reference)
     DATA(lt_changed) = NEW zcl_merp_doc_item_logic( )->set_defaults(
-      it_items             = CORRESPONDING #( lt_items MAPPING IsDraft             = %is_draft
-                                                               PoItemReferenceUUID = SoItemReferenceUUID )
+      it_items             = CORRESPONDING #( lt_items MAPPING IsDraft                = %is_draft
+                                                               OrderItemReferenceUUID = SoItemReferenceUUID )
       it_siblings          = CORRESPONDING #( lt_siblings MAPPING IsDraft = %is_draft )
       it_header_currencies = CORRESPONDING #( lt_headers MAPPING HeaderUUID = DocumentUUID
                                                                  IsDraft    = %is_draft ) ).
