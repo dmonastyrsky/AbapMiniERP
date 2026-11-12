@@ -283,7 +283,6 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
   " --- Actions ---
   METHOD postDocument.
     DATA lt_update       TYPE TABLE FOR UPDATE zmerp_r_goodsissue.
-    DATA lt_stock_keys   TYPE zif_merp_stock_sel=>tt_stock_keys.
     DATA lo_message      TYPE REF TO zcx_merp_sd.
     DATA lo_item_message TYPE REF TO zcx_merp_sd.
     DATA lv_items_valid  TYPE abap_bool.
@@ -298,6 +297,19 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_items).
 
+    " Lock first, then read (as in SAP): the stock of the issued products stays locked until the end of
+    " the transaction, so no other user can take the same goods before the movements are saved
+    DATA(lt_stock_keys) = VALUE zif_merp_stock_sel=>tt_stock_keys(
+      FOR item IN lt_items
+      LET header = VALUE #( lt_headers[ DocumentUUID = item-HeaderUUID ] OPTIONAL ) IN
+      ( CompanyCode   = header-CompanyCode
+        WarehouseCode = header-WarehouseCode
+        ItemCode      = item-ItemCode
+        UnitOfMeasure = item-UnitOfMeasure ) ).
+
+    DATA(lt_lock_failures) = zcl_merp_stock_control=>lock_stock( lt_stock_keys ).
+    DATA(lo_stock)         = NEW zcl_merp_stock_control( lt_stock_keys ).
+
     " Company currencies and sales order context of all documents in one selection each
     DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
       VALUE #( FOR header IN lt_headers ( CompanyCode = header-CompanyCode ) ) ).
@@ -308,31 +320,6 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
     DATA(lo_so_selector) = NEW zcl_merp_doc_so_sel( ).
     DATA(lt_so_headers)  = lo_so_selector->zif_merp_doc_so_sel~read_headers( lt_so_keys ).
     DATA(lt_progress)    = lo_so_selector->zif_merp_doc_so_sel~read_progress( lt_so_keys ).
-
-    " Services are not kept in stock: only products are checked against the stock
-    DATA(lt_items_master) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items(
-      VALUE #( FOR item IN lt_items ( ItemCode = item-ItemCode ) ) ).
-
-    DATA(lt_stock_items) = lt_items.
-    LOOP AT lt_stock_items REFERENCE INTO DATA(lr_stock_item).
-      IF VALUE #( lt_items_master[ ItemCode = lr_stock_item->ItemCode ]-ItemTypeCode OPTIONAL )
-         = zif_merp_constants=>c_item_type-service.
-        DELETE lt_stock_items.
-      ENDIF.
-    ENDLOOP.
-
-    " Current stock of the affected products (ST1: current balance, not the posting date)
-    LOOP AT lt_stock_items REFERENCE INTO lr_stock_item.
-      ASSIGN lt_headers[ DocumentUUID = lr_stock_item->HeaderUUID ] TO FIELD-SYMBOL(<ls_stock_header>).
-      IF sy-subrc = 0.
-        APPEND VALUE #( CompanyCode   = <ls_stock_header>-CompanyCode
-                        WarehouseCode = <ls_stock_header>-WarehouseCode
-                        ItemCode      = lr_stock_item->ItemCode
-                        UnitOfMeasure = lr_stock_item->UnitOfMeasure ) TO lt_stock_keys.
-      ENDIF.
-    ENDLOOP.
-
-    DATA(lt_stock) = NEW zcl_merp_stock_sel( )->zif_merp_stock_sel~read_balances( lt_stock_keys ).
 
     " Open quantities and amounts are reduced by each document accepted below, so further documents
     " of the same request on the same sales order are checked against the remaining values
@@ -374,7 +361,24 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
                             attr1    = |{ lt_so_headers[ DocumentUUID = lr_header->SoReferenceUUID ]-DocumentDate DATE = ISO }| ).
       ENDIF.
 
-      " 2. Items of the sales order are checked against its current open quantities and amounts
+      " 2. The stock of an item is being posted by another user: the document waits for the next attempt
+      IF lo_message IS NOT BOUND.
+        LOOP AT lt_items REFERENCE INTO DATA(lr_locked) WHERE HeaderUUID = lr_header->DocumentUUID.
+          ASSIGN lt_lock_failures[ company_code   = lr_header->CompanyCode
+                                   warehouse_code = lr_header->WarehouseCode
+                                   item_code      = lr_locked->ItemCode ] TO FIELD-SYMBOL(<ls_lock>).
+          IF sy-subrc = 0.
+            lo_message = NEW #( textid   = zcx_merp_sd=>stock_locked
+                                severity = if_abap_behv_message=>severity-error
+                                attr1    = CONV #( <ls_lock>-item_code )
+                                attr2    = CONV #( <ls_lock>-warehouse_code )
+                                attr3    = <ls_lock>-locked_by ).
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+      " 3. Items of the sales order are checked against its current open quantities and amounts
       "    (another goods issue may have been posted in the meantime)
       IF lo_message IS NOT BOUND.
         LOOP AT lt_items REFERENCE INTO DATA(lr_item)
@@ -414,18 +418,20 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
         ENDLOOP.
       ENDIF.
 
-      " 3. Availability: the stock of every product must cover the issued quantity
-      "    (products only; several lines of one item and several documents are checked one after another)
+      " 4. Availability: the stock must cover the issued products (ST3); a covered document takes its
+      "    quantities from the stock, so further documents of the request are checked against the rest
       IF lo_message IS NOT BOUND AND lv_items_valid = abap_true.
-        DATA(lt_stock_check) = lt_stock.
+        DATA(lt_shortages) = lo_stock->check_availability(
+          iv_company_code   = lr_header->CompanyCode
+          iv_warehouse_code = lr_header->WarehouseCode
+          it_lines          = VALUE #( FOR item IN lt_items WHERE ( HeaderUUID = lr_header->DocumentUUID )
+                                       ( item_uuid       = item-ItemUUID
+                                         item_code       = item-ItemCode
+                                         quantity        = item-Quantity
+                                         unit_of_measure = item-UnitOfMeasure ) ) ).
 
-        LOOP AT lt_stock_items REFERENCE INTO lr_item WHERE HeaderUUID = lr_header->DocumentUUID.
-          ASSIGN lt_stock_check[ CompanyCode   = lr_header->CompanyCode
-                                 WarehouseCode = lr_header->WarehouseCode
-                                 ItemCode      = lr_item->ItemCode
-                                 UnitOfMeasure = lr_item->UnitOfMeasure ] TO FIELD-SYMBOL(<ls_check>).
-
-          IF sy-subrc <> 0 OR <ls_check>-Quantity < lr_item->Quantity.
+        LOOP AT lt_items REFERENCE INTO lr_item WHERE HeaderUUID = lr_header->DocumentUUID.
+          IF line_exists( lt_shortages[ table_line = lr_item->ItemUUID ] ).
             lv_items_valid = abap_false.
             APPEND VALUE #( %tky              = lr_item->%tky
                             %path             = VALUE #( GoodsIssue-%is_draft    = lr_item->%is_draft
@@ -437,8 +443,6 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
                                                   attr2    = CONV #( lr_item->ItemCode )
                                                   attr3    = CONV #( lr_header->WarehouseCode ) )
                             %element-Quantity = if_abap_behv=>mk-on ) TO reported-goodsissueitem.
-          ELSE.
-            <ls_check>-Quantity -= lr_item->Quantity.
           ENDIF.
         ENDLOOP.
       ENDIF.
@@ -455,7 +459,7 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
         APPEND VALUE #( %tky   = lr_header->%tky
                         Status = zcl_merp_doc_gi_lifecycle=>c_status_posted ) TO lt_update.
 
-        " This document now takes its part of the open values and of the stock
+        " This document now takes its part of the open values
         LOOP AT lt_items REFERENCE INTO lr_item
              WHERE HeaderUUID          = lr_header->DocumentUUID
                AND SoItemReferenceUUID IS NOT INITIAL.
@@ -467,19 +471,17 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
             <ls_open>-OpenGrossAmount -= lr_item->GrossAmount.
           ENDIF.
         ENDLOOP.
-
-        lt_stock = lt_stock_check.
       ENDIF.
     ENDLOOP.
 
     IF lt_update IS NOT INITIAL.
-      " 4. Sales orders follow the issue progress including the documents posted now
+      " 5. Sales orders follow the issue progress including the documents posted now
       IF update_so_issue_status(
            it_items    = VALUE #( FOR upd IN lt_update
                                   FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
                                                                AND SoItemReferenceUUID IS NOT INITIAL )
                                   ( OrderItemReferenceUUID = item-SoItemReferenceUUID
-                                    Quantity            = item-Quantity ) )
+                                    Quantity               = item-Quantity ) )
            it_progress = lt_progress
            iv_sign     = 1 ) = abap_false.
 
@@ -498,7 +500,7 @@ CLASS lhc_zmerp_r_goodsissue IMPLEMENTATION.
         RETURN.
       ENDIF.
 
-      " 5. Goods issues are posted (stock movements are written by the saver)
+      " 6. Goods issues are posted (stock movements are written by the saver)
       MODIFY ENTITIES OF zmerp_r_goodsissue IN LOCAL MODE
         ENTITY GoodsIssue
         UPDATE FIELDS ( Status )

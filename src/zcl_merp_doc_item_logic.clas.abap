@@ -65,7 +65,7 @@ CLASS zcl_merp_doc_item_logic DEFINITION
                 io_item_selector TYPE REF TO zif_merp_md_item_sel OPTIONAL.
 
     "! Quantity or price changed: net -> VAT -> gross are recalculated (prices are always without VAT)
-    "! @parameter it_items             | Items to be processed (HeaderUUID, ItemNo, ItemCode, UnitOfMeasure, VatCode, CurrencyCode, PoItemReferenceUUID)
+    "! @parameter it_items             | Items to be processed (HeaderUUID, ItemNo, ItemCode, UnitOfMeasure, VatCode, CurrencyCode, OrderItemReferenceUUID)
     "! @parameter rt_changed | Only the items whose amounts really changed (with the new amounts)
     METHODS recalc_on_qty_price
       IMPORTING it_items          TYPE tt_items

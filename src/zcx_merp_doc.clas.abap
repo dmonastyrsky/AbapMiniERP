@@ -213,6 +213,16 @@ CLASS zcx_merp_doc DEFINITION
         attr4 TYPE scx_attrname VALUE '',
       END OF stock_would_be_negative,
 
+      " &1 = item code, &2 = warehouse code, &3 = user who holds the lock
+      BEGIN OF stock_locked,
+        msgid TYPE symsgid VALUE 'ZMC_MERP_DOC',
+        msgno TYPE symsgno VALUE '140',
+        attr1 TYPE scx_attrname VALUE 'MV_ATTR1',
+        attr2 TYPE scx_attrname VALUE 'MV_ATTR2',
+        attr3 TYPE scx_attrname VALUE 'MV_ATTR3',
+        attr4 TYPE scx_attrname VALUE '',
+      END OF stock_locked,
+
       " ==================================================================
       " Status & Lifecycle Actions (130, 132-137)
       " ==================================================================

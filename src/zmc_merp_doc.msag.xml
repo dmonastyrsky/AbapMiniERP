@@ -347,6 +347,12 @@
     <T100>
      <SPRSL>E</SPRSL>
      <ARBGB>ZMC_MERP_DOC</ARBGB>
+     <MSGNR>140</MSGNR>
+     <TEXT>Stock of item &amp;1 in warehouse &amp;2 is locked by user &amp;3.</TEXT>
+    </T100>
+    <T100>
+     <SPRSL>E</SPRSL>
+     <ARBGB>ZMC_MERP_DOC</ARBGB>
      <MSGNR>150</MSGNR>
      <TEXT>Purchase Order &amp;1 is used in &amp;2.</TEXT>
     </T100>

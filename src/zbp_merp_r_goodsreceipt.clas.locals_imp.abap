@@ -467,7 +467,6 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD unpostDocument.
-    DATA lt_stock_keys  TYPE zif_merp_stock_sel=>tt_stock_keys.
     DATA lt_update      TYPE TABLE FOR UPDATE zmerp_r_goodsreceipt.
     DATA lo_message     TYPE REF TO zcx_merp_pur.
     DATA lv_items_valid TYPE abap_bool.
@@ -482,30 +481,18 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_items).
 
-    " Services are not kept in stock: only products are checked against the stock
-    DATA(lt_items_master) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_items(
-      VALUE #( FOR item IN lt_items ( ItemCode = item-ItemCode ) ) ).
+    " Lock first, then read (as in SAP): unposting takes the received goods out of the stock again,
+    " so the stock of the products stays locked until the end of the transaction
+    DATA(lt_stock_keys) = VALUE zif_merp_stock_sel=>tt_stock_keys(
+      FOR item IN lt_items
+      LET header = VALUE #( lt_headers[ DocumentUUID = item-HeaderUUID ] OPTIONAL ) IN
+      ( CompanyCode   = header-CompanyCode
+        WarehouseCode = header-WarehouseCode
+        ItemCode      = item-ItemCode
+        UnitOfMeasure = item-UnitOfMeasure ) ).
 
-    DATA(lt_stock_items) = lt_items.
-    LOOP AT lt_stock_items REFERENCE INTO DATA(lr_stock_item).
-      IF VALUE #( lt_items_master[ ItemCode = lr_stock_item->ItemCode ]-ItemTypeCode OPTIONAL )
-         = zif_merp_constants=>c_item_type-service.
-        DELETE lt_stock_items.
-      ENDIF.
-    ENDLOOP.
-
-    " Current stock of the affected products (including the movements of the documents to be unposted)
-    LOOP AT lt_stock_items REFERENCE INTO DATA(lr_item).
-      ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<ls_header>).
-      IF sy-subrc = 0.
-        APPEND VALUE #( CompanyCode   = <ls_header>-CompanyCode
-                        WarehouseCode = <ls_header>-WarehouseCode
-                        ItemCode      = lr_item->ItemCode
-                        UnitOfMeasure = lr_item->UnitOfMeasure ) TO lt_stock_keys.
-      ENDIF.
-    ENDLOOP.
-
-    DATA(lt_stock) = NEW zcl_merp_stock_sel( )->zif_merp_stock_sel~read_balances( lt_stock_keys ).
+    DATA(lt_lock_failures) = zcl_merp_stock_control=>lock_stock( lt_stock_keys ).
+    DATA(lo_stock)         = NEW zcl_merp_stock_control( lt_stock_keys ).
 
     " Receipt progress of the referenced purchase orders (the documents to be unposted are included)
     DATA(lt_progress) = NEW zcl_merp_doc_po_sel( )->zif_merp_doc_po_sel~read_progress(
@@ -522,15 +509,37 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
       ENDIF.
 
-      " 2. Removing the movements of the document must not make the stock negative (products only)
+      " 2. The stock of an item is being posted by another user: the document waits for the next attempt
       IF lo_message IS NOT BOUND.
-        LOOP AT lt_stock_items REFERENCE INTO lr_item WHERE HeaderUUID = lr_header->DocumentUUID.
-          ASSIGN lt_stock[ CompanyCode   = lr_header->CompanyCode
-                           WarehouseCode = lr_header->WarehouseCode
-                           ItemCode      = lr_item->ItemCode
-                           UnitOfMeasure = lr_item->UnitOfMeasure ] TO FIELD-SYMBOL(<ls_stock>).
+        LOOP AT lt_items REFERENCE INTO DATA(lr_locked) WHERE HeaderUUID = lr_header->DocumentUUID.
+          ASSIGN lt_lock_failures[ company_code   = lr_header->CompanyCode
+                                   warehouse_code = lr_header->WarehouseCode
+                                   item_code      = lr_locked->ItemCode ] TO FIELD-SYMBOL(<ls_lock>).
+          IF sy-subrc = 0.
+            lo_message = NEW #( textid   = zcx_merp_pur=>stock_locked
+                                severity = if_abap_behv_message=>severity-error
+                                attr1    = CONV #( <ls_lock>-item_code )
+                                attr2    = CONV #( <ls_lock>-warehouse_code )
+                                attr3    = <ls_lock>-locked_by ).
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
 
-          IF sy-subrc <> 0 OR <ls_stock>-Quantity < lr_item->Quantity.
+      " 3. Removing the movements of the document must not make the stock negative (products only);
+      "    a covered document takes its quantities from the stock for the next documents of the request
+      IF lo_message IS NOT BOUND.
+        DATA(lt_shortages) = lo_stock->check_availability(
+          iv_company_code   = lr_header->CompanyCode
+          iv_warehouse_code = lr_header->WarehouseCode
+          it_lines          = VALUE #( FOR item IN lt_items WHERE ( HeaderUUID = lr_header->DocumentUUID )
+                                       ( item_uuid       = item-ItemUUID
+                                         item_code       = item-ItemCode
+                                         quantity        = item-Quantity
+                                         unit_of_measure = item-UnitOfMeasure ) ) ).
+
+        LOOP AT lt_items REFERENCE INTO DATA(lr_item) WHERE HeaderUUID = lr_header->DocumentUUID.
+          IF line_exists( lt_shortages[ table_line = lr_item->ItemUUID ] ).
             lv_items_valid = abap_false.
             APPEND VALUE #( %tky              = lr_item->%tky
                             %path             = VALUE #( GoodsReceipt-%is_draft    = lr_item->%is_draft
@@ -555,31 +564,20 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
                           %action-unpostDocument = if_abap_behv=>mk-on ) TO reported-goodsreceipt.
         ENDIF.
       ELSE.
-        " Stock is reduced already here, so further documents of the same request are checked against it
-        LOOP AT lt_stock_items REFERENCE INTO lr_item WHERE HeaderUUID = lr_header->DocumentUUID.
-          ASSIGN lt_stock[ CompanyCode   = lr_header->CompanyCode
-                           WarehouseCode = lr_header->WarehouseCode
-                           ItemCode      = lr_item->ItemCode
-                           UnitOfMeasure = lr_item->UnitOfMeasure ] TO <ls_stock>.
-          IF sy-subrc = 0.
-            <ls_stock>-Quantity -= lr_item->Quantity.
-          ENDIF.
-        ENDLOOP.
-
         APPEND VALUE #( %tky   = lr_header->%tky
                         Status = zcl_merp_doc_gr_lifecycle=>c_status_new ) TO lt_update.
       ENDIF.
     ENDLOOP.
 
     IF lt_update IS NOT INITIAL.
-      " 3. Purchase orders follow the receipt progress without the documents unposted now
+      " 4. Purchase orders follow the receipt progress without the documents unposted now
       "    (all items, services included: they close purchase order items as well)
       IF update_po_receipt_status(
            it_items    = VALUE #( FOR upd IN lt_update
                                   FOR item IN lt_items WHERE ( HeaderUUID          = upd-DocumentUUID
                                                                AND PoItemReferenceUUID IS NOT INITIAL )
                                   ( OrderItemReferenceUUID = item-PoItemReferenceUUID
-                                    Quantity            = item-Quantity ) )
+                                    Quantity               = item-Quantity ) )
            it_progress = lt_progress
            iv_sign     = -1 ) = abap_false.
 
@@ -598,7 +596,7 @@ CLASS lhc_zmerp_r_goodsreceipt IMPLEMENTATION.
         RETURN.
       ENDIF.
 
-      " 4. Goods receipts return to 'New' (stock movements are removed by the saver)
+      " 5. Goods receipts return to 'New' (stock movements are removed by the saver)
       MODIFY ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
         ENTITY GoodsReceipt
         UPDATE FIELDS ( Status )
