@@ -51,7 +51,8 @@ ENDCLASS.
 
 
 
-CLASS zcl_merp_stock_posting IMPLEMENTATION.
+CLASS ZCL_MERP_STOCK_POSTING IMPLEMENTATION.
+
 
   METHOD delete_document_movements.
     IF it_document_keys IS INITIAL.
@@ -68,6 +69,7 @@ CLASS zcl_merp_stock_posting IMPLEMENTATION.
       DELETE zmerp_stock_mov FROM TABLE @lt_db_movements.
     ENDIF.
   ENDMETHOD.
+
 
   METHOD insert_movements.
     DATA lt_db_movements TYPE STANDARD TABLE OF zmerp_stock_mov WITH EMPTY KEY.
@@ -161,5 +163,4 @@ CLASS zcl_merp_stock_posting IMPLEMENTATION.
       INSERT zmerp_stock_mov FROM TABLE @lt_db_movements.
     ENDIF.
   ENDMETHOD.
-
 ENDCLASS.

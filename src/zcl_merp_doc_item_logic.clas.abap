@@ -111,7 +111,9 @@ CLASS zcl_merp_doc_item_logic DEFINITION
 ENDCLASS.
 
 
-CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
+
+CLASS ZCL_MERP_DOC_ITEM_LOGIC IMPLEMENTATION.
+
 
   METHOD constructor.
     IF io_vat_selector IS BOUND.
@@ -126,6 +128,7 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
       mo_item_selector = NEW zcl_merp_md_item_sel( ).
     ENDIF.
   ENDMETHOD.
+
 
   METHOD recalc_on_qty_price.
     IF it_items IS INITIAL.
@@ -161,6 +164,7 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+
   METHOD recalc_on_vat_code.
     IF it_items IS INITIAL.
       RETURN.
@@ -193,6 +197,7 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
+
 
   METHOD set_defaults.
     TYPES: BEGIN OF ty_counter,
@@ -275,6 +280,7 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+
   METHOD calc_header_totals.
     LOOP AT it_header_keys INTO DATA(ls_key).
       " Extract the exact item amount structures belonging to the current header document context (UUID + Draft status)
@@ -296,12 +302,11 @@ CLASS zcl_merp_doc_item_logic IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+
   METHOD get_vat_percentage.
     ASSIGN it_vat_rates[ VatCode = iv_vat_code ] TO FIELD-SYMBOL(<ls_vat>).
     IF sy-subrc = 0.
       rv_percentage = <ls_vat>-percentage.
     ENDIF.
   ENDMETHOD.
-
 ENDCLASS.
-

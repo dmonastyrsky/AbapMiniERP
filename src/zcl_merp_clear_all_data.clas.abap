@@ -28,7 +28,7 @@ ENDCLASS.
 
 
 
-CLASS zcl_merp_clear_all_data IMPLEMENTATION.
+CLASS ZCL_MERP_CLEAR_ALL_DATA IMPLEMENTATION.
 
 
   METHOD if_oo_adt_classrun~main.

@@ -65,7 +65,44 @@ CLASS zcl_merp_stock_control DEFINITION
 ENDCLASS.
 
 
-CLASS zcl_merp_stock_control IMPLEMENTATION.
+
+CLASS ZCL_MERP_STOCK_CONTROL IMPLEMENTATION.
+
+
+  METHOD constructor.
+    mt_stock = NEW zcl_merp_stock_sel( )->zif_merp_stock_sel~read_balances( it_stock_keys ).
+  ENDMETHOD.
+
+
+  METHOD check_availability.
+    DATA(lt_stock_items) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_stock_items(
+      VALUE #( FOR line IN it_lines ( ItemCode = line-item_code ) ) ).
+
+    " The document is checked against a copy: only a covered document reduces the stock
+    DATA(lt_stock) = mt_stock.
+
+    LOOP AT it_lines REFERENCE INTO DATA(lr_line) WHERE quantity > 0.
+      IF NOT line_exists( lt_stock_items[ table_line = lr_line->item_code ] ).
+        CONTINUE.
+      ENDIF.
+
+      ASSIGN lt_stock[ CompanyCode   = iv_company_code
+                       WarehouseCode = iv_warehouse_code
+                       ItemCode      = lr_line->item_code
+                       UnitOfMeasure = lr_line->unit_of_measure ] TO FIELD-SYMBOL(<ls_stock>).
+
+      IF sy-subrc <> 0 OR <ls_stock>-Quantity < lr_line->quantity.
+        INSERT lr_line->item_uuid INTO TABLE rt_shortages.
+      ELSE.
+        <ls_stock>-Quantity -= lr_line->quantity.
+      ENDIF.
+    ENDLOOP.
+
+    IF rt_shortages IS INITIAL.
+      mt_stock = lt_stock.
+    ENDIF.
+  ENDMETHOD.
+
 
   METHOD lock_stock.
     DATA lt_keys TYPE tt_lock_failures.
@@ -110,40 +147,4 @@ CLASS zcl_merp_stock_control IMPLEMENTATION.
       ENDTRY.
     ENDLOOP.
   ENDMETHOD.
-
-
-  METHOD constructor.
-    mt_stock = NEW zcl_merp_stock_sel( )->zif_merp_stock_sel~read_balances( it_stock_keys ).
-  ENDMETHOD.
-
-
-  METHOD check_availability.
-    DATA(lt_stock_items) = NEW zcl_merp_md_item_sel( )->zif_merp_md_item_sel~read_stock_items(
-      VALUE #( FOR line IN it_lines ( ItemCode = line-item_code ) ) ).
-
-    " The document is checked against a copy: only a covered document reduces the stock
-    DATA(lt_stock) = mt_stock.
-
-    LOOP AT it_lines REFERENCE INTO DATA(lr_line) WHERE quantity > 0.
-      IF NOT line_exists( lt_stock_items[ table_line = lr_line->item_code ] ).
-        CONTINUE.
-      ENDIF.
-
-      ASSIGN lt_stock[ CompanyCode   = iv_company_code
-                       WarehouseCode = iv_warehouse_code
-                       ItemCode      = lr_line->item_code
-                       UnitOfMeasure = lr_line->unit_of_measure ] TO FIELD-SYMBOL(<ls_stock>).
-
-      IF sy-subrc <> 0 OR <ls_stock>-Quantity < lr_line->quantity.
-        INSERT lr_line->item_uuid INTO TABLE rt_shortages.
-      ELSE.
-        <ls_stock>-Quantity -= lr_line->quantity.
-      ENDIF.
-    ENDLOOP.
-
-    IF rt_shortages IS INITIAL.
-      mt_stock = lt_stock.
-    ENDIF.
-  ENDMETHOD.
-
 ENDCLASS.
