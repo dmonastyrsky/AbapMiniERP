@@ -237,22 +237,42 @@ CLASS lhc_zmerp_r_stocktransfer IMPLEMENTATION.
 
   " --- Actions ---
   METHOD postDocument.
-    DATA lt_update  TYPE TABLE FOR UPDATE zmerp_r_stocktransfer.
-    DATA lo_message TYPE REF TO zcx_merp_stock.
+    DATA lt_update      TYPE TABLE FOR UPDATE zmerp_r_stocktransfer.
+    DATA lo_message     TYPE REF TO zcx_merp_stock.
+    DATA lv_items_valid TYPE abap_bool.
 
     READ ENTITIES OF zmerp_r_stocktransfer IN LOCAL MODE
       ENTITY StockTransfer
-        FIELDS ( Status DocumentNumber )
+        FIELDS ( Status DocumentNumber CompanyCode )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_headers)
       ENTITY StockTransfer BY \_Items
-        FIELDS ( HeaderUUID )
+        FIELDS ( HeaderUUID ItemNo ItemCode Quantity UnitOfMeasure WarehouseCode ReceivingWarehouseCode )
         WITH CORRESPONDING #( keys )
         RESULT DATA(lt_items).
 
+    " Lock first, then read (as in SAP): the stock of both warehouses of each line stays locked
+    " until the end of the transaction
+    DATA(lt_stock_keys) = VALUE zif_merp_stock_sel=>tt_stock_keys(
+      FOR item IN lt_items
+      LET header = VALUE #( lt_headers[ DocumentUUID = item-HeaderUUID ] OPTIONAL ) IN
+      ( CompanyCode   = header-CompanyCode
+        WarehouseCode = item-WarehouseCode
+        ItemCode      = item-ItemCode
+        UnitOfMeasure = item-UnitOfMeasure )
+      ( CompanyCode   = header-CompanyCode
+        WarehouseCode = item-ReceivingWarehouseCode
+        ItemCode      = item-ItemCode
+        UnitOfMeasure = item-UnitOfMeasure ) ).
+
+    DATA(lt_lock_failures) = zcl_merp_stock_control=>lock_stock( lt_stock_keys ).
+    DATA(lo_stock)         = NEW zcl_merp_stock_control( lt_stock_keys ).
+
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       CLEAR lo_message.
+      lv_items_valid = abap_true.
 
+      " 1. Header checks
       IF zcl_merp_doc_st_lifecycle=>can_post( lr_header->Status ) = abap_false.
         lo_message = NEW #( textid   = zcx_merp_stock=>post_not_allowed
                             severity = if_abap_behv_message=>severity-error
@@ -262,18 +282,69 @@ CLASS lhc_zmerp_r_stocktransfer IMPLEMENTATION.
                             severity = if_abap_behv_message=>severity-error ).
       ENDIF.
 
-      IF lo_message IS BOUND.
+      " 2. The stock of an item in one of the warehouses is being posted by another user
+      IF lo_message IS NOT BOUND.
+        LOOP AT lt_lock_failures REFERENCE INTO DATA(lr_lock) WHERE company_code = lr_header->CompanyCode.
+          IF line_exists( lt_items[ HeaderUUID    = lr_header->DocumentUUID
+                                    ItemCode      = lr_lock->item_code
+                                    WarehouseCode = lr_lock->warehouse_code ] )
+             OR line_exists( lt_items[ HeaderUUID             = lr_header->DocumentUUID
+                                       ItemCode               = lr_lock->item_code
+                                       ReceivingWarehouseCode = lr_lock->warehouse_code ] ).
+            lo_message = NEW #( textid   = zcx_merp_stock=>stock_locked
+                                severity = if_abap_behv_message=>severity-error
+                                attr1    = CONV #( lr_lock->item_code )
+                                attr2    = CONV #( lr_lock->warehouse_code )
+                                attr3    = lr_lock->locked_by ).
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+      " 3. Availability in the issuing warehouse (ST3); a covered document takes its quantities
+      "    from the stock, so further documents of the request are checked against the rest
+      IF lo_message IS NOT BOUND.
+        DATA(lt_shortages) = lo_stock->check_availability(
+          iv_company_code = lr_header->CompanyCode
+          it_lines        = VALUE #( FOR item IN lt_items WHERE ( HeaderUUID = lr_header->DocumentUUID )
+                                     ( item_uuid       = item-ItemUUID
+                                       item_code       = item-ItemCode
+                                       warehouse_code  = item-WarehouseCode
+                                       quantity        = item-Quantity
+                                       unit_of_measure = item-UnitOfMeasure ) ) ).
+
+        LOOP AT lt_items REFERENCE INTO DATA(lr_item) WHERE HeaderUUID = lr_header->DocumentUUID.
+          IF line_exists( lt_shortages[ table_line = lr_item->ItemUUID ] ).
+            lv_items_valid = abap_false.
+            APPEND VALUE #( %tky              = lr_item->%tky
+                            %path             = VALUE #( StockTransfer-%is_draft    = lr_item->%is_draft
+                                                         StockTransfer-DocumentUUID = lr_item->HeaderUUID )
+                            %msg              = NEW zcx_merp_stock(
+                                                  textid   = zcx_merp_stock=>stock_would_be_negative
+                                                  severity = if_abap_behv_message=>severity-error
+                                                  attr1    = CONV #( lr_item->ItemNo )
+                                                  attr2    = CONV #( lr_item->ItemCode )
+                                                  attr3    = CONV #( lr_item->WarehouseCode ) )
+                            %element-Quantity = if_abap_behv=>mk-on ) TO reported-stocktransferitem.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+      IF lo_message IS BOUND OR lv_items_valid = abap_false.
         APPEND VALUE #( %tky        = lr_header->%tky
                         %fail-cause = if_abap_behv=>cause-conflict ) TO failed-stocktransfer.
-        APPEND VALUE #( %tky                 = lr_header->%tky
-                        %msg                 = lo_message
-                        %action-postDocument = if_abap_behv=>mk-on ) TO reported-stocktransfer.
+        IF lo_message IS BOUND.
+          APPEND VALUE #( %tky                 = lr_header->%tky
+                          %msg                 = lo_message
+                          %action-postDocument = if_abap_behv=>mk-on ) TO reported-stocktransfer.
+        ENDIF.
       ELSE.
         APPEND VALUE #( %tky   = lr_header->%tky
                         Status = zcl_merp_doc_st_lifecycle=>c_status_posted ) TO lt_update.
       ENDIF.
     ENDLOOP.
 
+    " 4. Stock transfers are posted (stock movements are written by the saver)
     IF lt_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_stocktransfer IN LOCAL MODE
         ENTITY StockTransfer
@@ -299,36 +370,109 @@ CLASS lhc_zmerp_r_stocktransfer IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD unpostDocument.
-    DATA lt_update  TYPE TABLE FOR UPDATE zmerp_r_stocktransfer.
-    DATA lo_message TYPE REF TO zcx_merp_stock.
+    DATA lt_update      TYPE TABLE FOR UPDATE zmerp_r_stocktransfer.
+    DATA lo_message     TYPE REF TO zcx_merp_stock.
+    DATA lv_items_valid TYPE abap_bool.
 
     READ ENTITIES OF zmerp_r_stocktransfer IN LOCAL MODE
       ENTITY StockTransfer
-      FIELDS ( Status DocumentNumber )
-      WITH CORRESPONDING #( keys )
-      RESULT DATA(lt_headers).
+        FIELDS ( Status DocumentNumber CompanyCode )
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(lt_headers)
+      ENTITY StockTransfer BY \_Items
+        FIELDS ( HeaderUUID ItemNo ItemCode Quantity UnitOfMeasure WarehouseCode ReceivingWarehouseCode )
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(lt_items).
+
+    " Lock first, then read: unposting takes the goods out of the receiving warehouse again
+    DATA(lt_stock_keys) = VALUE zif_merp_stock_sel=>tt_stock_keys(
+      FOR item IN lt_items
+      LET header = VALUE #( lt_headers[ DocumentUUID = item-HeaderUUID ] OPTIONAL ) IN
+      ( CompanyCode   = header-CompanyCode
+        WarehouseCode = item-WarehouseCode
+        ItemCode      = item-ItemCode
+        UnitOfMeasure = item-UnitOfMeasure )
+      ( CompanyCode   = header-CompanyCode
+        WarehouseCode = item-ReceivingWarehouseCode
+        ItemCode      = item-ItemCode
+        UnitOfMeasure = item-UnitOfMeasure ) ).
+
+    DATA(lt_lock_failures) = zcl_merp_stock_control=>lock_stock( lt_stock_keys ).
+    DATA(lo_stock)         = NEW zcl_merp_stock_control( lt_stock_keys ).
 
     LOOP AT lt_headers REFERENCE INTO DATA(lr_header).
       CLEAR lo_message.
+      lv_items_valid = abap_true.
 
+      " 1. Only posted documents can be unposted
       IF zcl_merp_doc_st_lifecycle=>can_unpost( lr_header->Status ) = abap_false.
         lo_message = NEW #( textid   = zcx_merp_stock=>unpost_not_allowed
                             severity = if_abap_behv_message=>severity-error
                             attr1    = CONV #( lr_header->DocumentNumber ) ).
       ENDIF.
 
-      IF lo_message IS BOUND.
+      " 2. The stock of an item in one of the warehouses is being posted by another user
+      IF lo_message IS NOT BOUND.
+        LOOP AT lt_lock_failures REFERENCE INTO DATA(lr_lock) WHERE company_code = lr_header->CompanyCode.
+          IF line_exists( lt_items[ HeaderUUID    = lr_header->DocumentUUID
+                                    ItemCode      = lr_lock->item_code
+                                    WarehouseCode = lr_lock->warehouse_code ] )
+             OR line_exists( lt_items[ HeaderUUID             = lr_header->DocumentUUID
+                                       ItemCode               = lr_lock->item_code
+                                       ReceivingWarehouseCode = lr_lock->warehouse_code ] ).
+            lo_message = NEW #( textid   = zcx_merp_stock=>stock_locked
+                                severity = if_abap_behv_message=>severity-error
+                                attr1    = CONV #( lr_lock->item_code )
+                                attr2    = CONV #( lr_lock->warehouse_code )
+                                attr3    = lr_lock->locked_by ).
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+      " 3. The receiving warehouse must not become negative (as GR20)
+      IF lo_message IS NOT BOUND.
+        DATA(lt_shortages) = lo_stock->check_availability(
+          iv_company_code = lr_header->CompanyCode
+          it_lines        = VALUE #( FOR item IN lt_items WHERE ( HeaderUUID = lr_header->DocumentUUID )
+                                     ( item_uuid       = item-ItemUUID
+                                       item_code       = item-ItemCode
+                                       warehouse_code  = item-ReceivingWarehouseCode
+                                       quantity        = item-Quantity
+                                       unit_of_measure = item-UnitOfMeasure ) ) ).
+
+        LOOP AT lt_items REFERENCE INTO DATA(lr_item) WHERE HeaderUUID = lr_header->DocumentUUID.
+          IF line_exists( lt_shortages[ table_line = lr_item->ItemUUID ] ).
+            lv_items_valid = abap_false.
+            APPEND VALUE #( %tky              = lr_item->%tky
+                            %path             = VALUE #( StockTransfer-%is_draft    = lr_item->%is_draft
+                                                         StockTransfer-DocumentUUID = lr_item->HeaderUUID )
+                            %msg              = NEW zcx_merp_stock(
+                                                  textid   = zcx_merp_stock=>stock_would_be_negative
+                                                  severity = if_abap_behv_message=>severity-error
+                                                  attr1    = CONV #( lr_item->ItemNo )
+                                                  attr2    = CONV #( lr_item->ItemCode )
+                                                  attr3    = CONV #( lr_item->ReceivingWarehouseCode ) )
+                            %element-Quantity = if_abap_behv=>mk-on ) TO reported-stocktransferitem.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+      IF lo_message IS BOUND OR lv_items_valid = abap_false.
         APPEND VALUE #( %tky        = lr_header->%tky
                         %fail-cause = if_abap_behv=>cause-conflict ) TO failed-stocktransfer.
-        APPEND VALUE #( %tky                   = lr_header->%tky
-                        %msg                   = lo_message
-                        %action-unpostDocument = if_abap_behv=>mk-on ) TO reported-stocktransfer.
+        IF lo_message IS BOUND.
+          APPEND VALUE #( %tky                   = lr_header->%tky
+                          %msg                   = lo_message
+                          %action-unpostDocument = if_abap_behv=>mk-on ) TO reported-stocktransfer.
+        ENDIF.
       ELSE.
         APPEND VALUE #( %tky   = lr_header->%tky
                         Status = zcl_merp_doc_st_lifecycle=>c_status_new ) TO lt_update.
       ENDIF.
     ENDLOOP.
 
+    " 4. Stock transfers return to 'New' (stock movements are removed by the saver)
     IF lt_update IS NOT INITIAL.
       MODIFY ENTITIES OF zmerp_r_stocktransfer IN LOCAL MODE
         ENTITY StockTransfer
@@ -1269,6 +1413,83 @@ CLASS lhc_zmerp_r_stocktransferitm IMPLEMENTATION.
         ) TO reported-stocktransferitem.
       ENDIF.
     ENDLOOP.
+  ENDMETHOD.
+
+ENDCLASS.
+
+"! Saver for Stock Transfer: writes the stock movements (issue in the issuing warehouse and receipt
+"! in the receiving warehouse at the same value) when a document is posted and removes them when it
+"! leaves the posted status.
+CLASS lsc_zmerp_r_stocktransfer DEFINITION INHERITING FROM cl_abap_behavior_saver.
+  PROTECTED SECTION.
+    CONSTANTS c_document_type TYPE zmerp_doc_type VALUE 'ST'.
+
+    METHODS save_modified REDEFINITION.
+ENDCLASS.
+
+CLASS lsc_zmerp_r_stocktransfer IMPLEMENTATION.
+
+  METHOD save_modified.
+    DATA lt_changed   TYPE zcl_merp_stock_posting=>tt_document_keys.
+    DATA lt_posted    TYPE TABLE FOR READ IMPORT zmerp_r_stocktransfer.
+    DATA lt_movements TYPE zcl_merp_stock_posting=>tt_movements.
+
+    LOOP AT update-stocktransfer REFERENCE INTO DATA(lr_header)
+         WHERE %control-Status = if_abap_behv=>mk-on.
+
+      " Any status change first removes the movements of the document ...
+      APPEND VALUE #( document_uuid = lr_header->DocumentUUID ) TO lt_changed.
+
+      " ... and posted documents get new movements
+      IF zcl_merp_doc_st_lifecycle=>is_posted( lr_header->Status ) = abap_true.
+        APPEND VALUE #( %key = lr_header->%key ) TO lt_posted.
+      ENDIF.
+    ENDLOOP.
+
+    zcl_merp_stock_posting=>delete_document_movements( lt_changed ).
+
+    IF lt_posted IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    READ ENTITIES OF zmerp_r_stocktransfer IN LOCAL MODE
+      ENTITY StockTransfer
+        FIELDS ( CompanyCode PostingDate )
+        WITH lt_posted
+        RESULT DATA(lt_headers)
+      ENTITY StockTransfer BY \_Items
+        FIELDS ( HeaderUUID ItemCode Quantity UnitOfMeasure WarehouseCode ReceivingWarehouseCode )
+        WITH CORRESPONDING #( lt_posted )
+        RESULT DATA(lt_items).
+
+    " Stock is kept in the company currency
+    DATA(lt_companies) = NEW zcl_merp_md_comp_code_sel( )->zif_merp_md_comp_code_sel~read_companies(
+      VALUE #( FOR header IN lt_headers ( CompanyCode = header-CompanyCode ) ) ).
+
+    " One issue per line with the receiving warehouse: the stock posting values it at moving average
+    " cost of the issuing warehouse and adds the receipt in the receiving warehouse (ST2)
+    LOOP AT lt_items REFERENCE INTO DATA(lr_item).
+      ASSIGN lt_headers[ DocumentUUID = lr_item->HeaderUUID ] TO FIELD-SYMBOL(<ls_header>).
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+
+      APPEND VALUE #(
+        document_uuid            = lr_item->HeaderUUID
+        document_item_uuid       = lr_item->ItemUUID
+        company_code             = <ls_header>-CompanyCode
+        warehouse_code           = lr_item->WarehouseCode
+        receiving_warehouse_code = lr_item->ReceivingWarehouseCode
+        item_code                = lr_item->ItemCode
+        quantity                 = - lr_item->Quantity
+        unit_of_measure          = lr_item->UnitOfMeasure
+        currency_code            = VALUE #( lt_companies[ CompanyCode = <ls_header>-CompanyCode ]-CurrencyCode OPTIONAL )
+        posting_date             = <ls_header>-PostingDate
+      ) TO lt_movements.
+    ENDLOOP.
+
+    zcl_merp_stock_posting=>insert_movements( iv_document_type = c_document_type
+                                              it_movements     = lt_movements ).
   ENDMETHOD.
 
 ENDCLASS.
