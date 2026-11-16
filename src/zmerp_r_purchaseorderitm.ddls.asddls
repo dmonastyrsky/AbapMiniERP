@@ -25,6 +25,8 @@ define view entity ZMERP_R_PURCHASEORDERITM
 
       @ObjectModel.foreignKey.association: '_UnitOfMeasure'
       unit_of_measure       as UnitOfMeasure,
+      
+      warehouse_code        as WarehouseCode,
 
       /* zmerp_s_doc_itm_commercial */
       @ObjectModel.foreignKey.association: '_Currency'

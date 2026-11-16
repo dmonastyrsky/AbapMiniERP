@@ -24,6 +24,7 @@ CLASS zcl_merp_doc_item_logic DEFINITION
              ItemCode            TYPE zmerp_item_code,
              Quantity            TYPE zmerp_quantity,
              UnitOfMeasure       TYPE zmerp_unit,
+             WarehouseCode       TYPE zmerp_warehouse_code,
              CurrencyCode        TYPE zmerp_currency_code,
              Price               TYPE zmerp_price,
              NetAmount           TYPE zmerp_net_amount,
@@ -41,13 +42,14 @@ CLASS zcl_merp_doc_item_logic DEFINITION
            END OF ty_header_key,
            tt_header_keys TYPE STANDARD TABLE OF ty_header_key WITH EMPTY KEY.
 
-    "! Currency of a document header
-    TYPES: BEGIN OF ty_header_currency,
-             HeaderUUID   TYPE sysuuid_x16,
-             IsDraft      TYPE abp_behv_flag,
-             CurrencyCode TYPE zmerp_currency_code,
-           END OF ty_header_currency,
-           tt_header_currencies TYPE STANDARD TABLE OF ty_header_currency WITH EMPTY KEY.
+    "! Header values that new items take over as defaults (currency, warehouse)
+    TYPES: BEGIN OF ty_header_defaults,
+             HeaderUUID    TYPE sysuuid_x16,
+             IsDraft       TYPE abp_behv_flag,
+             CurrencyCode  TYPE zmerp_currency_code,
+             WarehouseCode TYPE zmerp_warehouse_code,
+           END OF ty_header_defaults,
+           tt_header_defaults TYPE STANDARD TABLE OF ty_header_defaults WITH EMPTY KEY.
 
     "! Calculated totals of a document header
     TYPES: BEGIN OF ty_header_totals,
@@ -78,16 +80,17 @@ CLASS zcl_merp_doc_item_logic DEFINITION
       IMPORTING it_items          TYPE tt_items
       RETURNING VALUE(rt_changed) TYPE tt_items.
 
-    "! Derives item defaults: next item number, item currency from the header, UoM and VAT code from the item master data
-    "! @parameter it_items             | Items to be processed (HeaderUUID, ItemNo, ItemCode, UnitOfMeasure, VatCode, CurrencyCode)
-    "! @parameter it_siblings          | ALL items of the affected documents (HeaderUUID, ItemNo) to find the highest used item number
-    "! @parameter it_header_currencies | Currencies of the parent documents
-    "! @parameter rt_changed           | Only the items where at least one default was set (with the new values)
+    "! Derives item defaults: next item number, item currency and warehouse from the header,
+    "! UoM and VAT code from the item master data
+    "! @parameter it_items           | Items to be processed (HeaderUUID, ItemNo, ItemCode, UnitOfMeasure, VatCode, CurrencyCode, WarehouseCode)
+    "! @parameter it_siblings        | ALL items of the affected documents (HeaderUUID, ItemNo) to find the highest used item number
+    "! @parameter it_header_defaults | Currency and warehouse of the parent documents
+    "! @parameter rt_changed         | Only the items where at least one default was set (with the new values)
     METHODS set_defaults
-      IMPORTING it_items             TYPE tt_items
-                it_siblings          TYPE tt_items
-                it_header_currencies TYPE tt_header_currencies
-      RETURNING VALUE(rt_changed)    TYPE tt_items.
+      IMPORTING it_items           TYPE tt_items
+                it_siblings        TYPE tt_items
+                it_header_defaults TYPE tt_header_defaults
+      RETURNING VALUE(rt_changed)  TYPE tt_items.
 
     "! Sums up item amounts into header totals
     "! @parameter it_header_keys | Documents to be recalculated (also documents that no longer have any items)
@@ -250,12 +253,17 @@ CLASS ZCL_MERP_DOC_ITEM_LOGIC IMPLEMENTATION.
         ENDIF.
       ENDIF.
 
-      " Item currency follows the document currency (only if not yet set)
-      IF ls_item-CurrencyCode IS INITIAL.
-        ASSIGN it_header_currencies[ HeaderUUID = ls_item-HeaderUUID
-                                     IsDraft    = ls_item-IsDraft ] TO FIELD-SYMBOL(<ls_header>).
-        IF sy-subrc = 0.
+      " Item currency and warehouse follow the document (only if not yet set, as default values;
+      " later header changes are passed on by the syncItemCurrency / syncItemWarehouse determinations)
+      ASSIGN it_header_defaults[ HeaderUUID = ls_item-HeaderUUID
+                                 IsDraft    = ls_item-IsDraft ] TO FIELD-SYMBOL(<ls_header>).
+      IF sy-subrc = 0.
+        IF ls_item-CurrencyCode IS INITIAL.
           ls_item-CurrencyCode = <ls_header>-CurrencyCode.
+        ENDIF.
+
+        IF ls_item-WarehouseCode IS INITIAL.
+          ls_item-WarehouseCode = <ls_header>-WarehouseCode.
         ENDIF.
       ENDIF.
 

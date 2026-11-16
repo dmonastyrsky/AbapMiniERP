@@ -14,6 +14,7 @@ CLASS zcl_merp_stock_control DEFINITION
     TYPES: BEGIN OF ty_line,
              item_uuid       TYPE sysuuid_x16,
              item_code       TYPE zmerp_item_code,
+             warehouse_code  TYPE zmerp_warehouse_code,
              quantity        TYPE zmerp_quantity,
              unit_of_measure TYPE zmerp_unit,
            END OF ty_line,
@@ -47,13 +48,11 @@ CLASS zcl_merp_stock_control DEFINITION
     "! Checks that the stock covers the lines of one document. Several lines of one item and several
     "! documents are checked one after another: a document without shortages takes its quantities
     "! from the stock, so the next document is checked against the rest.
-    "! @parameter iv_company_code   | Company of the document
-    "! @parameter iv_warehouse_code | Warehouse of the document
-    "! @parameter it_lines          | Lines that take goods out of the stock (services are ignored)
-    "! @parameter rt_shortages      | Lines without enough stock (empty = the document is covered)
+    "! @parameter iv_company_code | Company of the document
+    "! @parameter it_lines        | Lines that take goods out of the stock, each in its warehouse (services are ignored)
+    "! @parameter rt_shortages    | Lines without enough stock (empty = the document is covered)
     METHODS check_availability
       IMPORTING iv_company_code     TYPE zmerp_company_code
-                iv_warehouse_code   TYPE zmerp_warehouse_code
                 it_lines            TYPE tt_lines
       RETURNING VALUE(rt_shortages) TYPE tt_item_uuids.
 
@@ -86,8 +85,9 @@ CLASS ZCL_MERP_STOCK_CONTROL IMPLEMENTATION.
         CONTINUE.
       ENDIF.
 
+      " Stock of the warehouse of the line
       ASSIGN lt_stock[ CompanyCode   = iv_company_code
-                       WarehouseCode = iv_warehouse_code
+                       WarehouseCode = lr_line->warehouse_code
                        ItemCode      = lr_line->item_code
                        UnitOfMeasure = lr_line->unit_of_measure ] TO FIELD-SYMBOL(<ls_stock>).
 
