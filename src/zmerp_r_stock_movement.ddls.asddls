@@ -31,7 +31,6 @@ define root view entity ZMERP_R_STOCK_MOVEMENT
       document_type   as DocumentType,
       document_uuid   as DocumentUUID,
 
-      // A movement belongs either to a goods receipt or to a goods issue
       @EndUserText.label: 'Document'
       coalesce( coalesce( _GoodsReceipt.DocumentNumber, _GoodsIssue.DocumentNumber ), _StockTransfer.DocumentNumber ) as DocumentNumber,
 

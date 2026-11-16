@@ -1549,6 +1549,9 @@ CLASS lhc_zmerp_r_goodsreceiptitm DEFINITION INHERITING FROM cl_abap_behavior_ha
     " and consumed (and cleared) by calcHeaderTotals within the same request
     CLASS-DATA gt_deleted_headers TYPE STANDARD TABLE OF ty_header_key WITH EMPTY KEY.
 
+    " Static buffer: parents of the items being deleted, consumed (and cleared) by handleMessagesOnItemModify
+    CLASS-DATA gt_deleted_dup_headers TYPE STANDARD TABLE OF ty_header_key WITH EMPTY KEY.
+
     " --- Access and state ---
     "! Items copied from a purchase order: item code, price and VAT code are fixed by the order, only quantity can change.
     METHODS get_instance_features FOR INSTANCE FEATURES
@@ -1651,11 +1654,14 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_items).
 
-    " Parents of the deleted items, for calcHeaderTotals
+    " Parents of the deleted items, for calcHeaderTotals and for the duplicate check
     gt_deleted_headers = VALUE #( BASE gt_deleted_headers
       FOR item IN lt_items ( document_uuid = item-HeaderUUID
                              is_draft      = item-%is_draft ) ).
 
+    gt_deleted_dup_headers = VALUE #( BASE gt_deleted_dup_headers
+      FOR item IN lt_items ( document_uuid = item-HeaderUUID
+                             is_draft      = item-%is_draft ) ).
   ENDMETHOD.
 
   " --- Actions ---
@@ -2181,27 +2187,32 @@ CLASS lhc_zmerp_r_goodsreceiptitm IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD handleMessagesOnItemModify.
+    DATA lt_header_keys TYPE TABLE FOR READ IMPORT zmerp_r_goodsreceipt.
+
+    " Documents of the changed items; deleted items cannot be read, their documents come from precheck_delete
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceiptItem
-      FIELDS ( HeaderUUID ItemCode )
+      FIELDS ( HeaderUUID )
       WITH CORRESPONDING #( keys )
       RESULT DATA(lt_items).
 
-    IF lt_items IS INITIAL.
+    lt_header_keys = VALUE #(
+      FOR item IN lt_items ( %tky-DocumentUUID = item-HeaderUUID
+                             %is_draft         = item-%is_draft ) ).
+
+    lt_header_keys = VALUE #( BASE lt_header_keys
+      FOR deleted IN gt_deleted_dup_headers ( %tky-DocumentUUID = deleted-document_uuid
+                                              %is_draft         = deleted-is_draft ) ).
+    CLEAR gt_deleted_dup_headers.
+
+    SORT lt_header_keys BY DocumentUUID %is_draft.
+    DELETE ADJACENT DUPLICATES FROM lt_header_keys COMPARING DocumentUUID %is_draft.
+
+    IF lt_header_keys IS INITIAL.
       RETURN.
     ENDIF.
 
-    DATA lt_header_keys TYPE TABLE FOR READ IMPORT zmerp_r_goodsreceipt.
-
-    " Documents of the changed items
-    lt_header_keys = VALUE #(
-      FOR GROUPS of <g> IN lt_items GROUP BY ( HeaderUUID = <g>-HeaderUUID
-                                               is_draft   = <g>-%is_draft )
-      ( %tky-DocumentUUID = <g>-HeaderUUID
-        %is_draft         = <g>-%is_draft )
-    ).
-
-    " All items of these documents: a changed item can create or remove a duplicate on another item
+    " All items of these documents: a changed or deleted item can create or remove a duplicate on another item
     READ ENTITIES OF zmerp_r_goodsreceipt IN LOCAL MODE
       ENTITY GoodsReceipt BY \_Items
       FIELDS ( HeaderUUID ItemCode PoItemReferenceUUID )

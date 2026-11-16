@@ -116,7 +116,7 @@ authorization dependent by _GoodsIssue
   determination calcHeaderTotals         on modify { create; update; delete; field NetAmount, GrossAmount; }
 
   determination clearMessagesForItemFields on modify { field Quantity, Price, UnitOfMeasure, VatCode; }
-  determination handleMessagesOnItemModify on modify { field ItemCode; }
+  determination handleMessagesOnItemModify on modify { delete; field ItemCode; }
 
   validation validateItemFields on save { create; update; field ItemCode, Quantity, Price, VatCode; }
 
