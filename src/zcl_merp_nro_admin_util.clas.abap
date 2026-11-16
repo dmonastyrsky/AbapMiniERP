@@ -168,6 +168,7 @@ CLASS ZCL_MERP_NRO_ADMIN_UTIL IMPLEMENTATION.
       ( CONV string( zif_merp_constants=>c_gr-number_object ) )
       ( CONV string( zif_merp_constants=>c_so-number_object ) )
       ( CONV string( zif_merp_constants=>c_gi-number_object ) )
+      ( CONV string( zif_merp_constants=>c_st-number_object ) )
     ).
   ENDMETHOD.
 

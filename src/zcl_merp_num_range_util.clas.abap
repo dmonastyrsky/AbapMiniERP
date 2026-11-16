@@ -39,7 +39,7 @@ CLASS zcl_merp_num_range_util DEFINITION
     "! Draws document numbers via NRO: one bulk call per company code, numbers in the order of the documents.
     "! Documents of a company whose numbers cannot be drawn get none (no fallback, N1): the caller's
     "! validation rejects them.
-    "! @parameter is_meta      | NRO metadata of the document type (zif_merp_constants=>c_po, c_gr, c_so, c_gi)
+    "! @parameter is_meta      | NRO metadata of the document type (zif_merp_constants=>c_po, c_gr, c_so, c_gi, c_st)
     "! @parameter it_requests  | Documents without a number, with company code
     "! @parameter rt_numbers   | Drawn numbers (documents without a number are missing)
     CLASS-METHODS get_doc_numbers
@@ -275,7 +275,8 @@ CLASS ZCL_MERP_NUM_RANGE_UTIL IMPLEMENTATION.
     DATA(lt_metas) = VALUE tt_metas( ( zif_merp_constants=>c_po )
                                      ( zif_merp_constants=>c_gr )
                                      ( zif_merp_constants=>c_so )
-                                     ( zif_merp_constants=>c_gi ) ).
+                                     ( zif_merp_constants=>c_gi )
+                                     ( zif_merp_constants=>c_st ) ).
 
     " All companies, also blocked ones: their documents still exist and keep their numbering
     SELECT company_code
