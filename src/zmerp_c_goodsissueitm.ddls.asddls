@@ -43,9 +43,9 @@ define view entity ZMERP_C_GOODSISSUEITM
       // Empty for lines added manually (without sales order item reference)
       _SoProgress.SoDocumentNumber as SoDocumentNumber,
 
-      // Current stock of the item in the warehouse of the document (ST1)
+      // Current stock of the item in the warehouse of the line, also in unsaved drafts (ST1)
       @Semantics.quantity.unitOfMeasure: 'UnitOfMeasure'
-      _Stock.StockQuantity as StockQuantity,
+      _Stock.Quantity as StockQuantity,
 
       /* zmerp_s_admin */
       CreatedBy,
