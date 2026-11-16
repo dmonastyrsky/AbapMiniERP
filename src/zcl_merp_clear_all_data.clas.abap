@@ -46,10 +46,21 @@ CLASS ZCL_MERP_CLEAR_ALL_DATA IMPLEMENTATION.
     " ------------------------------------------------------------------
     " 1. Documents (child tables first) and stock movements
     " ------------------------------------------------------------------
-
     clear_entity(
       iv_label      = 'Stock Movements'
       iv_active_tab = CONV tabname( zif_merp_constants=>c_stock_mov-table_db )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Stock Transfer Items'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_st_itm-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_st_itm-table_draft )
+      out           = out ).
+
+    clear_entity(
+      iv_label      = 'Stock Transfer Header'
+      iv_active_tab = CONV tabname( zif_merp_constants=>c_st-table_db )
+      iv_draft_tab  = CONV tabname( zif_merp_constants=>c_st-table_draft )
       out           = out ).
 
     clear_entity(
@@ -88,7 +99,7 @@ CLASS ZCL_MERP_CLEAR_ALL_DATA IMPLEMENTATION.
       iv_draft_tab  = CONV tabname( zif_merp_constants=>c_po-table_draft )
       out           = out ).
 
-     clear_entity(
+    clear_entity(
       iv_label      = 'Sales Order Items'
       iv_active_tab = CONV tabname( zif_merp_constants=>c_so_itm-table_db )
       iv_draft_tab  = CONV tabname( zif_merp_constants=>c_so_itm-table_draft )
@@ -105,7 +116,6 @@ CLASS ZCL_MERP_CLEAR_ALL_DATA IMPLEMENTATION.
     "    so they are reset while the company codes still exist
     " ------------------------------------------------------------------
     zcl_merp_nro_admin_util=>reset_doc_intervals( ).
-
     IF out IS BOUND.
       out->write( '[Number Ranges]: Document intervals reset.' ).
     ENDIF.

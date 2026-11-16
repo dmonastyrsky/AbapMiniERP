@@ -84,6 +84,19 @@ CLASS zcl_merp_initial_setup DEFINITION
              lines       TYPE tt_lines,
            END OF ty_gi.
 
+    "! Stock transfer definition (master data by seed order, dates relative to today)
+    TYPES: BEGIN OF ty_st,
+             company_no             TYPE i,
+             warehouse_no           TYPE i,
+             receiving_warehouse_no TYPE i,
+             days_ago               TYPE i,
+             responsible            TYPE zmerp_resp_person,
+             remarks                TYPE zmerp_remarks,
+             post                   TYPE abap_bool,
+             cancel                 TYPE abap_bool,
+             lines                  TYPE tt_lines,
+           END OF ty_st.
+
     TYPES: BEGIN OF ty_quantity,
              item_code TYPE zmerp_item_code,
              quantity  TYPE zmerp_quantity,
@@ -190,6 +203,12 @@ CLASS zcl_merp_initial_setup DEFINITION
         is_codes TYPE ty_codes
         out      TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
+    "! Creates the stock transfers of company 3000 (and the receipt they need in the receiving warehouse).
+    CLASS-METHODS setup_transfer_documents
+      IMPORTING
+        is_codes TYPE ty_codes
+        out      TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
     "! Creates a purchase order via EML and optionally releases it.
     "! @parameter is_po      | Purchase order definition
     "! @parameter rv_po_uuid | Key of the created purchase order (initial if it failed)
@@ -230,6 +249,14 @@ CLASS zcl_merp_initial_setup DEFINITION
         is_gi    TYPE ty_gi
         out      TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
 
+    "! Creates a stock transfer via EML and optionally posts or cancels it.
+    "! @parameter is_st | Stock transfer definition
+    CLASS-METHODS create_stock_transfer
+      IMPORTING
+        is_codes TYPE ty_codes
+        is_st    TYPE ty_st
+        out      TYPE REF TO if_oo_adt_classrun_out OPTIONAL .
+
 ENDCLASS.
 
 
@@ -238,11 +265,11 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
 
 
   METHOD setup_documents.
-    " Purchasing first: the sales documents are issued from the stock of the goods receipts
+    " Purchasing first: the sales documents and the stock transfers use the stock of the goods receipts
     setup_purchase_documents( is_codes = is_codes out = out ).
     setup_sales_documents( is_codes = is_codes out = out ).
+    setup_transfer_documents( is_codes = is_codes out = out ).
   ENDMETHOD.
-
 
   METHOD if_oo_adt_classrun~main.
     execute( out ).
@@ -353,6 +380,106 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
                out     = out ).
   ENDMETHOD.
 
+    METHOD create_stock_transfer.
+    DATA(lv_date)         = CONV d( cl_abap_context_info=>get_system_date( ) - is_st-days_ago ).
+    DATA(lv_company_code) = get_code( it_codes = is_codes-companies iv_no = is_st-company_no ).
+
+    " 1. Header and items: item numbers, units and the warehouses of the lines are derived by the stock transfer logic
+    MODIFY ENTITIES OF zmerp_r_stocktransfer
+      ENTITY StockTransfer
+        CREATE FIELDS ( CompanyCode WarehouseCode ReceivingWarehouseCode DocumentDate PostingDate
+                        ResponsiblePerson Remarks )
+        WITH VALUE #( ( %cid                   = 'ST'
+                        CompanyCode            = lv_company_code
+                        WarehouseCode          = get_code( it_codes = is_codes-warehouses iv_no = is_st-warehouse_no )
+                        ReceivingWarehouseCode = get_code( it_codes = is_codes-warehouses iv_no = is_st-receiving_warehouse_no )
+                        DocumentDate           = lv_date
+                        PostingDate            = lv_date
+                        ResponsiblePerson      = is_st-responsible
+                        Remarks                = is_st-remarks ) )
+        CREATE BY \_Items
+        FIELDS ( ItemCode Quantity )
+        WITH VALUE #( ( %cid_ref = 'ST'
+                        %target  = VALUE #( FOR st_line IN is_st-lines INDEX INTO lv_index
+                                            ( %cid     = |ST_ITEM_{ lv_index }|
+                                              ItemCode = get_code( it_codes = is_codes-items iv_no = st_line-item_no )
+                                              Quantity = st_line-quantity ) ) ) )
+      MAPPED DATA(ls_mapped).
+
+    DATA(lv_st_uuid) = VALUE #( ls_mapped-stocktransfer[ 1 ]-DocumentUUID OPTIONAL ).
+
+    COMMIT ENTITIES RESPONSE OF zmerp_r_stocktransfer
+      FAILED DATA(ls_save_failed)
+      REPORTED DATA(ls_save_reported).
+
+    IF ls_save_failed IS NOT INITIAL OR lv_st_uuid IS INITIAL.
+      write_failure(
+        iv_text     = |[Stock Transfer]: Creation for company { lv_company_code } failed:|
+        it_messages = VALUE #( BASE VALUE #( FOR save_hdr IN ls_save_reported-stocktransfer ( save_hdr-%msg ) )
+                               FOR save_itm IN ls_save_reported-stocktransferitem ( save_itm-%msg ) )
+        out         = out ).
+      ROLLBACK ENTITIES.
+      RETURN.
+    ENDIF.
+
+    " 2. Posting: the stock movements follow the stock transfer logic
+    IF is_st-post = abap_true.
+      MODIFY ENTITIES OF zmerp_r_stocktransfer
+        ENTITY StockTransfer
+        EXECUTE postDocument
+        FROM VALUE #( ( DocumentUUID = lv_st_uuid ) )
+        FAILED DATA(ls_post_failed)
+        REPORTED DATA(ls_post_reported).
+
+      IF ls_post_failed IS INITIAL.
+        COMMIT ENTITIES RESPONSE OF zmerp_r_stocktransfer
+          FAILED DATA(ls_post_commit_failed)
+          REPORTED DATA(ls_post_commit_reported).
+      ENDIF.
+
+      IF ls_post_failed IS NOT INITIAL OR ls_post_commit_failed IS NOT INITIAL.
+        write_failure(
+          iv_text     = '[Stock Transfer]: Posting failed:'
+          it_messages = VALUE #( BASE VALUE #( BASE VALUE #( FOR post_hdr IN ls_post_reported-stocktransfer ( post_hdr-%msg ) )
+                                               FOR post_itm IN ls_post_reported-stocktransferitem ( post_itm-%msg ) )
+                                 FOR com_hdr IN ls_post_commit_reported-stocktransfer ( com_hdr-%msg ) )
+          out         = out ).
+        ROLLBACK ENTITIES.
+      ENDIF.
+    ENDIF.
+
+    " 3. Cancellation ('New' -> 'Cancelled')
+    IF is_st-cancel = abap_true.
+      MODIFY ENTITIES OF zmerp_r_stocktransfer
+        ENTITY StockTransfer
+        EXECUTE cancelDocument
+        FROM VALUE #( ( DocumentUUID = lv_st_uuid ) )
+        FAILED DATA(ls_cancel_failed)
+        REPORTED DATA(ls_cancel_reported).
+
+      IF ls_cancel_failed IS INITIAL.
+        COMMIT ENTITIES RESPONSE OF zmerp_r_stocktransfer
+          FAILED DATA(ls_cancel_commit_failed)
+          REPORTED DATA(ls_cancel_commit_reported).
+      ENDIF.
+
+      IF ls_cancel_failed IS NOT INITIAL OR ls_cancel_commit_failed IS NOT INITIAL.
+        write_failure(
+          iv_text     = '[Stock Transfer]: Cancellation failed:'
+          it_messages = VALUE #( BASE VALUE #( FOR can_hdr IN ls_cancel_reported-stocktransfer ( can_hdr-%msg ) )
+                                 FOR com_hdr IN ls_cancel_commit_reported-stocktransfer ( com_hdr-%msg ) )
+          out         = out ).
+        ROLLBACK ENTITIES.
+      ENDIF.
+    ENDIF.
+
+    SELECT SINGLE document_number, status
+      FROM zmerp_st_hdr
+      WHERE document_uuid = @lv_st_uuid
+      INTO @DATA(ls_st).
+
+    write_log( iv_text = |[Stock Transfer]: { ls_st-document_number } created, status { ls_st-status }.| out = out ).
+  ENDMETHOD.
 
   METHOD setup_sales_documents.
     " Readable amounts as in purchasing: every line net amount is a multiple of 100, so VAT and gross
@@ -515,6 +642,69 @@ CLASS ZCL_MERP_INITIAL_SETUP IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+  METHOD setup_transfer_documents.
+    " Company 3000: Hauptlager Kusel holds the TVs of PO 7 at 599.99. Lager Kaiserslautern first receives
+    " one TV at 700.00 (PO 10), so the transfer changes its moving average cost (ST2):
+    "   ST 1: 1 TV Kusel -> Kaiserslautern at 599.99 -> Kaiserslautern 2 TVs for 1299.99 -> 'Posted'
+    "   ST 2: 1 TV stays 'New' for a live demo; ST 3: 1 HDMI cable -> 'Cancelled'
+    DATA(lv_po10) = create_purchase_order(
+      is_po = VALUE #( company_no   = 3      warehouse_no = 10 partner_no = 4
+                       days_ago     = 2      delivery_in  = 1
+                       responsible  = 'WEBER_J'
+                       remarks      = 'TV for Kaiserslautern'
+                       release      = abap_true
+                       lines        = VALUE #( ( item_no = 7 quantity = 1 price = '700.00' ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    create_goods_receipt(
+      is_gr = VALUE #( po_uuid     = lv_po10
+                       days_ago    = 1
+                       responsible = 'WEBER_J'
+                       remarks     = 'Complete delivery'
+                       post        = abap_true )
+      is_codes = is_codes
+      out      = out ).
+
+    create_stock_transfer(
+      is_st = VALUE #( company_no = 3 warehouse_no = 9 receiving_warehouse_no = 10
+                       days_ago    = 0
+                       responsible = 'WEBER_J'
+                       remarks     = 'TV for the showroom in Kaiserslautern'
+                       post        = abap_true
+                       lines       = VALUE #( ( item_no = 7 quantity = 1 ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    create_stock_transfer(
+      is_st = VALUE #( company_no = 3 warehouse_no = 9 receiving_warehouse_no = 10
+                       days_ago    = 0
+                       responsible = 'WEBER_J'
+                       remarks     = 'Second TV, waiting for posting'
+                       lines       = VALUE #( ( item_no = 7 quantity = 1 ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    create_stock_transfer(
+      is_st = VALUE #( company_no = 3 warehouse_no = 9 receiving_warehouse_no = 10
+                       days_ago    = 0
+                       responsible = 'WEBER_J'
+                       remarks     = 'Cable not needed any more'
+                       cancel      = abap_true
+                       lines       = VALUE #( ( item_no = 10 quantity = 1 ) ) )
+      is_codes = is_codes
+      out      = out ).
+
+    SELECT document_number, status
+      FROM zmerp_st_hdr
+      ORDER BY document_number
+      INTO TABLE @DATA(lt_st_status).
+
+    write_log( iv_text = '[Summary] Stock transfer statuses:' out = out ).
+    LOOP AT lt_st_status REFERENCE INTO DATA(lr_st_status).
+      write_log( iv_text = |    { lr_st_status->document_number }: { lr_st_status->status }| out = out ).
+    ENDLOOP.
+  ENDMETHOD.
 
   METHOD create_business_partners.
     TYPES tt_create TYPE TABLE FOR CREATE zmerp_r_bus_partner.
