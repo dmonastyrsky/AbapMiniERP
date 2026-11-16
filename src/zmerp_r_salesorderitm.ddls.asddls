@@ -14,7 +14,7 @@ define view entity ZMERP_R_SALESORDERITM
   key item_uuid             as ItemUUID,
       header_uuid           as HeaderUUID,
 
-      /* zmerp_s_doc_itm_common */
+      /* zmerp_s_doc_itm_base */
       item_no               as ItemNo,
 
       @ObjectModel.foreignKey.association: '_Item'
@@ -26,6 +26,7 @@ define view entity ZMERP_R_SALESORDERITM
       @ObjectModel.foreignKey.association: '_UnitOfMeasure'
       unit_of_measure       as UnitOfMeasure,
 
+      /* zmerp_s_doc_itm_commercial */
       @ObjectModel.foreignKey.association: '_Currency'
       currency_code         as CurrencyCode,
 

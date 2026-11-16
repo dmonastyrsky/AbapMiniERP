@@ -10,7 +10,7 @@ CLASS zcl_merp_doc_item_logic DEFINITION
     "! Step between two item numbers within a document
     CONSTANTS c_item_no_step TYPE i VALUE 10.
 
-    "! Item data in the shape of the common item structure ZMERP_S_DOC_ITM_COMMON.
+    "! Item data in the shape of the item structures ZMERP_S_DOC_ITM_BASE and ZMERP_S_DOC_ITM_COMMERCIAL.
     "! Component names match the fields of the document item entities, so the caller can fill it with
     "! CORRESPONDING (IsDraft is the only technical field: pass-through of %is_draft, needed to map results back).
     "! Only the fields read by the caller are filled, all other components stay initial.
